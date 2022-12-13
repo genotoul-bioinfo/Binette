@@ -20,7 +20,7 @@ import cds
 import diamond
 import bin_quality
 from checkm2 import modelPostprocessing
-
+from pprint import pprint
 
 # import pkg_resources
 
@@ -76,11 +76,17 @@ def infer_bin_name_from_bin_dir(bin_dirs):
 
 def write_bin_info(bins, output):
 
-    header = ['origin', "name", 'contig_count', 'size']
+    header = ['origin', "name", 'completeness', 'contamination', "score", 'size', 'contig_count',  'contigs']
     with open(output, "w") as fl:
         fl.write('\t'.join(header)+"\n")
         for bin_obj in bins:
-            fl.write(f'{bin_obj.origin}\t{bin_obj.name}\t{len(bin_obj.contigs)}\t{bin_obj.length}\n')
+
+            line = [bin_obj.origin, bin_obj.name,
+                    bin_obj.completeness, bin_obj.contamination, bin_obj.score, 
+                     len(bin_obj.contigs), bin_obj.length,
+                     ";".join(bin_obj.contigs)]
+
+            fl.write("\t".join((str(e) for e in line)) + '\n')
 
 def check_contig_consistency(contigs_from_assembly, contigs_from_elsewhere, assembly_file, elsewhere_file):
     are_contigs_consistent = len(set(contigs_from_elsewhere) | set(contigs_from_assembly)) <= len(set(contigs_from_assembly))
@@ -133,32 +139,27 @@ def main():
 
     bin_name_to_bins = bin_manager.parse_bin_directories(bin_name_to_bin_dir)
 
-    bins = bin_name_to_bins['concoct']
-
     logging.info('Assess bin quality of input bins')
     postProcessor = modelPostprocessing.modelProcessor(threads)
-    # postProcessor = None
-    for bin_set_id, bins in bin_name_to_bins.items():
-        logging.info(bin_set_id)
-        bin_quality.assess_bins_quality(bins, contig_to_kegg_counter, contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length, postProcessor=postProcessor,  threads=threads)
 
+    # # postProcessor = None
+    # for bin_set_id, bins in bin_name_to_bins.items():
+    #     logging.info(bin_set_id)
+    #     bin_quality.assess_bins_quality(bins, contig_to_kegg_counter, contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length, postProcessor=postProcessor,  threads=threads)
+        
 
-    
     # launching checkm2 externally
 
     # run_checkm2.setup_checkm2_intermediate_file(bins, "checkm2_outdir", 'diamond_result.tsv', faa_file)
 
-    # run_checkm2.run_checkm2('concoct', "checkm2_outdir", threads)
-
-    return 
+    # run_checkm2.run_checkm2('concoct', "checkm2_outdir", threads) 
 
     logging.info('Making bin graph...')
-    connected_bins_graph = bin_manager.get_connected_bin_graph(bin_name_to_bins)
+    connected_bins_graph = bin_manager.from_bin_sets_to_bin_graph(bin_name_to_bins)
 
 
     logging.info('Create intersection bin...')
     intersection_bins = bin_manager.get_intersection_bins(connected_bins_graph)
-
 
     logging.info('Create difference bin...')
     difference_bins =  bin_manager.get_difference_bins(connected_bins_graph)
@@ -188,22 +189,31 @@ def main():
     print('union_bins', len(union_bins))
 
     print('All bins', len(all_bins))
-
-
-
+    
     bin_manager.add_bin_size(all_bins, contig_to_length)
 
+    bin_quality.assess_bins_quality(all_bins, contig_to_kegg_counter, contig_to_cds_count,
+                                    contig_to_aa_counter, contig_to_aa_length,
+                                    postProcessor=postProcessor,  threads=threads)
+        
+    # for b in all_bins:
+    #     print(b, b.score)
 
-    write_bin_info(original_bins, 'original_bins.tsv')
-    write_bin_info(intersection_bins, 'intersection_bins.tsv')
-    write_bin_info(difference_bins, 'difference_bins.tsv')
-    write_bin_info(union_bins, 'union_bins.tsv')
-    write_bin_info(all_bins, 'all_bins.tsv')
+    selected_bins = bin_manager.select_best_bins(all_bins)
+    write_bin_info(selected_bins, 'selected_bins.tsv')
+
+    # import pickle
+    # with open("all_bin.p", "bw") as fl:
+    #     pickle.dump( all_bins, fl)
+
+    # 
 
 
-    logging.info('Launching checkm2 first step on assembly.')
-
-
+    # write_bin_info(original_bins, 'original_bins.tsv')
+    # write_bin_info(intersection_bins, 'intersection_bins.tsv')
+    # write_bin_info(difference_bins, 'difference_bins.tsv')
+    # write_bin_info(union_bins, 'union_bins.tsv')
+    # write_bin_info(all_bins, 'all_bins.tsv')
     
 
     # for b in new_bins:
@@ -218,6 +228,22 @@ def main():
     #     [print(b) for b in clique]
 
 
+
+    # checkup 
+    # contig name appears only once in assembly
+    # all contig name in bins are in assembly 
+    # file exist?  
+    
+    # Add N50 to sort bins based on score and N50
+    # Add pytest 
+    # add plot of metawrap
+    # add output support 
+    # add rich click 
+    # add readme
+    # add optimisation if needed
+    # check bin with zero contig
+    # benchmarck with other tools
+    # apply linter
 
 
         

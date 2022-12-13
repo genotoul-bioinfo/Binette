@@ -19,7 +19,12 @@ class Bin:
         self.name = name
         self.id = Bin.counter
         self.contigs = set(contigs)
+
         self.length = None
+        
+        self.completeness = None
+        self.contamination = None
+        self.score = None
 
     def __eq__(self, other):
         return self.contigs == other.contigs
@@ -42,6 +47,11 @@ class Bin:
 
     def add_length(self, length):
         self.length = length
+
+    def add_quality(self, completeness, contamination):
+        self.completeness =  completeness
+        self.contamination = contamination 
+        self.score = completeness - 5*contamination
 
     def intersection(self, *others):
         other_contigs = (o.contigs for o in others)
@@ -96,12 +106,12 @@ def parse_bin_directories(bin_name_to_bin_dir: dict) -> dict:
     return bin_name_to_bins
 
 
-def get_connected_bin_graph(bin_name_to_bins):
+def from_bin_sets_to_bin_graph(bin_name_to_bin_set):
     G = nx.Graph()
 
-    for set1_name, set2_name in itertools.combinations(bin_name_to_bins, 2):
-        set1 = bin_name_to_bins[set1_name]
-        set2 = bin_name_to_bins[set2_name]
+    for set1_name, set2_name in itertools.combinations(bin_name_to_bin_set, 2):
+        set1 = bin_name_to_bin_set[set1_name]
+        set2 = bin_name_to_bin_set[set2_name]
         
         # logging.debug(f"{set1_name} vs {set2_name}")
         for bin1, bin2 in itertools.product(set1, set2):
@@ -111,6 +121,16 @@ def get_connected_bin_graph(bin_name_to_bins):
                 G.add_edge(bin1, bin2)
     return G
 
+def get_bin_graph(bins):
+    G = nx.Graph()
+    G.add_nodes_from((b.id for b in bins))     
+
+    for i, (bin1, bin2) in enumerate(itertools.combinations(bins, 2)):
+
+            if bin1.overlaps_with(bin2):
+                # logging.info(f"{bin1} overlaps with {bin2}")
+                G.add_edge(bin1.id, bin2.id)
+    return G
 
 def get_all_possible_combinations(clique):
     return (c for r in range(2, len(clique)+1) for c in itertools.combinations(clique, r))
@@ -128,7 +148,6 @@ def get_intersection_bins(G):
     return intersect_bins
 
 
-
 def get_difference_bins(G):
     difference_bins = set()
     #nx.draw_shell(G, with_labels=True)
@@ -138,7 +157,8 @@ def get_difference_bins(G):
         for bins in bins_combinations:
             for bin_a in bins:
                 bin_diff = bin_a.difference(*(b for b in bins if b != bin_a))
-                difference_bins.add(bin_diff)
+                if bin_diff.contigs:
+                    difference_bins.add(bin_diff)
 
     return difference_bins
 
@@ -185,17 +205,17 @@ def add_bin_size(bins, contig_to_size):
         length = sum((contig_to_size[c] for c in bin_obj.contigs))
         bin_obj.add_length(length)
 
-# def get_diff_bins(connected_bins_graph):
-
-#     #nx.draw_shell(G, with_labels=True)
-#     for clique in nx.clique.find_cliques(G):
-#         print('=====')
-#         [print(b) for b in clique]
-
-# def get_bins_intersections(bins):
-#     for bin_obj in bins:
-
-#     return set().intersection(*sets)
+def select_best_bins(bins):
+    G = get_bin_graph(bins)
+    sorted_bins = sorted(bins, key=lambda x: x.score, reverse=True)
+    selected_bins = []
+    for b in sorted_bins:
+        if b.id in G:
+            selected_bins.append(b)
+            neigbors_bins = nx.neighbors(G, b.id)
+            G.remove_nodes_from(list(neigbors_bins))
+    
+    return selected_bins
 
 def dereplicate_bin_sets(bin_sets):
     """Dereplicate bins from different bin sets to get a non redondant bin set."""

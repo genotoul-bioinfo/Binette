@@ -5,19 +5,15 @@
 """
 
 
-import multiprocessing.pool
-import pyrodigal
-import concurrent.futures as cf
-import pyfastx
 import os 
 from collections import Counter
 import pandas as pd
 import numpy as np
 import logging
 
-import cds
-import bin_manager
-import bin_refinement
+# For unnessesary tensorflow warnings:
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+logging.getLogger('tensorflow').setLevel(logging.FATAL)
 
 from checkm2 import keggData
 from checkm2 import modelProcessing
@@ -31,7 +27,7 @@ def get_bins_metadata_df(bins, contig_to_cds_count, contig_to_aa_counter, contig
     ## Get bin metadata
     bin_metadata_list = []
     for bin_obj in bins:
-        bin_metadata = {"Name":bin_obj.name,
+        bin_metadata = {"Name":bin_obj.id,
                         'CDS': sum((contig_to_cds_count[c] for c in bin_obj.contigs if c in contig_to_cds_count)), 
                         "AALength":sum((contig_to_aa_length[c] for c in bin_obj.contigs if c in contig_to_aa_length)),
                         }
@@ -97,7 +93,7 @@ def get_diamond_feature_per_bin_df(bins, contig_to_kegg_counter):
                 # no ko annotation found in this contig
                 continue
 
-        bin_to_ko_counter[bin_obj.name] = bin_ko_counter
+        bin_to_ko_counter[bin_obj.id] = bin_ko_counter
 
     ko_count_per_bin_df = pd.DataFrame(bin_to_ko_counter, index=defaultKOs).transpose().fillna(0)
     ko_count_per_bin_df = ko_count_per_bin_df.astype(int)
@@ -126,14 +122,13 @@ def assess_bins_quality(bins, contig_to_kegg_counter, contig_to_cds_count, conti
 
     if postProcessor is None:
         postProcessor = modelPostprocessing.modelProcessor(threads) 
-        
+
 
     metadata_df = get_bins_metadata_df(bins, contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length)
     
-
     diamond_complete_results, ko_list_length = get_diamond_feature_per_bin_df(bins, contig_to_kegg_counter)
     diamond_complete_results = diamond_complete_results.drop(columns=['Name'])
-    
+
     feature_vectors = pd.concat([metadata_df, diamond_complete_results], axis=1)
     feature_vectors = feature_vectors.sort_values(by='Name')
     
@@ -145,7 +140,7 @@ def assess_bins_quality(bins, contig_to_kegg_counter, contig_to_cds_count, conti
 
     logging.info('Predicting completeness and contamination using general model.')
     general_results_comp, general_results_cont = modelProc.run_prediction_general(vector_array)
-    general_results_comp
+
 
     logging.info('Predicting completeness using specific model.')
     specific_model_vector_len = (ko_list_length + len(metadata_df.columns)) - 1  # -1 = without name TODO a bit ugly - maybe just calculate length on setup somewhere
@@ -163,8 +158,14 @@ def assess_bins_quality(bins, contig_to_kegg_counter, contig_to_cds_count, conti
         general_results_cont,
         specific_results_comp)
 
+
     final_results = feature_vectors[['Name']].copy()
     final_results['Completeness'] = np.round(final_comp, 2)
     final_results['Contamination'] = np.round(final_cont, 2)
 
-    print(final_results)
+    for bin_obj in bins:
+        completeness = final_results.loc[bin_obj.id, 'Completeness']
+        contamination = final_results.loc[bin_obj.id, 'Contamination']
+
+        bin_obj.add_quality(completeness, contamination)
+
