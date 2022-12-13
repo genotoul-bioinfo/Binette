@@ -16,6 +16,11 @@ import logging
 import bin_manager
 import file_manager
 import os
+import cds
+import diamond
+import bin_quality
+from checkm2 import modelPostprocessing
+
 
 # import pkg_resources
 
@@ -32,11 +37,11 @@ def init_logging(verbose):
     if verbose:
         logging.basicConfig(level=logging.DEBUG,
                             format='%(asctime)s %(levelname)s - %(message)s',
-                            datefmt="%Y-%m-%d %H:%M:%S")
+                            datefmt="[%Y-%m-%d %H:%M:%S]")
 
     else:
         logging.basicConfig(format='%(asctime)s %(levelname)s - %(message)s',
-                    datefmt="%Y-%m-%d %H:%M:%S")
+                    datefmt="[%Y-%m-%d %H:%M:%S]")
 
     logging.info('Program started')
     logging.info(f'command line: {" ".join(sys.argv)}', )
@@ -76,7 +81,11 @@ def write_bin_info(bins, output):
         fl.write('\t'.join(header)+"\n")
         for bin_obj in bins:
             fl.write(f'{bin_obj.origin}\t{bin_obj.name}\t{len(bin_obj.contigs)}\t{bin_obj.length}\n')
-    
+
+def check_contig_consistency(contigs_from_assembly, contigs_from_elsewhere, assembly_file, elsewhere_file):
+    are_contigs_consistent = len(set(contigs_from_elsewhere) | set(contigs_from_assembly)) <= len(set(contigs_from_assembly))
+    message = f"{len(set(contigs_from_elsewhere) - set(contigs_from_assembly))} contigs found in file {elsewhere_file} were not found in assembly_file ({assembly_file})."
+    assert are_contigs_consistent, message
 
 def main():
     "Orchestrate the execution of the program"
@@ -86,17 +95,62 @@ def main():
     init_logging(args.verbose)
 
     bin_dirs = args.bins
-    contigs = args.contigs
+    contigs_fasta = args.contigs
+    threads = 3
+    faa_file = 'tmp_head.faa'
+    diamond_result_file = 'diamond_result.tsv' 
+    run_tool = False
+
 
     logging.info('Parse contig fasta file.')
-    contigs_object = file_manager.parse_fasta_file(contigs)
+    contigs_object = file_manager.parse_fasta_file(contigs_fasta)
     contig_to_length = {seq.name:len(seq) for seq in contigs_object}
+
+
+    if run_tool:
+        contig_to_genes = cds.predict(contigs_fasta, faa_file, threads)
+    else:
+        logging.info('Parse faa file.')
+        contig_to_genes = cds.parse_faa_file(faa_file)
+        check_contig_consistency(contig_to_length, contig_to_genes, contigs_fasta, faa_file)
+
+    # TODO paralelize this step.  or not? checking on big datat if it takes some times or not? 
+
+    # from genes extract contig cds metadata
+    contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length = cds.get_contig_cds_metadata(contig_to_genes)
+
+    if run_tool:
+        diamond_db_path = diamond.get_checkm2_db()
+        diamond.run(faa_file, diamond_result_file, diamond_db_path, threads)
+
+    contig_to_kegg_counter = bin_quality.get_contig_to_kegg_id(diamond_result_file)
+
+    ## Check diamond and assembly consistency
+    check_contig_consistency(contig_to_length, contig_to_kegg_counter, contigs_fasta, diamond_result_file)
 
     logging.info('Parse bin directories.')
     bin_name_to_bin_dir = infer_bin_name_from_bin_dir(bin_dirs)
 
     bin_name_to_bins = bin_manager.parse_bin_directories(bin_name_to_bin_dir)
 
+    bins = bin_name_to_bins['concoct']
+
+    logging.info('Assess bin quality of input bins')
+    postProcessor = modelPostprocessing.modelProcessor(threads)
+    # postProcessor = None
+    for bin_set_id, bins in bin_name_to_bins.items():
+        logging.info(bin_set_id)
+        bin_quality.assess_bins_quality(bins, contig_to_kegg_counter, contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length, postProcessor=postProcessor,  threads=threads)
+
+
+    
+    # launching checkm2 externally
+
+    # run_checkm2.setup_checkm2_intermediate_file(bins, "checkm2_outdir", 'diamond_result.tsv', faa_file)
+
+    # run_checkm2.run_checkm2('concoct', "checkm2_outdir", threads)
+
+    return 
 
     logging.info('Making bin graph...')
     connected_bins_graph = bin_manager.get_connected_bin_graph(bin_name_to_bins)
@@ -146,6 +200,11 @@ def main():
     write_bin_info(union_bins, 'union_bins.tsv')
     write_bin_info(all_bins, 'all_bins.tsv')
 
+
+    logging.info('Launching checkm2 first step on assembly.')
+
+
+    
 
     # for b in new_bins:
     #     print(b)
