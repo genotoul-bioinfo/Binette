@@ -244,9 +244,8 @@ def main():
     # check bin with zero contig
     # benchmarck with other tools
     # apply linter
-
-
-        
+    # improve prodigal by doing same as checkm2 but on contig scale? 
+    # dealing only with contig found in bins and not all assembly 
 
     ### check input validity 
 
