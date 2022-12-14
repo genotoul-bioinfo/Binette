@@ -10,37 +10,41 @@ This program is released as open source software under the terms of [MIT License
 
 You can install bin_refinement directly from the source code or build and run it from within Docker container.
 
-## Installing directly from source code
+## Installing from a conda environnement
 
 Clone this repository: 
 ```
-git clone https://github.com/GITHUB_USERNAME/bin_refinement
-```
-
-Move into the repository directory:
-```
+git clone git@forgemia.inra.fr:jean.mainguy/bin-refinement.git
 cd bin_refinement
 ```
 
-Python 3 is required for this software.
-
-Bin_refinement can be installed using `pip` in a variety of ways (`$` indicates the command line prompt):
-
-1. Inside a virtual environment:
+Then create a Conda environment using the `bin_refinement_dev.yaml` file:
 ```
-python3 -m venv bin_refinement_dev
-source bin_refinement_dev/bin/activate
-pip install -U /path/to/bin_refinement
-```
-2. Into the global package database for all users:
-```
-pip install -U /path/to/bin_refinement
-```
-3. Into the user package database (for the current user only):
-```
-pip install -U --user /path/to/bin_refinement
+conda env create -n bin_refinement -f bin_refinement_dev.yaml
+conda activate bin_refinement 
 ```
 
+Finally install checkm2 still in bin_refinement
+
+```
+git clone --recursive https://github.com/chklovski/checkm2.git
+
+pip install checkm2/
+
+```
+and download its database
+
+```
+
+checkm2 database --download --path checkm2/database/
+```
+
+
+Binette should be able to run :
+
+```
+python bin_refinement/bin_refinement.py -h
+```
 
 
 # General behaviour
