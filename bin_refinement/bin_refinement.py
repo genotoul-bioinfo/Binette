@@ -20,7 +20,6 @@ import cds
 import diamond
 import bin_quality
 from checkm2 import modelPostprocessing
-from pprint import pprint
 
 # import pkg_resources
 
@@ -57,6 +56,7 @@ def parse_arguments():
                         help="Bin folders containing each bin in a fasta file.")
 
     parser.add_argument("-c", "--contigs", required=True, help="Contigs in fasta format.")
+    parser.add_argument("-t", "--threads", default=1, type=int, help="Number of threads.")
 
     parser.add_argument("-v", "--verbose", help="increase output verbosity",
                         action="store_true")
@@ -102,10 +102,10 @@ def main():
 
     bin_dirs = args.bins
     contigs_fasta = args.contigs
-    threads = 3
+    threads = args.threads
     faa_file = 'tmp_head.faa'
     diamond_result_file = 'diamond_result.tsv' 
-    run_tool = False
+    run_tool = True
 
 
     logging.info('Parse contig fasta file.')
@@ -123,6 +123,7 @@ def main():
     # TODO paralelize this step.  or not? checking on big datat if it takes some times or not? 
 
     # from genes extract contig cds metadata
+    logging.info('Compute cds metadata.')
     contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length = cds.get_contig_cds_metadata(contig_to_genes)
 
     if run_tool:
@@ -206,26 +207,6 @@ def main():
     # with open("all_bin.p", "bw") as fl:
     #     pickle.dump( all_bins, fl)
 
-    # 
-
-
-    # write_bin_info(original_bins, 'original_bins.tsv')
-    # write_bin_info(intersection_bins, 'intersection_bins.tsv')
-    # write_bin_info(difference_bins, 'difference_bins.tsv')
-    # write_bin_info(union_bins, 'union_bins.tsv')
-    # write_bin_info(all_bins, 'all_bins.tsv')
-    
-
-    # for b in new_bins:
-    #     print(b)
-
-    # print('BIN CREATED', bin_manager.Bin.counter)
-    # diff_bins = bin_manager.get_diff_bins(connected_bins_graph)
-
-    #nx.draw_shell(G, with_labels=True)
-    # for clique in nx.clique.find_cliques(G):
-    #     print('=====')
-    #     [print(b) for b in clique]
 
 
 
@@ -240,8 +221,7 @@ def main():
     # add output support 
     # add rich click 
     # add readme
-    # add optimisation if needed
-    # check bin with zero contig
+    # add optimisation if needed to filter bins reducing work amount
     # benchmarck with other tools
     # apply linter
     # improve prodigal by doing same as checkm2 but on contig scale? 
