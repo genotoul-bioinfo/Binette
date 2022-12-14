@@ -4,12 +4,12 @@ import logging
 import file_manager
 from collections import Counter
 import pyfastx
-
+from memory_control import measure_memory
 
 def get_contig_from_cds_name(cds_name):
     return '_'.join(cds_name.split('_')[:-1])
 
-
+@measure_memory
 def predict(contigs_file:str, outfaa:str, threads:int = 1):
     """Predict open reading frames with Pyrodigal."""
 
@@ -39,7 +39,7 @@ def write_faa(outfaa, contig_to_genes ):
 def parse_faa_file(faa_file):
     
     return {get_contig_from_cds_name(name):seq for name, seq, _ in pyfastx.Fastx(faa_file)}
-    
+
 
 def get_aa_composition(genes):
     aa_counter = Counter()
@@ -49,6 +49,7 @@ def get_aa_composition(genes):
 
     return aa_counter
 
+@measure_memory
 def get_contig_cds_metadata(contig_to_genes):
 
     contig_to_cds_count = {contig:len(genes) for contig, genes in contig_to_genes.items()}

@@ -105,12 +105,18 @@ def main():
     threads = args.threads
     faa_file = 'tmp_head.faa'
     diamond_result_file = 'diamond_result.tsv' 
-    run_tool = True
+    run_tool = False
 
 
-    logging.info('Parse contig fasta file.')
+    logging.info('Parse bin directories.')
+    bin_name_to_bin_dir = infer_bin_name_from_bin_dir(bin_dirs)
+    bin_name_to_bins = bin_manager.parse_bin_directories(bin_name_to_bin_dir)
+    original_bins = bin_manager.dereplicate_bin_sets(bin_name_to_bins.values()) 
+    contigs_in_bins = bin_manager.get_contigs_in_bins(original_bins) 
+
+    logging.info('Parse fasta file of assembly.')
     contigs_object = file_manager.parse_fasta_file(contigs_fasta)
-    contig_to_length = {seq.name:len(seq) for seq in contigs_object}
+    contig_to_length = {seq.name:len(seq) for seq in contigs_object if contigs_in_bins}
 
 
     if run_tool:
@@ -120,11 +126,9 @@ def main():
         contig_to_genes = cds.parse_faa_file(faa_file)
         check_contig_consistency(contig_to_length, contig_to_genes, contigs_fasta, faa_file)
 
-    # TODO paralelize this step.  or not? checking on big datat if it takes some times or not? 
-
     # from genes extract contig cds metadata
     logging.info('Compute cds metadata.')
-    contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length = cds.get_contig_cds_metadata(contig_to_genes)
+    contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length = cds.get_contig_cds_metadata(contig_to_genes) 
 
     if run_tool:
         diamond_db_path = diamond.get_checkm2_db()
@@ -132,75 +136,57 @@ def main():
 
     contig_to_kegg_counter = bin_quality.get_contig_to_kegg_id(diamond_result_file)
 
-    ## Check diamond and assembly consistency
+    ## Check contigs from diamond vs input assembly consistency
     check_contig_consistency(contig_to_length, contig_to_kegg_counter, contigs_fasta, diamond_result_file)
+    
 
-    logging.info('Parse bin directories.')
-    bin_name_to_bin_dir = infer_bin_name_from_bin_dir(bin_dirs)
-
-    bin_name_to_bins = bin_manager.parse_bin_directories(bin_name_to_bin_dir)
-
-    logging.info('Assess bin quality of input bins')
+    logging.info('Add size and assess quality of input bins')
     postProcessor = modelPostprocessing.modelProcessor(threads)
 
-    # # postProcessor = None
-    # for bin_set_id, bins in bin_name_to_bins.items():
-    #     logging.info(bin_set_id)
-    #     bin_quality.assess_bins_quality(bins, contig_to_kegg_counter, contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length, postProcessor=postProcessor,  threads=threads)
+    for bin_set_id, bins in bin_name_to_bins.items():
+        logging.info(f'{bin_set_id} - {len(bins)} ')
+        logging.info('Add size')
+        bin_manager.add_bin_size(bins, contig_to_length)
+        logging.info('Asses quality')
+        bin_quality.assess_bins_quality(bins, contig_to_kegg_counter, contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length, postProcessor=postProcessor,  threads=threads)
         
 
-    # launching checkm2 externally
-
-    # run_checkm2.setup_checkm2_intermediate_file(bins, "checkm2_outdir", 'diamond_result.tsv', faa_file)
-
-    # run_checkm2.run_checkm2('concoct', "checkm2_outdir", threads) 
+    logging.info('Create intermediate bins:')
 
     logging.info('Making bin graph...')
     connected_bins_graph = bin_manager.from_bin_sets_to_bin_graph(bin_name_to_bins)
 
-
-    logging.info('Create intersection bin...')
+    logging.info('Create intersection bins...')
     intersection_bins = bin_manager.get_intersection_bins(connected_bins_graph)
+    logging.info(f'{len(intersection_bins)} bins created on intersections.')
 
     logging.info('Create difference bin...')
     difference_bins =  bin_manager.get_difference_bins(connected_bins_graph)
+    logging.info(f'{len(difference_bins)} bins created based on symetric difference.')
+
 
     logging.info('Create get_union_bins bin...')
     union_bins =  bin_manager.get_union_bins(connected_bins_graph)
+    logging.info(f'{len(union_bins)} bins created on unions.')
 
-    # new_bins = bin_manager.create_intersec_diff_bins(connected_bins_graph)
-    
+    new_bins = difference_bins | intersection_bins | union_bins 
 
-    logging.info('PRINTING INFO ON DIFFERENT BIN SETS...')
-    bin_sets = bin_name_to_bins.values()
-    original_bins = bin_manager.dereplicate_bin_sets(bin_sets)
-
-    all_bins = set(original_bins) |  set(difference_bins) | intersection_bins | union_bins 
-
-    for bin_set, bins in bin_name_to_bins.items():
-        print(bin_set, len(bins))
-
-
-    print("All input bins", len(original_bins))
-
-    print('intersection_bins', len(intersection_bins))
-
-    print('difference_bins', len(difference_bins))
-    
-    print('union_bins', len(union_bins))
-
-    print('All bins', len(all_bins))
-    
-    bin_manager.add_bin_size(all_bins, contig_to_length)
-
-    bin_quality.assess_bins_quality(all_bins, contig_to_kegg_counter, contig_to_cds_count,
+    logging.info('Assess bin quality of new bins created from intersection, difference or unions in bin graph.')
+    bin_quality.assess_bins_quality(new_bins, contig_to_kegg_counter, contig_to_cds_count,
                                     contig_to_aa_counter, contig_to_aa_length,
                                     postProcessor=postProcessor,  threads=threads)
         
-    # for b in all_bins:
-    #     print(b, b.score)
 
+    logging.info('Dereplicating input bins and new bins')
+    bin_sets = bin_name_to_bins.values()
+    original_bins = bin_manager.dereplicate_bin_sets(bin_sets)
+    all_bins = original_bins | new_bins
+
+
+    logging.info('Select best bin')
     selected_bins = bin_manager.select_best_bins(all_bins)
+
+    logging.info('Writing selected bins')
     write_bin_info(selected_bins, 'selected_bins.tsv')
 
     # import pickle
@@ -209,55 +195,6 @@ def main():
 
 
 
-
-    # checkup 
-    # contig name appears only once in assembly
-    # all contig name in bins are in assembly 
-    # file exist?  
-    
-    # Add N50 to sort bins based on score and N50
-    # Add pytest 
-    # add plot of metawrap
-    # add output support 
-    # add rich click 
-    # add readme
-    # add optimisation if needed to filter bins reducing work amount
-    # benchmarck with other tools
-    # apply linter
-    # improve prodigal by doing same as checkm2 but on contig scale? 
-    # dealing only with contig found in bins and not all assembly 
-
-    ### check input validity 
-
-    ### collect info on all bins sets  
-        # bin set is made of multiple bins
-            # bin is a set of contigs
-            # Class Bin 
-            ## attributes 
-            #  contigs = list of contigs
-            #  origin = name of the orginated bin set 
-            #  id = id of the bin 
-            
-    ### apply binning_refiner on all bins sets pairs 
-        ### parallelize by number of possible cpus ? 
-
-    ### run checkm2 on all bins sets
-        #### initialise checkm2 
-            #### run prodigal or use faa input files 
-                ##### input faa need faa files and gff file to have contig2faa_names
-            #### run diamond on all faa 
-
-        #### run checkm2 on all bin sets in a parallel fashion
-            #### organise checkm2 temp files 
-            #### run checkm2 with --resume flag
-
-    ### consolidate bins
-
-    ### run checkm2 on final bin sets
-
-    ### write final bin sets 
-
-    ### plot bins
 
 
 # If this script is run from the command line then call the main function.

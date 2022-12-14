@@ -20,7 +20,9 @@ from checkm2 import modelProcessing
 from checkm2 import modelPostprocessing
 
 
+from memory_control import measure_memory
 
+@measure_memory
 def get_bins_metadata_df(bins, contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length):
 
     metadata_order = keggData.KeggCalculator().return_proper_order('Metadata')
@@ -52,6 +54,7 @@ def get_bins_metadata_df(bins, contig_to_cds_count, contig_to_aa_counter, contig
     metadata_df = metadata_df.set_index('Name', drop=False)
     return metadata_df
 
+@measure_memory
 def get_contig_to_kegg_id(diamond_result_file):
 
     diamon_results_df = pd.read_csv(diamond_result_file, sep='\t', usecols=[0, 1], names=['ProteinID', 'annotation'])
@@ -77,7 +80,7 @@ def get_contig_to_kegg_id(diamond_result_file):
 
     return contig_to_kegg_counter
 
-
+@measure_memory
 def get_diamond_feature_per_bin_df(bins, contig_to_kegg_counter):
 
     KeggCalc = keggData.KeggCalculator()
@@ -117,7 +120,7 @@ def get_diamond_feature_per_bin_df(bins, contig_to_kegg_counter):
     
 
 
-
+@measure_memory
 def assess_bins_quality(bins, contig_to_kegg_counter, contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length, postProcessor=None, threads=1):
 
     if postProcessor is None:
