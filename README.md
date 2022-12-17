@@ -15,7 +15,7 @@ You can install bin_refinement directly from the source code or build and run it
 Clone this repository: 
 ```
 git clone git@forgemia.inra.fr:jean.mainguy/bin-refinement.git
-cd bin_refinement
+cd bin-refinement
 ```
 
 Then create a Conda environment using the `bin_refinement_dev.yaml` file:
