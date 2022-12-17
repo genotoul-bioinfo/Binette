@@ -7,9 +7,11 @@
 
 import os 
 from collections import Counter
+from itertools import islice
 import pandas as pd
 import numpy as np
 import logging
+
 
 # For unnessesary tensorflow warnings:
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
@@ -22,7 +24,7 @@ from checkm2 import modelPostprocessing
 
 from memory_control import measure_memory
 
-@measure_memory
+
 def get_bins_metadata_df(bins, contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length):
 
     metadata_order = keggData.KeggCalculator().return_proper_order('Metadata')
@@ -54,33 +56,7 @@ def get_bins_metadata_df(bins, contig_to_cds_count, contig_to_aa_counter, contig
     metadata_df = metadata_df.set_index('Name', drop=False)
     return metadata_df
 
-@measure_memory
-def get_contig_to_kegg_id(diamond_result_file):
 
-    diamon_results_df = pd.read_csv(diamond_result_file, sep='\t', usecols=[0, 1], names=['ProteinID', 'annotation'])
-    diamon_results_df[['Ref100_hit', 'Kegg_annotation']] = diamon_results_df['annotation'].str.split('~', n=1, expand=True)
-    diamon_results_df
-
-    ''' Get a list of default KO id's from data
-        Available categories are the keys in DefaultValues.feature_ordering
-        Here, returns an ordered set of KEGG ID's and sets to 0 
-    '''
-    KeggCalc = keggData.KeggCalculator()
-    defaultKOs = KeggCalc.return_default_values_from_category('KO_Genes')
-
-    #Remove from diamon_results_df any KOs not currently used by checkm2
-    diamon_results_df = diamon_results_df.loc[diamon_results_df['Kegg_annotation'].isin(defaultKOs.keys())]
-    diamon_results_df['contig'] = diamon_results_df['ProteinID'].str.split('_', n=-1).str[:-1].str.join('_')
-    #diamon_results_df[diamon_results_df['Kegg_annotation']]
-    # group by contig and create a counter with kegg_annotation
-    contig_to_kegg_counter = diamon_results_df.groupby("contig").agg({'Kegg_annotation':Counter}).reset_index() # ['Kegg_annotation'].apply(Counter)
-
-    # create a simple dict with contig --> kegg_counter
-    contig_to_kegg_counter = dict(zip(contig_to_kegg_counter['contig'], contig_to_kegg_counter['Kegg_annotation']))
-
-    return contig_to_kegg_counter
-
-@measure_memory
 def get_diamond_feature_per_bin_df(bins, contig_to_kegg_counter):
 
     KeggCalc = keggData.KeggCalculator()
@@ -119,8 +95,20 @@ def get_diamond_feature_per_bin_df(bins, contig_to_kegg_counter):
     return diamond_complete_results, len(defaultKOs)
     
 
+def chunks(iterable, size):
+    """Generate adjacent chunks of data"""
+    it = iter(iterable)
+    return iter(lambda: tuple(islice(it, size)), ())
 
-@measure_memory
+def assess_bins_quality_by_chunk(bins, contig_to_kegg_counter, contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length, postProcessor=None, threads=1):
+    n = 2500
+    
+    for i, chunk_bins_iter in enumerate(chunks(bins, n)):
+        chunk_bins = set(chunk_bins_iter)
+        logging.debug(f'chunk {i}: assessing quality of {len(chunk_bins)}')
+        assess_bins_quality(chunk_bins, contig_to_kegg_counter, contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length, postProcessor)
+
+
 def assess_bins_quality(bins, contig_to_kegg_counter, contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length, postProcessor=None, threads=1):
 
     if postProcessor is None:

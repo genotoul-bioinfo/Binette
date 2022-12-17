@@ -4,7 +4,13 @@ import sys
 import shutil
 import re
 import sys
+import pandas as pd
+from collections import Counter
 
+from checkm2 import keggData
+
+
+from memory_control import measure_memory
 
 def get_checkm2_db():
 
@@ -71,3 +77,29 @@ def run(faa_file, output, db, threads=1, query_cover=80, subject_cover=80, perce
         sys.exit(1)
 
     logging.info('Finished Running DIAMOND')
+
+
+def get_contig_to_kegg_id(diamond_result_file):
+
+    diamon_results_df = pd.read_csv(diamond_result_file, sep='\t', usecols=[0, 1], names=['ProteinID', 'annotation'])
+    diamon_results_df[['Ref100_hit', 'Kegg_annotation']] = diamon_results_df['annotation'].str.split('~', n=1, expand=True)
+    diamon_results_df
+
+    ''' Get a list of default KO id's from data
+        Available categories are the keys in DefaultValues.feature_ordering
+        Here, returns an ordered set of KEGG ID's and sets to 0 
+    '''
+    KeggCalc = keggData.KeggCalculator()
+    defaultKOs = KeggCalc.return_default_values_from_category('KO_Genes')
+
+    #Remove from diamon_results_df any KOs not currently used by checkm2
+    diamon_results_df = diamon_results_df.loc[diamon_results_df['Kegg_annotation'].isin(defaultKOs.keys())]
+    diamon_results_df['contig'] = diamon_results_df['ProteinID'].str.split('_', n=-1).str[:-1].str.join('_')
+    #diamon_results_df[diamon_results_df['Kegg_annotation']]
+    # group by contig and create a counter with kegg_annotation
+    contig_to_kegg_counter = diamon_results_df.groupby("contig").agg({'Kegg_annotation':Counter}).reset_index() # ['Kegg_annotation'].apply(Counter)
+
+    # create a simple dict with contig --> kegg_counter
+    contig_to_kegg_counter = dict(zip(contig_to_kegg_counter['contig'], contig_to_kegg_counter['Kegg_annotation']))
+
+    return contig_to_kegg_counter

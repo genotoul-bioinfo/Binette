@@ -10,9 +10,8 @@ import pyfastx
 import itertools
 import networkx as nx
 
-from memory_control import measure_memory
 
-
+# from memory_profiler import profile
 
 class Bin:
     counter = 0
@@ -109,7 +108,7 @@ def parse_bin_directories(bin_name_to_bin_dir: dict) -> dict:
 
     return bin_name_to_bins
 
-@measure_memory
+
 def from_bin_sets_to_bin_graph(bin_name_to_bin_set):
     G = nx.Graph()
 
@@ -126,7 +125,7 @@ def from_bin_sets_to_bin_graph(bin_name_to_bin_set):
     return G
 
 
-@measure_memory
+
 def get_bin_graph(bins):
     G = nx.Graph()
     G.add_nodes_from((b.id for b in bins))     
@@ -141,7 +140,7 @@ def get_bin_graph(bins):
 def get_all_possible_combinations(clique):
     return (c for r in range(2, len(clique)+1) for c in itertools.combinations(clique, r))
 
-@measure_memory
+
 def get_intersection_bins(G):
     intersect_bins = set()
     #nx.draw_shell(G, with_labels=True)
@@ -154,7 +153,7 @@ def get_intersection_bins(G):
 
     return intersect_bins
 
-@measure_memory
+
 def get_difference_bins(G):
     difference_bins = set()
     #nx.draw_shell(G, with_labels=True)
@@ -169,7 +168,7 @@ def get_difference_bins(G):
 
     return difference_bins
 
-@measure_memory
+
 def get_union_bins(G):
     union_bins = set()
     #nx.draw_shell(G, with_labels=True)
@@ -186,7 +185,7 @@ def get_union_bins(G):
 
     return union_bins
 
-@measure_memory
+
 def create_intersec_diff_bins(G):
     new_bins = set()
 
@@ -206,16 +205,22 @@ def create_intersec_diff_bins(G):
         
     return new_bins
     
-@measure_memory
+
 def add_bin_size(bins, contig_to_size):
     
     for bin_obj in bins:
         length = sum((contig_to_size[c] for c in bin_obj.contigs))
         bin_obj.add_length(length)
 
-@measure_memory
+
+
+# @profile
 def select_best_bins(bins):
+    logging.info(f'Building bin graph from {len(bins)} ins')
     G = get_bin_graph(bins)
+
+    nx.write_edgelist(G, "bin_graph_edglist")
+ 
     sorted_bins = sorted(bins, key=lambda x: x.score, reverse=True)
     selected_bins = []
     for b in sorted_bins:
@@ -226,11 +231,11 @@ def select_best_bins(bins):
     
     return selected_bins
 
-@measure_memory
+
 def dereplicate_bin_sets(bin_sets):
     """Dereplicate bins from different bin sets to get a non redondant bin set."""
     return set().union(*bin_sets)
 
-@measure_memory
+
 def get_contigs_in_bins(bins):
     return set().union(*(b.contigs for b in bins))
