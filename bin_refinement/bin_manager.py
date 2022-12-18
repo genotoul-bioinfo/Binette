@@ -22,8 +22,10 @@ class Bin:
         self.name = name
         self.id = Bin.counter
         self.contigs = set(contigs)
+        self.hash = hash(str(sorted(self.contigs)))
 
         self.length = None
+        self.N50 = None
         
         self.completeness = None
         self.contamination = None
@@ -33,7 +35,7 @@ class Bin:
         return self.contigs == other.contigs
 
     def __hash__(self):
-        return hash(str(sorted(self.contigs)))
+        return self.hash 
 
     def __str__(self):
         return  f"{self.origin}_{self.id}  ({len(self.contigs)} contigs)"
@@ -50,6 +52,10 @@ class Bin:
 
     def add_length(self, length):
         self.length = length
+    
+    def add_N50(self, n50):
+        self.N50 = n50
+          
 
     def add_quality(self, completeness, contamination):
         self.completeness =  completeness
@@ -83,7 +89,7 @@ class Bin:
 
 def get_bins_from_directory(bin_dir: str, set_name: str) -> list:
 
-    bins = [] 
+    bins = []
     
     for bin_fasta_file in os.listdir(bin_dir):
 
@@ -116,11 +122,10 @@ def from_bin_sets_to_bin_graph(bin_name_to_bin_set):
         set1 = bin_name_to_bin_set[set1_name]
         set2 = bin_name_to_bin_set[set2_name]
         
-        # logging.debug(f"{set1_name} vs {set2_name}")
+        
         for bin1, bin2 in itertools.product(set1, set2):
             
             if bin1.overlaps_with(bin2):
-                # logging.info(f"{bin1} overlaps with {bin2}")
                 G.add_edge(bin1, bin2)
     return G
 
@@ -147,6 +152,13 @@ def get_intersection_bins(G):
     for clique in nx.clique.find_cliques(G):
         bins_combinations = get_all_possible_combinations(clique)
         for bins in bins_combinations:
+            print("+========")
+            [print(b, b.completeness) for b in bins]
+
+            if max((b.completeness for b in bins)) < 20:
+                print('completeness is not good enough' )
+                input()    
+                continue
             intersec_bin = bins[0].intersection(*bins[1:])
 
             intersect_bins.add(intersec_bin)
@@ -161,8 +173,18 @@ def get_difference_bins(G):
         # TODO should not use combinations but another method of itertools to get all possible combination in all possible order.
         bins_combinations = get_all_possible_combinations(clique)
         for bins in bins_combinations:
+            print("+========")
+            [print(b, b.completeness) for b in bins]
+
+
             for bin_a in bins:
+  
                 bin_diff = bin_a.difference(*(b for b in bins if b != bin_a))
+                print(f'bin diff {bin_diff}')
+                if bin_a.completeness < 20:
+                    print(f'completeness of {bin_a} is not good enough to do difference... ' )
+  
+
                 if bin_diff.contigs:
                     difference_bins.add(bin_diff)
 
@@ -205,30 +227,41 @@ def create_intersec_diff_bins(G):
         
     return new_bins
     
-
-def add_bin_size(bins, contig_to_size):
-    
-    for bin_obj in bins:
-        length = sum((contig_to_size[c] for c in bin_obj.contigs))
-        bin_obj.add_length(length)
-
-
-
 # @profile
-def select_best_bins(bins):
-    logging.info(f'Building bin graph from {len(bins)} ins')
-    G = get_bin_graph(bins)
+# def select_best_bins(bins):
+#     logging.info(f'Building bin graph from {len(bins)} ins')
+#     G = get_bin_graph(bins)
 
-    nx.write_edgelist(G, "bin_graph_edglist")
+#     nx.write_edgelist(G, "bin_graph_edglist")
  
-    sorted_bins = sorted(bins, key=lambda x: x.score, reverse=True)
+#     sorted_bins = sorted(bins, key=lambda x: x.score, reverse=True)
+#     selected_bins = []
+#     for b in sorted_bins:
+#         if b.id in G:
+#             selected_bins.append(b)
+#             neigbors_bins = nx.neighbors(G, b.id)
+#             G.remove_nodes_from(list(neigbors_bins))
+    
+#     return selected_bins
+    
+def select_best_bins(bins):
+    logging.info(f'Building no bin graph from {len(bins)} ins')
+
+    logging.info('SORTNG')
+    # sort on score, N50 and id. 
+    # smaller id are prefered to select in priority original bins.
+    sorted_bins = sorted(bins, key=lambda x: (x.score, x.N50, -x.id), reverse=True)
+
+    logging.info('SELECTING')
     selected_bins = []
     for b in sorted_bins:
-        if b.id in G:
-            selected_bins.append(b)
-            neigbors_bins = nx.neighbors(G, b.id)
-            G.remove_nodes_from(list(neigbors_bins))
-    
+        if b in bins:
+            overlapping_bins = {b2 for b2 in bins if b.overlaps_with(b2)}
+            bins -= overlapping_bins
+
+            selected_bins.append(b) 
+
+    logging.info(f'SELECTING {len(selected_bins)} bins')
     return selected_bins
 
 

@@ -12,6 +12,8 @@ import pandas as pd
 import numpy as np
 import logging
 
+import concurrent.futures as cf
+
 
 # For unnessesary tensorflow warnings:
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
@@ -93,7 +95,72 @@ def get_diamond_feature_per_bin_df(bins, contig_to_kegg_counter):
     diamond_complete_results = pd.concat([ko_count_per_bin_df, KO_pathways, KO_modules, KO_categories], axis=1)
 
     return diamond_complete_results, len(defaultKOs)
+
+def compute_N50(list_of_lengths):
+    """Calculate N50 for a sequence of numbers.
+
+    Args:
+        list_of_lengths (list): List of numbers.
+
+    Returns:
+        int: N50 value.
+
+    """
+
+    list_of_lengths = sorted(list_of_lengths)
+
+    sum_len = sum(list_of_lengths)
+
+    cum_length = 0
+    for length in list_of_lengths:
+        if cum_length + length >= sum_len/2:
+            return length
+        cum_length += length
+    return length
+
+def add_bin_size_and_N50(bins, contig_to_size):
     
+    for bin_obj in bins:
+        lengths = [contig_to_size[c] for c in bin_obj.contigs]
+        n50 = compute_N50(lengths)
+
+        bin_obj.add_length(sum(lengths))
+        bin_obj.add_N50(n50)
+
+def add_bin_metrics_in_parallel(bins, contig_info, threads):
+    
+    chunk_size = int(len(bins)/threads) + 1
+    print("CHUNK SIZE TO PARALLELIZE",chunk_size )
+    results = []
+    with cf.ProcessPoolExecutor(max_workers=threads) as tpe:
+        for i, bins_chunk in enumerate(chunks(bins, chunk_size)):
+            print(f"chunk {i}, {len(bins_chunk)} bins")
+            results.append(tpe.submit(add_bin_metrics, *(bins_chunk, contig_info)))
+    
+    processed_bins = {bin_o for r in results for bin_o in r.result()}
+    
+    return processed_bins
+
+def add_bin_metrics(bins, contig_info, n=1000, threads=1):
+    postProcessor = modelPostprocessing.modelProcessor(threads)
+
+    contig_to_kegg_counter = contig_info["contig_to_kegg_counter"]
+    contig_to_cds_count = contig_info['contig_to_cds_count']
+    contig_to_aa_counter = contig_info['contig_to_aa_counter']
+    contig_to_aa_length = contig_info["contig_to_aa_length"]
+    contig_to_length = contig_info["contig_to_length"]
+
+    logging.info('Asses bin length and N50')
+    add_bin_size_and_N50(bins, contig_to_length)
+
+    logging.info('Asses bin quality')
+    assess_bins_quality_by_chunk(bins, contig_to_kegg_counter, contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length, postProcessor)
+    # # assess bin quality by chunk to reduce memory 
+    # for i, chunk_bins_iter in enumerate(chunks(bins, n)):
+    #     chunk_bins = set(chunk_bins_iter)
+    #     logging.debug(f'chunk {i}: assessing quality of {len(chunk_bins)}')
+    #     assess_bins_quality(chunk_bins, contig_to_kegg_counter, contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length, postProcessor)
+    return bins
 
 def chunks(iterable, size):
     """Generate adjacent chunks of data"""

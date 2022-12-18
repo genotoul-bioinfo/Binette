@@ -115,6 +115,7 @@ def main():
     logging.info('Parse bin directories.')
     bin_name_to_bin_dir = infer_bin_name_from_bin_dir(bin_dirs)
     bin_name_to_bins = bin_manager.parse_bin_directories(bin_name_to_bin_dir)
+
     original_bins = bin_manager.dereplicate_bin_sets(bin_name_to_bins.values()) 
     contigs_in_bins = bin_manager.get_contigs_in_bins(original_bins) 
 
@@ -123,6 +124,9 @@ def main():
     contig_to_length = {seq.name:len(seq) for seq in contigs_object if seq.name in contigs_in_bins}
 
     if run_tool:
+        diamond_db_path = diamond.get_checkm2_db()
+        diamond.run(faa_file, diamond_result_file, diamond_db_path, threads)
+
         contigs_iterator = (s for s in file_manager.parse_fasta_file(contigs_fasta) if s.name in contigs_in_bins)
         contig_to_genes = cds.predict(contigs_iterator, faa_file, threads)
     else:
@@ -130,12 +134,8 @@ def main():
         contig_to_genes = cds.parse_faa_file(faa_file)
         check_contig_consistency(contig_to_length, contig_to_genes, contigs_fasta, faa_file)
 
-
-    if run_tool:
-        diamond_db_path = diamond.get_checkm2_db()
-        diamond.run(faa_file, diamond_result_file, diamond_db_path, threads)
         
-    logging.info('Compute contig_to_kegg_id.')
+    logging.info('Parsing diamond results.')
     contig_to_kegg_counter = diamond.get_contig_to_kegg_id(diamond_result_file)
     ## Check contigs from diamond vs input assembly consistency
     check_contig_consistency(contig_to_length, contig_to_kegg_counter, contigs_fasta, diamond_result_file)
@@ -143,7 +143,6 @@ def main():
     if use_contig_index:
         logging.debug('Transforming contig name to index to save memory.')
         index_to_contig = {contig:index for index, contig in enumerate(contigs_in_bins)}
-        print(index_to_contig)
 
         contig_to_genes = {index_to_contig[contig]:genes for contig, genes in contig_to_genes.items()}
         contig_to_length = {index_to_contig[contig]:length for contig, length in contig_to_length.items()}
@@ -151,31 +150,35 @@ def main():
 
         for b in original_bins:
             b.contigs = {index_to_contig[contig] for contig in b.contigs}
-        logging.debug('Done transforming contig to index.')
 
     # from genes extract contig cds metadata
     logging.info('Compute cds metadata.')
     contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length = cds.get_contig_cds_metadata(contig_to_genes, threads) 
-
+    
+    contig_info = {'contig_to_cds_count':contig_to_cds_count,
+                    'contig_to_aa_counter':contig_to_aa_counter,
+                    'contig_to_aa_length':contig_to_aa_length,
+                    'contig_to_kegg_counter':contig_to_kegg_counter,
+                    'contig_to_length':contig_to_length}
 
     logging.info('Add size and assess quality of input bins')
-    postProcessor = modelPostprocessing.modelProcessor(threads)
-
+    
 
     # TODO paralellize
+    # original_bins = bin_quality.add_bin_metrics_in_parallel(original_bins, contig_info, threads)
+
+    bin_quality.add_bin_metrics(original_bins, contig_info)
+
     for bin_set_id, bins in bin_name_to_bins.items():
-        
+
         logging.info(f'{bin_set_id} - {len(bins)} ')
-        
-        logging.info('Add size')
-        bin_manager.add_bin_size(bins, contig_to_length)
 
-        logging.info('Asses quality')
-        bin_quality.assess_bins_quality_by_chunk(bins, contig_to_kegg_counter, contig_to_cds_count,
-                                                 contig_to_aa_counter, contig_to_aa_length,
-                                                 postProcessor=postProcessor,  threads=threads)
+        # bin_name_to_bins[bin_set_id] = 
         
-
+        for b in bin_name_to_bins[bin_set_id]:
+            print(b)
+            print(b.score)
+        
     logging.info('Create intermediate bins:')
 
     logging.info('Making bin graph...')
@@ -195,19 +198,22 @@ def main():
     logging.info(f'{len(union_bins)} bins created on unions.')
 
     new_bins = difference_bins | intersection_bins | union_bins
+    
+    
+    # bin_quality.add_bin_metrics(new_bins, contig_info)
+    new_bins = bin_quality.add_bin_metrics(new_bins, contig_info, threads)
 
-    bin_manager.add_bin_size(new_bins, contig_to_length)
 
-  
-    logging.info(f'Assess bin quality of {len(new_bins)} new bins created from intersection, difference or unions in bin graph.')
-    bin_quality.assess_bins_quality_by_chunk(new_bins, contig_to_kegg_counter, contig_to_cds_count,
-                                    contig_to_aa_counter, contig_to_aa_length,
-                                    postProcessor=postProcessor,  threads=threads)
+    # bin_quality.add_bin_size_and_N50(new_bins, contig_to_length)
+
+    # postProcessor = modelPostprocessing.modelProcessor(1)
+    # logging.info(f'Assess bin quality of {len(new_bins)} new bins created from intersection, difference or unions in bin graph.')
+    # bin_quality.assess_bins_quality_by_chunk(new_bins, contig_to_kegg_counter, contig_to_cds_count,
+    #                                 contig_to_aa_counter, contig_to_aa_length,
+    #                                 postProcessor=postProcessor,  threads=threads)
         
    
     logging.info('Dereplicating input bins and new bins')
-    original_bins = bin_manager.dereplicate_bin_sets(bin_name_to_bins.values())
-
     all_bins = original_bins | new_bins
 
     import pickle
@@ -222,11 +228,6 @@ def main():
 
     logging.info('Writing selected bins')
     write_bin_info(selected_bins, 'selected_bins.tsv')
-
-
-
-
-
 
 
 # If this script is run from the command line then call the main function.
