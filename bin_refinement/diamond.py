@@ -48,7 +48,7 @@ def check_diamond_exists():
         sys.exit(1)
     
 
-def run(faa_file, output, db, threads=1, query_cover=80, subject_cover=80, percent_id=30, evalue=1e-05, low_mem=False):
+def run(faa_file, output, db, log, threads=1, query_cover=80, subject_cover=80, percent_id=30, evalue=1e-05, low_mem=False):
     
     check_diamond_exists()
 
@@ -63,7 +63,7 @@ def run(faa_file, output, db, threads=1, query_cover=80, subject_cover=80, perce
         f"--query-cover {query_cover} " \
         f"--subject-cover {subject_cover} " \
         f"--id {percent_id} " \
-        f"--evalue {evalue} --block-size {blocksize} --quiet"
+        f"--evalue {evalue} --block-size {blocksize} 2> {log}"
 
 
     logging.info('Running diamond')
@@ -73,7 +73,7 @@ def run(faa_file, output, db, threads=1, query_cover=80, subject_cover=80, perce
     run = subprocess.run(cmd, shell=True)
 
     if run.returncode != 0:
-        logging.error(f'An error occured while running DIAMOND.')
+        logging.error(f'An error occured while running DIAMOND. check log file: {log}')
         sys.exit(1)
 
     logging.info('Finished Running DIAMOND')

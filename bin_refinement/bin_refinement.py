@@ -20,6 +20,7 @@ import cds
 import diamond
 import bin_quality
 from checkm2 import modelPostprocessing
+import pyfastx
 
 # import pkg_resources
 
@@ -30,17 +31,19 @@ from checkm2 import modelPostprocessing
 #     PROGRAM_VERSION = "undefined_version"
 
 
-def init_logging(verbose):
+def init_logging(verbose, debug):
     '''Initialise logging.'''
-
-    if verbose:
-        logging.basicConfig(level=logging.DEBUG,
-                            format='%(asctime)s %(levelname)s - %(message)s',
-                            datefmt="[%Y-%m-%d %H:%M:%S]")
-
+    if debug:
+        level = logging.DEBUG
+    elif verbose:
+        level = logging.INFO
     else:
-        logging.basicConfig(format='%(asctime)s %(levelname)s - %(message)s',
-                    datefmt="[%Y-%m-%d %H:%M:%S]")
+        level = logging.WARNING
+
+
+    logging.basicConfig(level=level,
+                        format='%(asctime)s %(levelname)s - %(message)s',
+                        datefmt="[%Y-%m-%d %H:%M:%S]")
 
     logging.info('Program started')
     logging.info(f'command line: {" ".join(sys.argv)}', )
@@ -54,11 +57,21 @@ def parse_arguments():
                         
     parser.add_argument("-i", "--bins", nargs='+', required=True, 
                         help="Bin folders containing each bin in a fasta file.")
-
+    
     parser.add_argument("-c", "--contigs", required=True, help="Contigs in fasta format.")
     parser.add_argument("-t", "--threads", default=1, type=int, help="Number of threads.")
+    parser.add_argument("-o", "--outdir", default='results', help="Output directory.")
+
 
     parser.add_argument("-v", "--verbose", help="increase output verbosity",
+                        action="store_true")
+    parser.add_argument("--debug", help="active debug mode",
+                    action="store_true")
+    parser.add_argument("--resume", help="active resume mode",
+                        action="store_true")
+
+
+    parser.add_argument("--use_contig_index", help="active debug mode",
                         action="store_true")
 
     # parser.add_argument('--version',
@@ -76,18 +89,44 @@ def infer_bin_name_from_bin_dir(bin_dirs):
 
 def write_bin_info(bins, output):
 
-    header = ['origin', "name", 'id', 'completeness', 'contamination', "score", 'size', 'contig_count',  'contigs']
+    header = ['origin', "name", 'completeness', 'contamination', "score", 'size', 'N50', 'contig_count']
+    with open(output, "w") as fl:
+        fl.write('\t'.join(header)+"\n")
+        for bin_obj in bins:
+
+            line = [bin_obj.origin, bin_obj.name,
+                    bin_obj.completeness, bin_obj.contamination, bin_obj.score, 
+                    bin_obj.length, bin_obj.N50,
+                     len(bin_obj.contigs), ]
+
+            fl.write("\t".join((str(e) for e in line)) + '\n')
+
+def write_bin_info_debug(bins, output):
+
+    header = ['origin', "name", "id", 'completeness', 'contamination', "score", 'size', 'N50', 'contig_count', "contigs"]
+
     with open(output, "w") as fl:
         fl.write('\t'.join(header)+"\n")
         for bin_obj in bins:
 
             line = [bin_obj.origin, bin_obj.name, bin_obj.id,
                     bin_obj.completeness, bin_obj.contamination, bin_obj.score, 
-                    bin_obj.length,
+                    bin_obj.length, bin_obj.N50,
                      len(bin_obj.contigs), 
                      ";".join((str(c) for c in bin_obj.contigs))]
 
             fl.write("\t".join((str(e) for e in line)) + '\n')
+
+def write_bins_fasta(selected_bins, contigs_fasta, outdir):
+    fa = pyfastx.Fasta(contigs_fasta, build_index=True)
+
+    for sbin in selected_bins:
+        outfile = os.path.join(outdir, f"bin_{sbin.id}.fa")
+
+        with open(outfile, 'w') as outfl:
+            sequences = (f">{c}\n{fa[c]}" for c in sbin.contigs)
+            outfl.write('\n'.join(sequences)+"\n")
+            
 
 def check_contig_consistency(contigs_from_assembly, contigs_from_elsewhere, assembly_file, elsewhere_file):
     logging.debug('check_contig_consistency.')
@@ -101,15 +140,27 @@ def main():
 
     args = parse_arguments()
 
-    init_logging(args.verbose)
+    init_logging(args.verbose, args.debug)
 
     bin_dirs = args.bins
     contigs_fasta = args.contigs
     threads = args.threads
-    faa_file = 'tmp_head.faa'
-    diamond_result_file = 'diamond_result.tsv' 
-    run_tool = False
-    use_contig_index = True
+    outdir = args.outdir
+    outdir_final_bin_set = os.path.join(outdir, 'final_bins')
+    out_tmp_dir = os.path.join(outdir, 'temporary_files')
+
+
+    os.makedirs(out_tmp_dir, exist_ok=True)
+    os.makedirs(outdir_final_bin_set, exist_ok=True)
+
+    faa_file = os.path.join(out_tmp_dir, 'assembly_proteins.faa')
+    diamond_result_file = os.path.join(out_tmp_dir, 'diamond_result.tsv' ) 
+    diamond_log  = os.path.join(out_tmp_dir, 'diamond_run.log' ) 
+
+    final_bin_report = os.path.join(outdir, 'final_bins_quality_reports.tsv')
+    resume = args.resume
+    use_contig_index = args.use_contig_index
+    debug = args.debug
 
 
     logging.info('Parse bin directories.')
@@ -123,18 +174,18 @@ def main():
     contigs_object = file_manager.parse_fasta_file(contigs_fasta)
     contig_to_length = {seq.name:len(seq) for seq in contigs_object if seq.name in contigs_in_bins}
 
-    if run_tool:
-        diamond_db_path = diamond.get_checkm2_db()
-        diamond.run(faa_file, diamond_result_file, diamond_db_path, threads)
-
+    if not resume:
         contigs_iterator = (s for s in file_manager.parse_fasta_file(contigs_fasta) if s.name in contigs_in_bins)
         contig_to_genes = cds.predict(contigs_iterator, faa_file, threads)
+
+        diamond_db_path = diamond.get_checkm2_db()
+        diamond.run(faa_file, diamond_result_file, diamond_db_path, diamond_log, threads)
+
     else:
         logging.info('Parse faa file.')
         contig_to_genes = cds.parse_faa_file(faa_file)
         check_contig_consistency(contig_to_length, contig_to_genes, contigs_fasta, faa_file)
 
-        
     logging.info('Parsing diamond results.')
     contig_to_kegg_counter = diamond.get_contig_to_kegg_id(diamond_result_file)
     ## Check contigs from diamond vs input assembly consistency
@@ -142,14 +193,15 @@ def main():
     
     if use_contig_index:
         logging.debug('Transforming contig name to index to save memory.')
-        index_to_contig = {contig:index for index, contig in enumerate(contigs_in_bins)}
+        contig_to_index = {contig:index for index, contig in enumerate(contigs_in_bins)}
+        index_to_contig = {index:contig for contig, index  in contig_to_index.items() }
 
-        contig_to_genes = {index_to_contig[contig]:genes for contig, genes in contig_to_genes.items()}
-        contig_to_length = {index_to_contig[contig]:length for contig, length in contig_to_length.items()}
-        contig_to_kegg_counter =  {index_to_contig[contig]:kegg_counter for contig, kegg_counter in contig_to_kegg_counter.items()}
+        contig_to_genes = {contig_to_index[contig]:genes for contig, genes in contig_to_genes.items()}
+        contig_to_length = {contig_to_index[contig]:length for contig, length in contig_to_length.items()}
+        contig_to_kegg_counter =  {contig_to_index[contig]:kegg_counter for contig, kegg_counter in contig_to_kegg_counter.items()}
 
         for b in original_bins:
-            b.contigs = {index_to_contig[contig] for contig in b.contigs}
+            b.contigs = {contig_to_index[contig] for contig in b.contigs}
 
     # from genes extract contig cds metadata
     logging.info('Compute cds metadata.')
@@ -173,11 +225,8 @@ def main():
 
         logging.info(f'{bin_set_id} - {len(bins)} ')
 
-        # bin_name_to_bins[bin_set_id] = 
-        
         for b in bin_name_to_bins[bin_set_id]:
-            print(b)
-            print(b.score)
+            logging.debug(f"{b} -> {b.score}")
         
     logging.info('Create intermediate bins:')
 
@@ -201,9 +250,10 @@ def main():
     
     
     # bin_quality.add_bin_metrics(new_bins, contig_info)
+    logging.info(f'Assess quality for supplementary intermediate bins.')
     new_bins = bin_quality.add_bin_metrics(new_bins, contig_info, threads)
 
-
+    
     # bin_quality.add_bin_size_and_N50(new_bins, contig_to_length)
 
     # postProcessor = modelPostprocessing.modelProcessor(1)
@@ -216,18 +266,50 @@ def main():
     logging.info('Dereplicating input bins and new bins')
     all_bins = original_bins | new_bins
 
-    import pickle
-    with open("all_bin.p", "bw") as fl:
-        pickle.dump( all_bins, fl)
+    if debug:
+        # import pickle
+        # # import networkx as nx
+        # with open("all_bin.p", "bw") as fl:
+        #     pickle.dump( all_bins, fl)
+        logging.debug('Writting all bins info ')
+        write_bin_info_debug(all_bins, os.path.join(out_tmp_dir, 'all_bins.tsv'))
 
-    write_bin_info(all_bins, 'all_bins.tsv')
+        # G = bin_manager.get_bin_graph_with_attributes(all_bins, contig_to_length)
+
+        # nx.write_edgelist(G, os.path.join(out_tmp_dir, "bin_graph_edglist"))
+        # # df = nx.to_pandas_adjacency(G)
+        # # df.to_csv(os.path.join(out_tmp_dir, "bin_graph_edglist.tsv"), sep='\t')
+        # nx.write_weighted_edgelist(G, os.path.join(out_tmp_dir, "bin_graph_w_edglist.tsv"), delimiter='\t')
+
+        # with open(os.path.join(out_tmp_dir, "bin_graph_edglist"), "w") as fl:
+        #     for e in nx.edges(G):
+
+        #         print(e)
+        #         print(dir(e))
+        #         print(e)
 
 
-    logging.info('Select best bin')
+    logging.info('Select best bins')
     selected_bins = bin_manager.select_best_bins(all_bins)
 
-    logging.info('Writing selected bins')
-    write_bin_info(selected_bins, 'selected_bins.tsv')
+    logging.info(f'Writing selected bins in {final_bin_report}')
+    if use_contig_index:
+        for b in selected_bins:
+            b.contigs = {index_to_contig[c_index] for c_index in b.contigs }
+    write_bin_info(selected_bins, final_bin_report)
+
+    write_bins_fasta(selected_bins, contigs_fasta, outdir_final_bin_set)
+
+    if debug:
+        for sb in selected_bins:
+            if sb.completeness >= 90 and sb.contamination <= 10:
+                    print(sb, sb.completeness, sb.contamination )
+        hq_bins = len([sb for sb in selected_bins if sb.completeness >= 90 and sb.contamination <= 10 ]) 
+        hq_bins_single = len([sb for sb in selected_bins if sb.completeness >= 90 and sb.contamination <= 10 and len(sb.contigs) ==1 ]) 
+        logging.debug(f'{hq_bins}/{len(selected_bins)} selected bins have a high quality.')
+        logging.debug(f'{hq_bins_single}/{len(selected_bins)} selected bins have a high quality and are made of only one contig.')
+
+
 
 
 # If this script is run from the command line then call the main function.

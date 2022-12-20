@@ -112,6 +112,7 @@ def compute_N50(list_of_lengths):
     sum_len = sum(list_of_lengths)
 
     cum_length = 0
+    length = 0
     for length in list_of_lengths:
         if cum_length + length >= sum_len/2:
             return length

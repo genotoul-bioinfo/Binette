@@ -81,7 +81,7 @@ class Bin:
     def union(self, *others):
         other_contigs = (o.contigs for o in others)
         contigs = self.contigs.union(*other_contigs)
-        name = f"{self.name} & {' & '.join([other.name for other in others])}"
+        name = f"{self.name} | {' | '.join([other.name for other in others])}"
         origin = 'union'
 
         return Bin(contigs, origin, name)
@@ -139,7 +139,23 @@ def get_bin_graph(bins):
 
             if bin1.overlaps_with(bin2):
                 # logging.info(f"{bin1} overlaps with {bin2}")
-                G.add_edge(bin1.id, bin2.id)
+                G.add_edge(bin1.id, bin2.id, )
+    return G
+
+
+def get_bin_graph_with_attributes(bins, contig_to_length):
+    G = nx.Graph()
+    G.add_nodes_from((b.id for b in bins))     
+
+    for i, (bin1, bin2) in enumerate(itertools.combinations(bins, 2)):
+            if bin1.overlaps_with(bin2):
+                
+                contigs = (bin1.contigs & bin2.contigs)
+                shared_length = sum((contig_to_length[c] for c in contigs))
+                max_shared_length_prct = 100 - 100 * (shared_length / min((bin1.length, bin2.length)))
+
+                # logging.info(f"{bin1} overlaps with {bin2}")
+                G.add_edge(bin1.id, bin2.id, weight=max_shared_length_prct )
     return G
 
 def get_all_possible_combinations(clique):
@@ -152,12 +168,11 @@ def get_intersection_bins(G):
     for clique in nx.clique.find_cliques(G):
         bins_combinations = get_all_possible_combinations(clique)
         for bins in bins_combinations:
-            print("+========")
-            [print(b, b.completeness) for b in bins]
 
             if max((b.completeness for b in bins)) < 20:
-                print('completeness is not good enough' )
-                input()    
+                logging.debug('completeness is not good enough to create a new bin on intersection')
+                logging.debug(f"{[(str(b), b.completeness, b.contamination)  for b in bins]}")
+
                 continue
             intersec_bin = bins[0].intersection(*bins[1:])
 
@@ -173,37 +188,35 @@ def get_difference_bins(G):
         # TODO should not use combinations but another method of itertools to get all possible combination in all possible order.
         bins_combinations = get_all_possible_combinations(clique)
         for bins in bins_combinations:
-            print("+========")
-            [print(b, b.completeness) for b in bins]
-
-
+        
             for bin_a in bins:
   
                 bin_diff = bin_a.difference(*(b for b in bins if b != bin_a))
-                print(f'bin diff {bin_diff}')
                 if bin_a.completeness < 20:
-                    print(f'completeness of {bin_a} is not good enough to do difference... ' )
+                    logging.debug(f'completeness of {bin_a} is not good enough to do difference... ' )
+                    logging.debug(f"{[(str(b), b.completeness, b.contamination)  for b in bins]}")
+                    continue
   
-
                 if bin_diff.contigs:
                     difference_bins.add(bin_diff)
 
     return difference_bins
 
 
-def get_union_bins(G):
+def get_union_bins(G, max_conta = 50):
     union_bins = set()
-    #nx.draw_shell(G, with_labels=True)
     for clique in nx.clique.find_cliques(G):
         bins_combinations = get_all_possible_combinations(clique)
         for bins in bins_combinations:
-            # print(f'bins {[str(b) for b in bins]}')
+            if max((b.contamination for b in bins)) > max_conta:
+                logging.debug(f"some bin are too contaminated to make a useful union bin")
+                logging.debug(f"{[(str(b), b.completeness, b.contamination)  for b in bins]}")
+                continue
 
-            for bin_a in bins:
-                bin_union = bin_a.union(*(b for b in bins if b != bin_a))
-                # print("DIFF", bin_union )
-                
-                union_bins.add(bin_union)
+            bins = set(bins)
+            bin_a = set(bins).pop()
+            bin_union = bin_a.union(*bins)
+            union_bins.add(bin_union)
 
     return union_bins
 
@@ -211,7 +224,6 @@ def get_union_bins(G):
 def create_intersec_diff_bins(G):
     new_bins = set()
 
-    #nx.draw_shell(G, with_labels=True)
     for clique in nx.clique.find_cliques(G):
         bins_combinations = get_all_possible_combinations(clique)
         for bins in bins_combinations:
