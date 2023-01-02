@@ -52,58 +52,10 @@ and download its database
 checkm2 database --download --path checkm2/database/
 ```
 
-
 Binette should be able to run :
 
 ```
 python bin_refinement/bin_refinement.py -h
-```
-
-
-# General behaviour
-
-## Help message
-
-Bin_refinement can display usage information on the command line via the `-h` or `--help` argument:
-
-```
-
-```
-
-
-# Testing
-
-## Unit tests
-
-You can run the unit tests for bin_refinement with the following commands:
-```
-cd bin_refinement/python/bin_refinement
-
-
-```
-
-## Test suite
-
-Sample test input files are provided in the `functional_tests/test_data` folder.
-```
-cd functional_tests/test_data
-bin_refinement two_sequence.fasta
-
-```
-
-Automated tests can be run using the `functional_tests/bin_refinement-test.sh` script like so:
-
-```
-cd functional_tests
-./bin_refinement-test.sh -p bin_refinement -d test_data
-```
-
-The `-p` argument specifies the name of the program to test, the `-d` argument specifies the path of the directory containing test data.
-The script will print the number of passed and failed test cases. More detailed information about each test case can be obtained
-by requesting "verbose" output with the `-d` flag:
-
-```
-./bin_refinement-test.sh -p bin_refinement -d test_data -v
 ```
 
 # Bug reporting and feature requests
