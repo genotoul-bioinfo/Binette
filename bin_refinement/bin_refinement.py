@@ -14,12 +14,11 @@ from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 import sys
 import logging
 import bin_manager
-import file_manager
+import contig_manager
 import os
 import cds
 import diamond
 import bin_quality
-from checkm2 import modelPostprocessing
 import pyfastx
 
 # import pkg_resources
@@ -69,8 +68,8 @@ def parse_arguments():
                     action="store_true")
     parser.add_argument("--resume", help="active resume mode",
                         action="store_true")
-
-
+    parser.add_argument("--low_mem", help="low mem mode",
+                        action="store_true")
     parser.add_argument("--use_contig_index", help="active debug mode",
                         action="store_true")
 
@@ -142,68 +141,82 @@ def main():
 
     init_logging(args.verbose, args.debug)
 
+    ### Setup input parameters ###
+
     bin_dirs = args.bins
     contigs_fasta = args.contigs
     threads = args.threads
     outdir = args.outdir
-    outdir_final_bin_set = os.path.join(outdir, 'final_bins')
+    low_mem = args.low_mem
+
+    ## Temporary files ##
     out_tmp_dir = os.path.join(outdir, 'temporary_files')
-
-
     os.makedirs(out_tmp_dir, exist_ok=True)
-    os.makedirs(outdir_final_bin_set, exist_ok=True)
 
     faa_file = os.path.join(out_tmp_dir, 'assembly_proteins.faa')
     diamond_result_file = os.path.join(out_tmp_dir, 'diamond_result.tsv' ) 
     diamond_log  = os.path.join(out_tmp_dir, 'diamond_run.log' ) 
 
+    ## Output files ##
+    outdir_final_bin_set = os.path.join(outdir, 'final_bins')
+    os.makedirs(outdir_final_bin_set, exist_ok=True)
+
     final_bin_report = os.path.join(outdir, 'final_bins_quality_reports.tsv')
+
+    ## Flag parameters ##
     resume = args.resume
     use_contig_index = args.use_contig_index
     debug = args.debug
 
+    if resume and not os.path.isfile(faa_file):
+        logging.error(f'Protein file {faa_file} does not exist. Resuming is not possible')
+        exit(1)
 
+    if resume and not os.path.isfile(diamond_result_file):
+        logging.error(f'Diamond result file {diamond_result_file} does not exist. Resuming is not possible')
+        exit(1) 
+
+    ### Loading input bin sets ####
     logging.info('Parse bin directories.')
     bin_name_to_bin_dir = infer_bin_name_from_bin_dir(bin_dirs)
-    bin_name_to_bins = bin_manager.parse_bin_directories(bin_name_to_bin_dir)
+    bin_set_name_to_bins = bin_manager.parse_bin_directories(bin_name_to_bin_dir)
 
-    original_bins = bin_manager.dereplicate_bin_sets(bin_name_to_bins.values()) 
+    original_bins = bin_manager.dereplicate_bin_sets(bin_set_name_to_bins.values()) 
     contigs_in_bins = bin_manager.get_contigs_in_bins(original_bins) 
 
     logging.info('Parse fasta file of assembly.')
-    contigs_object = file_manager.parse_fasta_file(contigs_fasta)
+    contigs_object = contig_manager.parse_fasta_file(contigs_fasta)
     contig_to_length = {seq.name:len(seq) for seq in contigs_object if seq.name in contigs_in_bins}
 
-    if not resume:
-        contigs_iterator = (s for s in file_manager.parse_fasta_file(contigs_fasta) if s.name in contigs_in_bins)
+    ### Predict or reuse proteins prediction and run diamond on them ####
+    if resume:
+        logging.info(f'Parsing faa file: {faa_file}.')
+        contig_to_genes = cds.parse_faa_file(faa_file)
+        check_contig_consistency(contig_to_length, contig_to_genes, contigs_fasta, faa_file)
+
+    else:
+        contigs_iterator = (s for s in contig_manager.parse_fasta_file(contigs_fasta) if s.name in contigs_in_bins)
         contig_to_genes = cds.predict(contigs_iterator, faa_file, threads)
 
         diamond_db_path = diamond.get_checkm2_db()
-        diamond.run(faa_file, diamond_result_file, diamond_db_path, diamond_log, threads)
-
-    else:
-        logging.info('Parse faa file.')
-        contig_to_genes = cds.parse_faa_file(faa_file)
-        check_contig_consistency(contig_to_length, contig_to_genes, contigs_fasta, faa_file)
+        diamond.run(faa_file, diamond_result_file, diamond_db_path, diamond_log, threads, low_mem=low_mem)
 
     logging.info('Parsing diamond results.')
     contig_to_kegg_counter = diamond.get_contig_to_kegg_id(diamond_result_file)
     ## Check contigs from diamond vs input assembly consistency
     check_contig_consistency(contig_to_length, contig_to_kegg_counter, contigs_fasta, diamond_result_file)
     
-    if use_contig_index:
-        logging.debug('Transforming contig name to index to save memory.')
-        contig_to_index = {contig:index for index, contig in enumerate(contigs_in_bins)}
-        index_to_contig = {index:contig for contig, index  in contig_to_index.items() }
+    ### Use contig index instead of contig name to save memory
+    contig_to_index, index_to_contig = contig_manager.make_contig_index(contigs_in_bins)
 
-        contig_to_genes = {contig_to_index[contig]:genes for contig, genes in contig_to_genes.items()}
-        contig_to_length = {contig_to_index[contig]:length for contig, length in contig_to_length.items()}
-        contig_to_kegg_counter =  {contig_to_index[contig]:kegg_counter for contig, kegg_counter in contig_to_kegg_counter.items()}
+    contig_to_kegg_counter = contig_manager.apply_contig_index(contig_to_index, contig_to_kegg_counter)
+    contig_to_genes = contig_manager.apply_contig_index(contig_to_index, contig_to_genes)
+    contig_to_length = contig_manager.apply_contig_index(contig_to_index, contig_to_length) 
+    
+    bin_manager.rename_bin_contigs(original_bins, contig_to_index)
 
-        for b in original_bins:
-            b.contigs = {contig_to_index[contig] for contig in b.contigs}
+    ## Extract cds metadata ##
 
-    # from genes extract contig cds metadata
     logging.info('Compute cds metadata.')
     contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length = cds.get_contig_cds_metadata(contig_to_genes, threads) 
     
@@ -214,42 +227,19 @@ def main():
                     'contig_to_length':contig_to_length}
 
     logging.info('Add size and assess quality of input bins')
-    
 
     # TODO paralellize
     # original_bins = bin_quality.add_bin_metrics_in_parallel(original_bins, contig_info, threads)
 
     bin_quality.add_bin_metrics(original_bins, contig_info)
 
-    for bin_set_id, bins in bin_name_to_bins.items():
-
+    for bin_set_id, bins in bin_set_name_to_bins.items():
         logging.info(f'{bin_set_id} - {len(bins)} ')
 
-        for b in bin_name_to_bins[bin_set_id]:
-            logging.debug(f"{b} -> {b.score}")
         
     logging.info('Create intermediate bins:')
-
-    logging.info('Making bin graph...')
-    connected_bins_graph = bin_manager.from_bin_sets_to_bin_graph(bin_name_to_bins)
-
-    logging.info('Create intersection bins...')
-    intersection_bins = bin_manager.get_intersection_bins(connected_bins_graph)
-    logging.info(f'{len(intersection_bins)} bins created on intersections.')
-
-    logging.info('Create difference bin...')
-    difference_bins =  bin_manager.get_difference_bins(connected_bins_graph)
-    logging.info(f'{len(difference_bins)} bins created based on symetric difference.')
-
-
-    logging.info('Create get_union_bins bin...')
-    union_bins =  bin_manager.get_union_bins(connected_bins_graph)
-    logging.info(f'{len(union_bins)} bins created on unions.')
-
-    new_bins = difference_bins | intersection_bins | union_bins
-    
-    
-    # bin_quality.add_bin_metrics(new_bins, contig_info)
+    new_bins = bin_manager.create_intermediate_bins(bin_set_name_to_bins)
+ 
     logging.info(f'Assess quality for supplementary intermediate bins.')
     new_bins = bin_quality.add_bin_metrics(new_bins, contig_info, threads)
 

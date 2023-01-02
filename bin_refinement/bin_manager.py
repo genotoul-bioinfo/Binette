@@ -73,7 +73,7 @@ class Bin:
     def difference(self, *others):
         other_contigs = (o.contigs for o in others)
         contigs = self.contigs.difference(*other_contigs)
-        name = f"{self.name} & {' & '.join([other.name for other in others])}"
+        name = f"{self.name} - {' - '.join([other.name for other in others])}"
         origin = 'diff'
 
         return Bin(contigs, origin, name)
@@ -284,3 +284,27 @@ def dereplicate_bin_sets(bin_sets):
 
 def get_contigs_in_bins(bins):
     return set().union(*(b.contigs for b in bins))
+
+def rename_bin_contigs(bins, contig_to_index):
+    for b in bins:
+        b.contigs = {contig_to_index[contig] for contig in b.contigs}
+
+def create_intermediate_bins(bin_set_name_to_bins):
+
+    logging.info('Making bin graph...')
+    connected_bins_graph = from_bin_sets_to_bin_graph(bin_set_name_to_bins)
+
+    logging.info('Create intersection bins...')
+    intersection_bins = get_intersection_bins(connected_bins_graph)
+    logging.info(f'{len(intersection_bins)} bins created on intersections.')
+
+    logging.info('Create difference bin...')
+    difference_bins =  get_difference_bins(connected_bins_graph)
+    logging.info(f'{len(difference_bins)} bins created based on symetric difference.')
+
+    logging.info('Create get_union_bins bin...')
+    union_bins =  get_union_bins(connected_bins_graph)
+    logging.info(f'{len(union_bins)} bins created on unions.')
+
+    return difference_bins | intersection_bins | union_bins
+    

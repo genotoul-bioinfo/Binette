@@ -1,21 +1,16 @@
 import pyrodigal
 import concurrent.futures as cf
 import logging
-import file_manager
 from collections import Counter
 import pyfastx
-from memory_control import measure_memory
 
 from tqdm import tqdm
 
 def get_contig_from_cds_name(cds_name):
     return '_'.join(cds_name.split('_')[:-1])
 
-
-def predict(contigs_iterator:str, outfaa:str, threads:int = 1):
+def predict(contigs_iterator, outfaa, threads = 1):
     """Predict open reading frames with Pyrodigal."""
-
-    # fa = file_manager.parse_fasta_file(contigs_file)
 
     future_per_contig = {}
     orf_finder = pyrodigal.OrfFinder(meta='meta')
