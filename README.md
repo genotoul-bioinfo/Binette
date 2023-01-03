@@ -14,14 +14,9 @@ Binette is inspired from the metaWRAP bin-refinement tool but it effectively sol
 - It is not limited in the number of input bin sets.
 - It selects the best bins in a more accurate and elegant manner.
 
-
-# Licence
-
-This program is released as an open source software under the terms of [MIT License](https://raw.githubusercontent.com/GITHUB_USERNAME/bin_refinement/master/LICENSE).
-
 # Installing
 
-You can install bin_refinement directly from the source code or build and run it from within Docker container.
+You can install binette directly from the source code or build and run it from within Docker container.
 
 ## Installing from a conda environnement
 
@@ -31,13 +26,13 @@ git clone git@forgemia.inra.fr:jean.mainguy/bin-refinement.git
 cd bin-refinement
 ```
 
-Then create a Conda environment using the `bin_refinement_dev.yaml` file:
+Then create a Conda environment using the `binette_dev.yaml` file:
 ```
-conda env create -n bin_refinement -f bin_refinement_dev.yaml
-conda activate bin_refinement 
+conda env create -n binette -f binette_dev.yaml
+conda activate binette 
 ```
 
-Finally install checkm2 still in bin_refinement
+Finally install checkm2 still in binette
 
 ```
 git clone --recursive https://github.com/chklovski/checkm2.git
@@ -55,11 +50,15 @@ checkm2 database --download --path checkm2/database/
 Binette should be able to run :
 
 ```
-python bin_refinement/bin_refinement.py -h
+python binette/binette.py -h
 ```
 
 # Bug reporting and feature requests
 
-Please submit bug reports and feature requests to the issue tracker on GitHub:
+Please submit bug reports and feature requests to the issue tracker:
 
-[bin_refinement issue tracker](https://github.com/GITHUB_USERNAME/bin_refinement/issues)
+[binette issue tracker](https://forgemia.inra.fr/jean.mainguy/binette/-/issues)
+
+# Licence
+
+This program is released as an open source software under the terms of [MIT License](https://forgemia.inra.fr/jean.mainguy/binette/-/raw/main/LICENSE).
