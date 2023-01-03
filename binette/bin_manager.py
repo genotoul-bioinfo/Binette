@@ -5,6 +5,7 @@
 
 import logging
 import os
+from collections import defaultdict
 import pyfastx
 
 import itertools
@@ -114,6 +115,29 @@ def parse_bin_directories(bin_name_to_bin_dir: dict) -> dict:
 
     return bin_name_to_bins
 
+def parse_contig2bin_tables(bin_name_to_bin_tables: dict) -> dict:
+    bin_name_to_bins = {}
+    
+    for name, contig2bin_table in bin_name_to_bin_tables.items():
+        bin_name_to_bins[name] = get_bins_from_contig2bin_table(contig2bin_table, name)
+
+    return bin_name_to_bins
+
+def get_bins_from_contig2bin_table(contig2bin_table, set_name):
+    bin_name2contigs = defaultdict(set)
+    with open(contig2bin_table) as fl:
+        for l in fl:
+            if l.startswith('#'):
+                continue
+            contig_name = l.strip().split("\t")[0]
+            bin_name = l.strip().split("\t")[1]
+            bin_name2contigs[bin_name].add(contig_name)
+
+    bins = []
+    for bin_name, contigs in bin_name2contigs.items():
+        bin_obj = Bin(contigs, set_name, bin_name)
+        bins.append(bin_obj)
+    return bins
 
 def from_bin_sets_to_bin_graph(bin_name_to_bin_set):
     G = nx.Graph()

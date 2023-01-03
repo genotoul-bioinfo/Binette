@@ -13,13 +13,14 @@ from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 
 import sys
 import logging
-import bin_manager
-import contig_manager
 import os
+
+import contig_manager
 import cds
 import diamond
 import bin_quality
 import pyfastx
+import bin_manager
 
 # import pkg_resources
 
@@ -53,14 +54,26 @@ def parse_arguments():
     """Parse script arguments."""
     parser = ArgumentParser(description="...",
                             formatter_class=ArgumentDefaultsHelpFormatter)
-                        
-    parser.add_argument("-i", "--bins", nargs='+', required=True, 
-                        help="Bin folders containing each bin in a fasta file.")
-    
-    parser.add_argument("-c", "--contigs", required=True, help="Contigs in fasta format.")
-    parser.add_argument("-t", "--threads", default=1, type=int, help="Number of threads.")
-    parser.add_argument("-o", "--outdir", default='results', help="Output directory.")
 
+    input_arg = parser.add_mutually_exclusive_group(required=True)
+
+    input_arg.add_argument("-d", "--bin_dirs", nargs='+', 
+                        help="list of bin folders containing each bin in a fasta file.")
+
+    input_arg.add_argument("-b", "--contig2bin_tables", nargs='+',
+                        help="list of contig2bin table with two columns separated with a tabulation: contig, bin")                   
+    
+    parser.add_argument("-c", "--contigs", required=True, 
+                        help="Contigs in fasta format.")
+
+    parser.add_argument("-t", "--threads", 
+                        default=1, type=int, help="Number of threads.")
+
+    parser.add_argument("-o", "--outdir", default='results',
+                        help="Output directory.")
+
+    parser.add_argument("-e", "--extension", default='fasta', 
+                        help="Extension of fasta files in bin folders (necessary when --bin_dirs is used).")
 
     parser.add_argument("-v", "--verbose", help="increase output verbosity",
                         action="store_true")
@@ -80,10 +93,13 @@ def parse_arguments():
     args = parser.parse_args()
     return args
 
-def infer_bin_name_from_bin_dir(bin_dirs):
+def infer_bin_name_from_bin_inputs(input_bins):
     # remove common prefix of bin dir to get nicer label
-    commonprefix_len = len(os.path.commonprefix(bin_dirs))
-    bin_name_to_bin_dir = {d[commonprefix_len:]:d for d in bin_dirs}
+    commonprefix_len = len(os.path.commonprefix(input_bins))
+    reversed_strings = [''.join(reversed(s)) for s in input_bins]
+    commonsufix_len = len(os.path.commonprefix(reversed_strings))
+
+    bin_name_to_bin_dir = {d[commonprefix_len:-commonsufix_len]:d for d in input_bins}
     return bin_name_to_bin_dir
 
 def write_bin_info(bins, output):
@@ -143,12 +159,13 @@ def main():
 
     ### Setup input parameters ###
 
-    bin_dirs = args.bins
+    bin_dirs = args.bin_dirs
+    contig2bin_tables = args.contig2bin_tables
     contigs_fasta = args.contigs
     threads = args.threads
     outdir = args.outdir
     low_mem = args.low_mem
-
+    
     ## Temporary files ##
     out_tmp_dir = os.path.join(outdir, 'temporary_files')
     os.makedirs(out_tmp_dir, exist_ok=True)
@@ -177,9 +194,21 @@ def main():
         exit(1) 
 
     ### Loading input bin sets ####
-    logging.info('Parse bin directories.')
-    bin_name_to_bin_dir = infer_bin_name_from_bin_dir(bin_dirs)
-    bin_set_name_to_bins = bin_manager.parse_bin_directories(bin_name_to_bin_dir)
+
+    if bin_dirs: 
+        logging.info('Parsing bin directories.')
+        bin_name_to_bin_dir = infer_bin_name_from_bin_inputs(bin_dirs)
+        bin_set_name_to_bins = bin_manager.parse_bin_directories(bin_name_to_bin_dir)
+    else:
+        logging.info('Parsing bin2contig files.')
+        bin_name_to_bin_table = infer_bin_name_from_bin_inputs(contig2bin_tables)
+        bin_set_name_to_bins = bin_manager.parse_contig2bin_tables(bin_name_to_bin_table)
+
+    logging.info(f'{len(bin_name_to_bin_table)} bin sets have been parsed:')
+    for bin_set_id, bins in bin_set_name_to_bins.items():
+        logging.info(f' {bin_set_id} - {len(bins)} ')
+
+    
 
     original_bins = bin_manager.dereplicate_bin_sets(bin_set_name_to_bins.values()) 
     contigs_in_bins = bin_manager.get_contigs_in_bins(original_bins) 
@@ -232,10 +261,6 @@ def main():
     # original_bins = bin_quality.add_bin_metrics_in_parallel(original_bins, contig_info, threads)
 
     bin_quality.add_bin_metrics(original_bins, contig_info)
-
-    for bin_set_id, bins in bin_set_name_to_bins.items():
-        logging.info(f'{bin_set_id} - {len(bins)} ')
-
         
     logging.info('Create intermediate bins:')
     new_bins = bin_manager.create_intermediate_bins(bin_set_name_to_bins)
