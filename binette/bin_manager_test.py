@@ -1,5 +1,5 @@
 '''
-Unit tests for bin_refinement.
+Unit tests for binette.
 
 '''
 
