@@ -13,6 +13,7 @@ Binette is inspired from the metaWRAP bin-refinement tool but it effectively sol
 - It is much faster as it launches the first steps of checkm2 (prodigal and diamond runs) only once on all contigs and then uses this intermediate results to assess quality for any bin.
 - It is not limited in the number of input bin sets.
 - It selects the best bins in a more accurate and elegant manner.
+- It is easier to use.
 
 # Installing
 
