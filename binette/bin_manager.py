@@ -58,10 +58,10 @@ class Bin:
         self.N50 = n50
           
 
-    def add_quality(self, completeness, contamination):
+    def add_quality(self, completeness, contamination, contamination_weigth):
         self.completeness =  completeness
         self.contamination = contamination 
-        self.score = completeness - 5*contamination
+        self.score = completeness - contamination_weigth*contamination
 
     def intersection(self, *others):
         other_contigs = (o.contigs for o in others)
@@ -127,7 +127,8 @@ def get_bins_from_contig2bin_table(contig2bin_table, set_name):
     bin_name2contigs = defaultdict(set)
     with open(contig2bin_table) as fl:
         for l in fl:
-            if l.startswith('#'):
+            if l.startswith('#') or l.startswith('@'):
+                logging.debug(f'Ignoring a line from {contig2bin_table}: {l}')
                 continue
             contig_name = l.strip().split("\t")[0]
             bin_name = l.strip().split("\t")[1]

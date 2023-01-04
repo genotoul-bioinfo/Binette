@@ -128,7 +128,7 @@ def add_bin_size_and_N50(bins, contig_to_size):
         bin_obj.add_length(sum(lengths))
         bin_obj.add_N50(n50)
 
-def add_bin_metrics_in_parallel(bins, contig_info, threads):
+def add_bin_metrics_in_parallel(bins, contig_info, threads, contamination_weigth):
     
     chunk_size = int(len(bins)/threads) + 1
     print("CHUNK SIZE TO PARALLELIZE",chunk_size )
@@ -136,13 +136,13 @@ def add_bin_metrics_in_parallel(bins, contig_info, threads):
     with cf.ProcessPoolExecutor(max_workers=threads) as tpe:
         for i, bins_chunk in enumerate(chunks(bins, chunk_size)):
             print(f"chunk {i}, {len(bins_chunk)} bins")
-            results.append(tpe.submit(add_bin_metrics, *(bins_chunk, contig_info)))
+            results.append(tpe.submit(add_bin_metrics, *(bins_chunk, contig_info, contamination_weigth)))
     
     processed_bins = {bin_o for r in results for bin_o in r.result()}
     
     return processed_bins
 
-def add_bin_metrics(bins, contig_info, n=1000, threads=1):
+def add_bin_metrics(bins, contig_info, contamination_weigth, n=1000, threads=1):
     postProcessor = modelPostprocessing.modelProcessor(threads)
 
     contig_to_kegg_counter = contig_info["contig_to_kegg_counter"]
@@ -155,7 +155,9 @@ def add_bin_metrics(bins, contig_info, n=1000, threads=1):
     add_bin_size_and_N50(bins, contig_to_length)
 
     logging.info('Asses bin quality')
-    assess_bins_quality_by_chunk(bins, contig_to_kegg_counter, contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length, postProcessor)
+    assess_bins_quality_by_chunk(bins, contig_to_kegg_counter, contig_to_cds_count, 
+                                    contig_to_aa_counter, contig_to_aa_length, 
+                                    contamination_weigth, postProcessor)
     # # assess bin quality by chunk to reduce memory 
     # for i, chunk_bins_iter in enumerate(chunks(bins, n)):
     #     chunk_bins = set(chunk_bins_iter)
@@ -168,16 +170,16 @@ def chunks(iterable, size):
     it = iter(iterable)
     return iter(lambda: tuple(islice(it, size)), ())
 
-def assess_bins_quality_by_chunk(bins, contig_to_kegg_counter, contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length, postProcessor=None, threads=1):
+def assess_bins_quality_by_chunk(bins, contig_to_kegg_counter, contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length, contamination_weigth,  postProcessor=None, threads=1):
     n = 2500
     
     for i, chunk_bins_iter in enumerate(chunks(bins, n)):
         chunk_bins = set(chunk_bins_iter)
         logging.debug(f'chunk {i}: assessing quality of {len(chunk_bins)}')
-        assess_bins_quality(chunk_bins, contig_to_kegg_counter, contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length, postProcessor)
+        assess_bins_quality(chunk_bins, contig_to_kegg_counter, contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length, contamination_weigth, postProcessor)
 
 
-def assess_bins_quality(bins, contig_to_kegg_counter, contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length, postProcessor=None, threads=1):
+def assess_bins_quality(bins, contig_to_kegg_counter, contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length, contamination_weigth, postProcessor=None, threads=1):
 
     if postProcessor is None:
         postProcessor = modelPostprocessing.modelProcessor(threads) 
@@ -226,5 +228,5 @@ def assess_bins_quality(bins, contig_to_kegg_counter, contig_to_cds_count, conti
         completeness = final_results.loc[bin_obj.id, 'Completeness']
         contamination = final_results.loc[bin_obj.id, 'Contamination']
 
-        bin_obj.add_quality(completeness, contamination)
+        bin_obj.add_quality(completeness, contamination, contamination_weigth)
 

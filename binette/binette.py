@@ -71,6 +71,9 @@ def parse_arguments():
 
     parser.add_argument("-o", "--outdir", default='results',
                         help="Output directory.")
+    parser.add_argument("-w", "--contamination_weigth", default=5, type=float,
+                        help="Bin are scored as follow: completeness - weigth * contamination. A low contamination_weigth favor complete bins over low contaminated bins.")
+                        
 
     parser.add_argument("-e", "--extension", default='fasta', 
                         help="Extension of fasta files in bin folders (necessary when --bin_dirs is used).")
@@ -82,8 +85,6 @@ def parse_arguments():
     parser.add_argument("--resume", help="active resume mode",
                         action="store_true")
     parser.add_argument("--low_mem", help="low mem mode",
-                        action="store_true")
-    parser.add_argument("--use_contig_index", help="active debug mode",
                         action="store_true")
 
     # parser.add_argument('--version',
@@ -99,17 +100,23 @@ def infer_bin_name_from_bin_inputs(input_bins):
     reversed_strings = [''.join(reversed(s)) for s in input_bins]
     commonsufix_len = len(os.path.commonprefix(reversed_strings))
 
-    bin_name_to_bin_dir = {d[commonprefix_len:-commonsufix_len]:d for d in input_bins}
+    bin_name_to_bin_dir = {d[commonprefix_len:len(d)-commonsufix_len]:d for d in input_bins}
+
+    logging.debug(f"input bins : {input_bins}")
+    logging.debug(f"commonprefix {os.path.commonprefix(input_bins)}")
+    logging.debug(f"commonsuffix {os.path.commonprefix(reversed_strings)}")
+    logging.debug(f"bin_name_to_bin_dir {bin_name_to_bin_dir}")
+
     return bin_name_to_bin_dir
 
 def write_bin_info(bins, output):
 
-    header = ['origin', "name", 'completeness', 'contamination', "score", 'size', 'N50', 'contig_count']
+    header = ['bin_id', 'origin', "namel", 'completeness', 'contamination', "score", 'size', 'N50', 'contig_count']
     with open(output, "w") as fl:
         fl.write('\t'.join(header)+"\n")
         for bin_obj in bins:
 
-            line = [bin_obj.origin, bin_obj.name,
+            line = [bin_obj.id, bin_obj.origin, bin_obj.name, 
                     bin_obj.completeness, bin_obj.contamination, bin_obj.score, 
                     bin_obj.length, bin_obj.N50,
                      len(bin_obj.contigs), ]
@@ -165,6 +172,7 @@ def main():
     threads = args.threads
     outdir = args.outdir
     low_mem = args.low_mem
+    contamination_weigth = args.contamination_weigth
     
     ## Temporary files ##
     out_tmp_dir = os.path.join(outdir, 'temporary_files')
@@ -182,7 +190,6 @@ def main():
 
     ## Flag parameters ##
     resume = args.resume
-    use_contig_index = args.use_contig_index
     debug = args.debug
 
     if resume and not os.path.isfile(faa_file):
@@ -204,7 +211,7 @@ def main():
         bin_name_to_bin_table = infer_bin_name_from_bin_inputs(contig2bin_tables)
         bin_set_name_to_bins = bin_manager.parse_contig2bin_tables(bin_name_to_bin_table)
 
-    logging.info(f'{len(bin_name_to_bin_table)} bin sets have been parsed:')
+    logging.info(f'{len(bin_set_name_to_bins)} bin sets processed:')
     for bin_set_id, bins in bin_set_name_to_bins.items():
         logging.info(f' {bin_set_id} - {len(bins)} ')
 
@@ -260,13 +267,13 @@ def main():
     # TODO paralellize
     # original_bins = bin_quality.add_bin_metrics_in_parallel(original_bins, contig_info, threads)
 
-    bin_quality.add_bin_metrics(original_bins, contig_info)
+    bin_quality.add_bin_metrics(original_bins, contig_info, contamination_weigth)
         
     logging.info('Create intermediate bins:')
     new_bins = bin_manager.create_intermediate_bins(bin_set_name_to_bins)
  
     logging.info(f'Assess quality for supplementary intermediate bins.')
-    new_bins = bin_quality.add_bin_metrics(new_bins, contig_info, threads)
+    new_bins = bin_quality.add_bin_metrics(new_bins, contig_info, threads, contamination_weigth)
 
     
     # bin_quality.add_bin_size_and_N50(new_bins, contig_to_length)
@@ -307,10 +314,13 @@ def main():
     logging.info('Select best bins')
     selected_bins = bin_manager.select_best_bins(all_bins)
 
+    logging.info('Filtering bins: only bins with completeness >= 10 are kept')
+    selected_bins = [b for b in selected_bins if b.completeness >= 10]
+
     logging.info(f'Writing selected bins in {final_bin_report}')
-    if use_contig_index:
-        for b in selected_bins:
-            b.contigs = {index_to_contig[c_index] for c_index in b.contigs }
+
+    for b in selected_bins:
+        b.contigs = {index_to_contig[c_index] for c_index in b.contigs }
     write_bin_info(selected_bins, final_bin_report)
 
     write_bins_fasta(selected_bins, contigs_fasta, outdir_final_bin_set)
@@ -319,13 +329,11 @@ def main():
         for sb in selected_bins:
             if sb.completeness >= 90 and sb.contamination <= 10:
                     print(sb, sb.completeness, sb.contamination )
-        hq_bins = len([sb for sb in selected_bins if sb.completeness >= 90 and sb.contamination <= 10 ]) 
-        hq_bins_single = len([sb for sb in selected_bins if sb.completeness >= 90 and sb.contamination <= 10 and len(sb.contigs) ==1 ]) 
-        logging.debug(f'{hq_bins}/{len(selected_bins)} selected bins have a high quality.')
-        logging.debug(f'{hq_bins_single}/{len(selected_bins)} selected bins have a high quality and are made of only one contig.')
 
-
-
+    hq_bins = len([sb for sb in selected_bins if sb.completeness >= 90 and sb.contamination <= 10 ]) 
+    hq_bins_single = len([sb for sb in selected_bins if sb.completeness >= 90 and sb.contamination <= 10 and len(sb.contigs) ==1 ]) 
+    logging.info(f'{hq_bins}/{len(selected_bins)} selected bins have a high quality.')
+    logging.info(f'{hq_bins_single}/{len(selected_bins)} selected bins have a high quality and are made of only one contig.')
 
 # If this script is run from the command line then call the main function.
 if __name__ == '__main__':
