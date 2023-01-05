@@ -17,7 +17,7 @@ Binette is inspired from the metaWRAP bin-refinement tool but it effectively sol
 
 # Installing
 
-You can install binette directly from the source code or build and run it from within Docker container.
+You can install binette directly from the source code or build and run it from within a Singularity container.
 
 ## Installing from a conda environnement
 
@@ -53,6 +53,29 @@ Binette should be able to run :
 ```
 python binette/binette.py -h
 ```
+
+
+## Running binette using using a singularity image
+
+Singularity version 3 or above must be installed. See [here](https://sylabs.io/guides/3.7/user-guide/quick_start.html#quick-installation-steps) how to install Singularity >=v3.
+
+Git clone binette repository and build the singularity image. 
+
+```
+git clone git@forgemia.inra.fr:jean.mainguy/bin-refinement.git
+cd bin-refinement
+sudo singularity build binette.sif singularity_recipe
+```
+
+Then if the build succesfully finished, you should be able to run Binette:
+
+```
+singularity exec binette.sif python binette/binette.py -h
+```
+
+# Usage 
+
+
 
 # Bug reporting and feature requests
 

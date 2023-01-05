@@ -1,0 +1,28 @@
+Bootstrap: docker
+From: condaforge/mambaforge
+IncludeCmd: yes
+
+%files
+bin_refinement_dev.yaml /
+
+%post
+# build-essential g++ are needed to pip install checkm2
+apt-get update && apt-get install -y procps build-essential g++ && apt-get clean -y
+/opt/conda/bin/mamba env create -n binette -f /bin_refinement_dev.yaml && /opt/conda/bin/conda clean -a
+
+export PATH=/opt/conda/envs/binette/bin:$PATH
+
+# /opt/conda/bin/conda activate binette 
+
+git clone --recursive https://github.com/chklovski/checkm2.git
+
+pip install checkm2/
+
+export PATH=/opt/conda/envs/binette/bin:/CheckM2/bin/:$PATH
+checkm2 database --download --path '.' || echo checkm2 database failed but it is probably ok
+
+%environment
+export PATH=/opt/conda/envs/binette/bin:/CheckM2/bin/:$PATH
+
+%runscript
+     "$@"
