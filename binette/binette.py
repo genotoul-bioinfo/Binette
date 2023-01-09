@@ -65,7 +65,8 @@ def parse_arguments():
     
     parser.add_argument("-c", "--contigs", required=True, 
                         help="Contigs in fasta format.")
-
+    parser.add_argument("-m", "--min_completeness", 
+                        default=10, type=int, help="Minimum completeness required for final bin selections.")
     parser.add_argument("-t", "--threads", 
                         default=1, type=int, help="Number of threads.")
 
@@ -173,6 +174,8 @@ def main():
     outdir = args.outdir
     low_mem = args.low_mem
     contamination_weigth = args.contamination_weigth
+
+    min_completeness = args.min_completeness
     
     ## Temporary files ##
     out_tmp_dir = os.path.join(outdir, 'temporary_files')
@@ -314,8 +317,8 @@ def main():
     logging.info('Select best bins')
     selected_bins = bin_manager.select_best_bins(all_bins)
 
-    logging.info('Filtering bins: only bins with completeness >= 10 are kept')
-    selected_bins = [b for b in selected_bins if b.completeness >= 10]
+    logging.info(f'Filtering bins: only bins with completeness >= {min_completeness} are kept')
+    selected_bins = [b for b in selected_bins if b.completeness >= min_completeness]
 
     logging.info(f'Writing selected bins in {final_bin_report}')
 
