@@ -3,6 +3,7 @@ import concurrent.futures as cf
 import logging
 from collections import Counter
 import pyfastx
+from collections import defaultdict
 
 from tqdm import tqdm
 
@@ -34,8 +35,12 @@ def write_faa(outfaa, contig_to_genes ):
             genes.write_translations(fl, contig_id)
         
 def parse_faa_file(faa_file):
-    
-    return {get_contig_from_cds_name(name):seq for name, seq, _ in pyfastx.Fastx(faa_file)}
+    contig_to_genes = defaultdict(list)
+    for name, seq, _ in pyfastx.Fastx(faa_file):
+        contig = get_contig_from_cds_name(name)
+        contig_to_genes[contig].append(seq)
+
+    return dict(contig_to_genes)
 
 
 def get_aa_composition(genes):
