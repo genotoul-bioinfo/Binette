@@ -93,10 +93,7 @@ def parse_arguments():
     parser.add_argument('--version',
                         action='version',
                         version=PROGRAM_VERSION)
-    # parser.add_argument('--version',
-    #                     action='version',
-    #                     version='%(prog)s ' + PROGRAM_VERSION)
-
+                        
     args = parser.parse_args()
     return args
 
@@ -300,27 +297,27 @@ def main():
     logging.info('Dereplicating input bins and new bins')
     all_bins = original_bins | new_bins
 
-    if debug:
-        import pickle
-        # import networkx as nx
-        with open(os.path.join(out_tmp_dir, 'all_bin.p' ), "bw") as fl:
-            pickle.dump( all_bins, fl)
-        logging.debug('Writting all bins info ')
-        # write_bin_info_debug(all_bins, os.path.join(out_tmp_dir, 'all_bins.tsv'))
+    # if debug:
+    #     import pickle
+    #     # import networkx as nx
+    #     with open(os.path.join(out_tmp_dir, 'all_bin.p' ), "bw") as fl:
+    #         pickle.dump( all_bins, fl)
+    #     logging.debug('Writting all bins info ')
+    #     # write_bin_info_debug(all_bins, os.path.join(out_tmp_dir, 'all_bins.tsv'))
 
-        # G = bin_manager.get_bin_graph_with_attributes(all_bins, contig_to_length)
+    #     # G = bin_manager.get_bin_graph_with_attributes(all_bins, contig_to_length)
 
-        # nx.write_edgelist(G, os.path.join(out_tmp_dir, "bin_graph_edglist"))
-        # # df = nx.to_pandas_adjacency(G)
-        # # df.to_csv(os.path.join(out_tmp_dir, "bin_graph_edglist.tsv"), sep='\t')
-        # nx.write_weighted_edgelist(G, os.path.join(out_tmp_dir, "bin_graph_w_edglist.tsv"), delimiter='\t')
+    #     # nx.write_edgelist(G, os.path.join(out_tmp_dir, "bin_graph_edglist"))
+    #     # # df = nx.to_pandas_adjacency(G)
+    #     # # df.to_csv(os.path.join(out_tmp_dir, "bin_graph_edglist.tsv"), sep='\t')
+    #     # nx.write_weighted_edgelist(G, os.path.join(out_tmp_dir, "bin_graph_w_edglist.tsv"), delimiter='\t')
 
-        # with open(os.path.join(out_tmp_dir, "bin_graph_edglist"), "w") as fl:
-        #     for e in nx.edges(G):
+    #     # with open(os.path.join(out_tmp_dir, "bin_graph_edglist"), "w") as fl:
+    #     #     for e in nx.edges(G):
 
-        #         print(e)
-        #         print(dir(e))
-        #         print(e)
+    #     #         print(e)
+    #     #         print(dir(e))
+    #     #         print(e)
 
 
     logging.info('Select best bins')
