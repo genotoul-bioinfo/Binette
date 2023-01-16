@@ -23,13 +23,15 @@ import bin_quality
 import pyfastx
 import bin_manager
 
-# import pkg_resources
+import pkg_resources
+
+PROGRAM_NAME = "Binette"
 
 
-# try:
-#     PROGRAM_VERSION = pkg_resources.require(PROGRAM_NAME)[0].version
-# except pkg_resources.DistributionNotFound:
-#     PROGRAM_VERSION = "undefined_version"
+try:
+    PROGRAM_VERSION = pkg_resources.require(PROGRAM_NAME)[0].version
+except pkg_resources.DistributionNotFound:
+    PROGRAM_VERSION = "undefined_version"
 
 
 def init_logging(verbose, debug):
@@ -88,7 +90,9 @@ def parse_arguments():
                         action="store_true")
     parser.add_argument("--low_mem", help="low mem mode",
                         action="store_true")
-
+    parser.add_argument('--version',
+                        action='version',
+                        version=PROGRAM_VERSION)
     # parser.add_argument('--version',
     #                     action='version',
     #                     version='%(prog)s ' + PROGRAM_VERSION)
@@ -113,7 +117,7 @@ def infer_bin_name_from_bin_inputs(input_bins):
 
 def write_bin_info(bins, output):
 
-    header = ['bin_id', 'origin', "namel", 'completeness', 'contamination', "score", 'size', 'N50', 'contig_count']
+    header = ['bin_id', 'origin', "name", 'completeness', 'contamination', "score", 'size', 'N50', 'contig_count']
     with open(output, "w") as fl:
         fl.write('\t'.join(header)+"\n")
         for bin_obj in bins:
@@ -178,6 +182,10 @@ def main():
 
     min_completeness = args.min_completeness
     
+    # High quality threshold used just to log number of high quality bins. 
+    hq_max_conta = 5
+    hq_min_completeness = 90
+
     ## Temporary files ##
     out_tmp_dir = os.path.join(outdir, 'temporary_files')
     os.makedirs(out_tmp_dir, exist_ok=True)
@@ -293,12 +301,12 @@ def main():
     all_bins = original_bins | new_bins
 
     if debug:
-        # import pickle
-        # # import networkx as nx
-        # with open("all_bin.p", "bw") as fl:
-        #     pickle.dump( all_bins, fl)
+        import pickle
+        # import networkx as nx
+        with open(os.path.join(out_tmp_dir, 'all_bin.p' ), "bw") as fl:
+            pickle.dump( all_bins, fl)
         logging.debug('Writting all bins info ')
-        write_bin_info_debug(all_bins, os.path.join(out_tmp_dir, 'all_bins.tsv'))
+        # write_bin_info_debug(all_bins, os.path.join(out_tmp_dir, 'all_bins.tsv'))
 
         # G = bin_manager.get_bin_graph_with_attributes(all_bins, contig_to_length)
 
@@ -331,12 +339,13 @@ def main():
 
     if debug:
         for sb in selected_bins:
-            if sb.completeness >= 90 and sb.contamination <= 10:
-                    print(sb, sb.completeness, sb.contamination )
+            if sb.completeness >= hq_min_completeness and sb.contamination <= hq_max_conta:
+                    logging.debug(f"{sb}, {sb.completeness}, {sb.contamination}")
 
-    hq_bins = len([sb for sb in selected_bins if sb.completeness >= 90 and sb.contamination <= 10 ]) 
-    hq_bins_single = len([sb for sb in selected_bins if sb.completeness >= 90 and sb.contamination <= 10 and len(sb.contigs) ==1 ]) 
-    logging.info(f'{hq_bins}/{len(selected_bins)} selected bins have a high quality.')
+
+    hq_bins = len([sb for sb in selected_bins if sb.completeness >= hq_min_completeness and sb.contamination <= hq_max_conta ]) 
+    hq_bins_single = len([sb for sb in selected_bins if sb.completeness >= hq_min_completeness and sb.contamination <=  hq_max_conta  and len(sb.contigs) ==1 ]) 
+    logging.info(f'{hq_bins}/{len(selected_bins)} selected bins have a high quality (completeness >= {hq_min_completeness} and contamination <= {hq_max_conta}).')
     logging.info(f'{hq_bins_single}/{len(selected_bins)} selected bins have a high quality and are made of only one contig.')
 
 # If this script is run from the command line then call the main function.
