@@ -193,15 +193,15 @@ def get_intersection_bins(G):
     for clique in nx.clique.find_cliques(G):
         bins_combinations = get_all_possible_combinations(clique)
         for bins in bins_combinations:
-
             if max((b.completeness for b in bins)) < 20:
                 logging.debug('completeness is not good enough to create a new bin on intersection')
                 logging.debug(f"{[(str(b), b.completeness, b.contamination)  for b in bins]}")
-
                 continue
-            intersec_bin = bins[0].intersection(*bins[1:])
 
-            intersect_bins.add(intersec_bin)
+            intersec_bin = bins[0].intersection(*bins[1:])
+            
+            if intersec_bin.contigs:
+                intersect_bins.add(intersec_bin)
 
     return intersect_bins
 
@@ -241,7 +241,9 @@ def get_union_bins(G, max_conta = 50):
             bins = set(bins)
             bin_a = set(bins).pop()
             bin_union = bin_a.union(*bins)
-            union_bins.add(bin_union)
+    
+            if bin_union.contigs:
+                union_bins.add(bin_union)
 
     return union_bins
 
