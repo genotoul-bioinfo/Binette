@@ -9,6 +9,7 @@ Portability : POSIX
 
 
 '''
+__version__ = '0.1.0'
 
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 
@@ -92,7 +93,7 @@ def parse_arguments():
                         action="store_true")
     parser.add_argument('--version',
                         action='version',
-                        version=PROGRAM_VERSION)
+                        version=__version__)
                         
     args = parser.parse_args()
     return args
