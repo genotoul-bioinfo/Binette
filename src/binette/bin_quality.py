@@ -24,8 +24,6 @@ from checkm2 import modelProcessing
 from checkm2 import modelPostprocessing
 
 
-from memory_control import measure_memory
-
 
 def get_bins_metadata_df(bins, contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length):
 

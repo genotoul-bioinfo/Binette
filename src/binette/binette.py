@@ -9,30 +9,41 @@ Portability : POSIX
 
 
 '''
-__version__ = '0.1.0'
 
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 
 import sys
 import logging
 import os
-
-import contig_manager
-import cds
-import diamond
-import bin_quality
-import pyfastx
-import bin_manager
-
 import pkg_resources
+import pyfastx
 
 PROGRAM_NAME = "Binette"
-
+PROGRAM_VERSION = "undefined_version"
 
 try:
-    PROGRAM_VERSION = pkg_resources.require(PROGRAM_NAME)[0].version
-except pkg_resources.DistributionNotFound:
-    PROGRAM_VERSION = "undefined_version"
+    # dev file
+    import contig_manager
+    import cds
+    import diamond
+    import bin_quality
+    import bin_manager
+    logging.warning('This is a dev mode execution.')
+
+except ModuleNotFoundError:
+    
+    # site-packages file
+    from .  import contig_manager
+    from .  import cds
+    from .  import diamond
+    from .  import bin_quality
+    from .  import bin_manager
+
+    try:
+        PROGRAM_VERSION = pkg_resources.require(PROGRAM_NAME)[0].version
+    except pkg_resources.DistributionNotFound:
+        PROGRAM_VERSION = "undefined_version"
+
 
 
 def init_logging(verbose, debug):
@@ -56,7 +67,7 @@ def init_logging(verbose, debug):
 
 def parse_arguments():
     """Parse script arguments."""
-    parser = ArgumentParser(description="...",
+    parser = ArgumentParser(description=f"Binette {PROGRAM_VERSION}",
                             formatter_class=ArgumentDefaultsHelpFormatter)
 
     input_arg = parser.add_mutually_exclusive_group(required=True)
@@ -93,7 +104,7 @@ def parse_arguments():
                         action="store_true")
     parser.add_argument('--version',
                         action='version',
-                        version=__version__)
+                        version=PROGRAM_VERSION)
                         
     args = parser.parse_args()
     return args

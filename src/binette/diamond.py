@@ -10,8 +10,6 @@ from collections import Counter
 from checkm2 import keggData
 
 
-from memory_control import measure_memory
-
 def get_checkm2_db():
 
     if shutil.which('checkm2') is None:
