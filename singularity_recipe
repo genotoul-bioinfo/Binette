@@ -23,7 +23,7 @@ checkm2 database --download --path '.' || echo checkm2 database failed but it is
 
 
 git clone https://github.com/genotoul-bioinfo/Binette
-pip install binette
+pip install Binette/
 
 binette -h
 
