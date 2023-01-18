@@ -33,7 +33,9 @@ conda env create -n binette -f binette_dev.yaml
 conda activate binette 
 ```
 
-Finally install checkm2 still in binette
+Binette need checkm2 to be fully installed with pip.
+
+Follow Chekm2 installation instruction:
 
 ```
 git clone --recursive https://github.com/chklovski/checkm2.git
@@ -48,14 +50,20 @@ and download its database
 checkm2 database --download --path checkm2/database/
 ```
 
+Finally install binette with pip
+
+```
+pip install .
+```
+
 Binette should be able to run :
 
 ```
-python binette/binette.py -h
+binette -h
 ```
 
 
-## Running binette using using a singularity image
+## Running binette using a singularity image
 
 Singularity version 3 or above must be installed. See [here](https://sylabs.io/guides/3.7/user-guide/quick_start.html#quick-installation-steps) how to install Singularity >=v3.
 
