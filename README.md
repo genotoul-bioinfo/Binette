@@ -78,7 +78,7 @@ sudo singularity build binette.sif singularity_recipe
 Then if the build succesfully finished, you should be able to run Binette:
 
 ```
-singularity exec binette.sif python binette/binette.py -h
+singularity exec binette.sif binette -h
 ```
 
 # Usage 
