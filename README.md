@@ -23,8 +23,8 @@ You can install binette directly from the source code or build and run it from w
 
 Clone this repository: 
 ```
-git clone git@forgemia.inra.fr:jean.mainguy/binette.git
-cd binette
+git clone https://github.com/genotoul-bioinfo/Binette
+cd Binette
 ```
 
 Then create a Conda environment using the `binette_dev.yaml` file:
