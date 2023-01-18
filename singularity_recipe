@@ -22,7 +22,7 @@ export PATH=/opt/conda/envs/binette/bin:/CheckM2/bin/:$PATH
 checkm2 database --download --path '.' || echo checkm2 database failed but it is probably ok see Checkm2 issue 31 https://github.com/chklovski/CheckM2/issues/31  
 
 
-git clone https://forgemia.inra.fr/jean.mainguy/binette
+git clone https://github.com/genotoul-bioinfo/Binette
 pip install binette
 
 binette -h
