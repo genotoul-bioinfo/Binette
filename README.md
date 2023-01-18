@@ -70,8 +70,8 @@ Singularity version 3 or above must be installed. See [here](https://sylabs.io/g
 Git clone binette repository and build the singularity image. 
 
 ```
-git clone https://forgemia.inra.fr/jean.mainguy/binette
-cd binette
+git clone https://github.com/genotoul-bioinfo/Binette
+cd Binette
 sudo singularity build binette.sif singularity_recipe
 ```
 
