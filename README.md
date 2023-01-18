@@ -89,7 +89,7 @@ singularity exec binette.sif python binette/binette.py -h
 
 Please submit bug reports and feature requests to the issue tracker:
 
-[binette issue tracker](https://forgemia.inra.fr/jean.mainguy/binette/-/issues)
+[binette issue tracker](https://github.com/genotoul-bioinfo/Binette/issues)
 
 # Licence
 
