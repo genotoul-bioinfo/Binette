@@ -1,6 +1,6 @@
 # Overview 
 
-Binette is a fast and accurate binning refinement tool that constructs high quality MAGs from the output of multiple binning tools.
+Binette is a fast and accurate binning refinement tool to constructs high quality MAGs from the output of multiple binning tools.
 
 From the input bin sets, Binette constructs new hybrid bins. A bin can be seen as a set of contigs. Based on this property when a least two bins overlap (they share at least one contig), Binette creates new bins using basic set operations:
 - Intersection bin: contigs shared by the overlapping bins.
@@ -15,11 +15,9 @@ Binette is inspired from the metaWRAP bin-refinement tool but it effectively sol
 - It selects the best bins in a more accurate and elegant manner.
 - It is easier to use.
 
-# Installing
+# Installation
 
-You can install binette directly from the source code or build and run it from within a Singularity container.
-
-## Installing from a conda environnement
+## From a conda environnement
 
 Clone this repository: 
 ```
