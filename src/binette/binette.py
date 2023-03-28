@@ -18,31 +18,18 @@ import pkg_resources
 PROGRAM_NAME = "Binette"
 PROGRAM_VERSION = "undefined_version"
 
+# site-packages file
+from . import contig_manager
+from . import cds
+from . import diamond
+from . import bin_quality
+from . import bin_manager
+from . import io_manager as io
+
 try:
-    # dev file
-    import contig_manager
-    import cds
-    import diamond
-    import bin_quality
-    import bin_manager
-    import io_manager as io
-
-    logging.warning("This is a dev mode execution.")
-
-except ModuleNotFoundError:
-
-    # site-packages file
-    from . import contig_manager
-    from . import cds
-    from . import diamond
-    from . import bin_quality
-    from . import bin_manager
-    from . import io_manager as io
-
-    try:
-        PROGRAM_VERSION = pkg_resources.require(PROGRAM_NAME)[0].version
-    except pkg_resources.DistributionNotFound:
-        PROGRAM_VERSION = "undefined"
+    PROGRAM_VERSION = pkg_resources.require(PROGRAM_NAME)[0].version
+except pkg_resources.DistributionNotFound:
+    PROGRAM_VERSION = "undefined"
 
 
 def init_logging(verbose, debug):
@@ -109,16 +96,22 @@ def parse_arguments():
         "--contamination_weigth",
         default=5,
         type=float,
-        help="Bin are scored as follow: completeness - weigth * contamination.\
-            A low contamination_weigth favor complete bins over low contaminated bins.",
+        help="Bin are scored as follow: completeness - weigth * contamination. "
+             "A low contamination_weigth favor complete bins over low contaminated bins.",
     )
 
     parser.add_argument(
         "-e",
         "--extension",
         default="fasta",
-        help="Extension of fasta files in bin folders \
-            (necessary when --bin_dirs is used).",
+        help="Extension of fasta files in bin folders "
+             "(necessary when --bin_dirs is used).",
+    )
+
+    parser.add_argument(
+        "--checkm2_db",
+        help="Provide a path for the CheckM2 diamond database. "
+        "By default the database set via <checkm2 database> is used.",
     )
 
     parser.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
@@ -216,7 +209,11 @@ def main():
         contigs_iterator = (s for s in contig_manager.parse_fasta_file(contigs_fasta) if s.name in contigs_in_bins)
         contig_to_genes = cds.predict(contigs_iterator, faa_file, threads)
 
-        diamond_db_path = diamond.get_checkm2_db()
+        if not args.checkm2_db:
+            diamond_db_path = diamond.get_checkm2_db()
+        else:
+            diamond_db_path = args.checkm2_db
+            
         diamond.run(
             faa_file,
             diamond_result_file,
