@@ -11,7 +11,7 @@ with open(path.join(setup_dir, "README.md"), encoding="utf-8") as f:
 
 setup(
     name="binette",
-    version="0.1.1",
+    version="0.1.2",
     author="Jean Mainguy",
     author_email="jean.mainguy@inrae.fr",
     packages=find_packages(where="src", include=["binette"]),
