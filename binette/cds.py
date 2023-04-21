@@ -42,7 +42,7 @@ def write_faa(outfaa, contig_to_genes):
 
 def parse_faa_file(faa_file):
     contig_to_genes = defaultdict(list)
-    for name, seq, _ in pyfastx.Fastx(faa_file):
+    for name, seq in pyfastx.Fastx(faa_file):
         contig = get_contig_from_cds_name(name)
         contig_to_genes[contig].append(seq)
 

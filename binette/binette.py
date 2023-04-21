@@ -18,19 +18,16 @@ import pkg_resources
 PROGRAM_NAME = "Binette"
 PROGRAM_VERSION = "undefined_version"
 
-# site-packages file
-from . import contig_manager
-from . import cds
-from . import diamond
-from . import bin_quality
-from . import bin_manager
-from . import io_manager as io
+# # site-packages file
+# from . import contig_manager
+# from . import cds
+# from . import diamond
+# from . import bin_quality
+# from . import bin_manager
+# from . import io_manager as io
+from binette import contig_manager, cds, diamond, bin_quality, bin_manager, io_manager as io
 
-try:
-    PROGRAM_VERSION = pkg_resources.require(PROGRAM_NAME)[0].version
-except pkg_resources.DistributionNotFound:
-    PROGRAM_VERSION = "undefined"
-
+PROGRAM_VERSION = pkg_resources.require(PROGRAM_NAME)[0].version
 
 def init_logging(verbose, debug):
     """Initialise logging."""
@@ -93,11 +90,11 @@ def parse_arguments():
 
     parser.add_argument(
         "-w",
-        "--contamination_weigth",
+        "--contamination_weight",
         default=5,
         type=float,
-        help="Bin are scored as follow: completeness - weigth * contamination. "
-             "A low contamination_weigth favor complete bins over low contaminated bins.",
+        help="Bin are scored as follow: completeness - weight * contamination. "
+             "A low contamination_weight favor complete bins over low contaminated bins.",
     )
 
     parser.add_argument(
@@ -143,7 +140,7 @@ def main():
     threads = args.threads
     outdir = args.outdir
     low_mem = args.low_mem
-    contamination_weigth = args.contamination_weigth
+    contamination_weight = args.contamination_weight
 
     min_completeness = args.min_completeness
 
@@ -174,7 +171,7 @@ def main():
         exit(1)
 
     if resume and not os.path.isfile(diamond_result_file):
-        logging.error(f"Diamond result file    {diamond_result_file} does not exist. Resuming is not possible")
+        logging.error(f"Diamond result file     {diamond_result_file} does not exist. Resuming is not possible")
         exit(1)
 
     # Loading input bin sets
@@ -210,6 +207,7 @@ def main():
         contig_to_genes = cds.predict(contigs_iterator, faa_file, threads)
 
         if not args.checkm2_db:
+            # get checkm2 db stored in checkm2 install
             diamond_db_path = diamond.get_checkm2_db()
         else:
             diamond_db_path = args.checkm2_db
@@ -259,13 +257,13 @@ def main():
     # TODO paralellize
     # original_bins = bin_quality.add_bin_metrics_in_parallel(original_bins, contig_info, threads)
 
-    bin_quality.add_bin_metrics(original_bins, contig_info, contamination_weigth)
+    bin_quality.add_bin_metrics(original_bins, contig_info, contamination_weight, threads)
 
     logging.info("Create intermediate bins:")
     new_bins = bin_manager.create_intermediate_bins(bin_set_name_to_bins)
 
     logging.info("Assess quality for supplementary intermediate bins.")
-    new_bins = bin_quality.add_bin_metrics(new_bins, contig_info, threads, contamination_weigth)
+    new_bins = bin_quality.add_bin_metrics(new_bins, contig_info, contamination_weight, threads)
 
     # bin_quality.add_bin_size_and_N50(new_bins, contig_to_length)
 
@@ -339,4 +337,5 @@ def main():
 
 # If this script is run from the command line then call the main function.
 if __name__ == "__main__":
-    main()
+    # main()
+    pass

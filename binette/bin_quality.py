@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-
-"""
-
-"""
-
 import os
 from collections import Counter
 from itertools import islice
@@ -11,15 +6,15 @@ import pandas as pd
 import numpy as np
 import logging
 import concurrent.futures as cf
+from multiprocessing.pool import Pool
 
+# For unnessesary tensorflow warnings:
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 logging.getLogger("tensorflow").setLevel(logging.FATAL)
 
 from checkm2 import keggData
 from checkm2 import modelProcessing
 from checkm2 import modelPostprocessing
-
-# For unnessesary tensorflow warnings:
 
 
 def get_bins_metadata_df(bins, contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length):
@@ -125,7 +120,16 @@ def add_bin_size_and_N50(bins, contig_to_size):
         bin_obj.add_N50(n50)
 
 
-def add_bin_metrics_in_parallel(bins, contig_info, threads, contamination_weigth):
+def get_bin_size_and_N50(bin_obj, contig_to_size):
+
+    lengths = [contig_to_size[c] for c in bin_obj.contigs]
+    n50 = compute_N50(lengths)
+
+    bin_obj.add_length(sum(lengths))
+    bin_obj.add_N50(n50)
+
+
+def add_bin_metrics_in_parallel(bins, contig_info, threads, contamination_weight):
 
     chunk_size = int(len(bins) / threads) + 1
     print("CHUNK SIZE TO PARALLELIZE", chunk_size)
@@ -133,14 +137,14 @@ def add_bin_metrics_in_parallel(bins, contig_info, threads, contamination_weigth
     with cf.ProcessPoolExecutor(max_workers=threads) as tpe:
         for i, bins_chunk in enumerate(chunks(bins, chunk_size)):
             print(f"chunk {i}, {len(bins_chunk)} bins")
-            results.append(tpe.submit(add_bin_metrics, *(bins_chunk, contig_info, contamination_weigth)))
+            results.append(tpe.submit(add_bin_metrics, *(bins_chunk, contig_info, contamination_weight)))
 
     processed_bins = {bin_o for r in results for bin_o in r.result()}
 
     return processed_bins
 
 
-def add_bin_metrics(bins, contig_info, contamination_weigth, n=1000, threads=1):
+def add_bin_metrics(bins, contig_info, contamination_weight, threads=1):
     postProcessor = modelPostprocessing.modelProcessor(threads)
 
     contig_to_kegg_counter = contig_info["contig_to_kegg_counter"]
@@ -149,8 +153,13 @@ def add_bin_metrics(bins, contig_info, contamination_weigth, n=1000, threads=1):
     contig_to_aa_length = contig_info["contig_to_aa_length"]
     contig_to_length = contig_info["contig_to_length"]
 
-    logging.info("Asses bin length and N50")
-    add_bin_size_and_N50(bins, contig_to_length)
+    logging.info("Assess bin length and N50")
+    bin_and_contigsize_args = ((bin, contig_to_length) for bin in bins)
+
+    with Pool(processes=threads) as pool:
+        pool.starmap(get_bin_size_and_N50, bin_and_contigsize_args)
+
+    # add_bin_size_and_N50(bins, contig_to_length)
 
     logging.info("Asses bin quality")
     assess_bins_quality_by_chunk(
@@ -159,7 +168,7 @@ def add_bin_metrics(bins, contig_info, contamination_weigth, n=1000, threads=1):
         contig_to_cds_count,
         contig_to_aa_counter,
         contig_to_aa_length,
-        contamination_weigth,
+        contamination_weight,
         postProcessor,
     )
     # # assess bin quality by chunk to reduce memory
@@ -183,7 +192,7 @@ def assess_bins_quality_by_chunk(
     contig_to_cds_count,
     contig_to_aa_counter,
     contig_to_aa_length,
-    contamination_weigth,
+    contamination_weight,
     postProcessor=None,
     threads=1,
 ):
@@ -198,7 +207,7 @@ def assess_bins_quality_by_chunk(
             contig_to_cds_count,
             contig_to_aa_counter,
             contig_to_aa_length,
-            contamination_weigth,
+            contamination_weight,
             postProcessor,
         )
 
@@ -209,7 +218,7 @@ def assess_bins_quality(
     contig_to_cds_count,
     contig_to_aa_counter,
     contig_to_aa_length,
-    contamination_weigth,
+    contamination_weight,
     postProcessor=None,
     threads=1,
 ):
@@ -256,4 +265,4 @@ def assess_bins_quality(
         completeness = final_results.loc[bin_obj.id, "Completeness"]
         contamination = final_results.loc[bin_obj.id, "Contamination"]
 
-        bin_obj.add_quality(completeness, contamination, contamination_weigth)
+        bin_obj.add_quality(completeness, contamination, contamination_weight)

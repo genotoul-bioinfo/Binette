@@ -59,10 +59,10 @@ class Bin:
     def add_N50(self, n50):
         self.N50 = n50
 
-    def add_quality(self, completeness, contamination, contamination_weigth):
+    def add_quality(self, completeness, contamination, contamination_weight):
         self.completeness = completeness
         self.contamination = contamination
-        self.score = completeness - contamination_weigth * contamination
+        self.score = completeness - contamination_weight * contamination
 
     def intersection(self, *others):
         other_contigs = (o.contigs for o in others)

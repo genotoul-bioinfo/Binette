@@ -1,5 +1,5 @@
-# from bin_manager import get_all_possible_combinations
-from . import bin_quality
+# from . import bin_quality
+from binette import bin_quality
 
 
 def test_compute_N50():
