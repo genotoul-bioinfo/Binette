@@ -3,8 +3,8 @@
 Module      : Main
 Description : The main entry point for the program.
 Copyright   : (c) Jean Mainguy, 28 nov. 2022 
-License     : MIT 
-Maintainer  : jean.mainguy@inrae.fr 
+License     : MIT
+Maintainer  : Jean Mainguy
 Portability : POSIX
 """
 
@@ -18,16 +18,10 @@ import pkg_resources
 PROGRAM_NAME = "Binette"
 PROGRAM_VERSION = "undefined_version"
 
-# # site-packages file
-# from . import contig_manager
-# from . import cds
-# from . import diamond
-# from . import bin_quality
-# from . import bin_manager
-# from . import io_manager as io
 from binette import contig_manager, cds, diamond, bin_quality, bin_manager, io_manager as io
 
 PROGRAM_VERSION = pkg_resources.require(PROGRAM_NAME)[0].version
+
 
 def init_logging(verbose, debug):
     """Initialise logging."""

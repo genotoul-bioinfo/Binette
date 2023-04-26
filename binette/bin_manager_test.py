@@ -5,9 +5,7 @@ Unit tests for binette.
 
 import pytest
 
-# from bin_manager import get_all_possible_combinations
-# from . import bin_manager
-from binette import bin_manager
+import bin_manager
 
 
 def test_get_all_possible_combinations():
@@ -100,6 +98,25 @@ def test_bin_union():
 
     assert bin1.union(bin2) == union_bin
     assert bin1.union(bin2).name == "bin1 | binA"
+
+
+def test_bin_union2():
+    # Create some example bins
+    bin1 = bin_manager.Bin({'contig1', 'contig2'}, 'origin1', 'bin1')
+    bin2 = bin_manager.Bin({'contig2', 'contig3'}, 'origin2', 'bin2')
+    bin3 = bin_manager.Bin({'contig4', 'contig5'}, 'origin3', 'bin3')
+
+    # Perform union operation
+    union_bin = bin1.union(bin2, bin3)
+
+    # Check the result
+    expected_contigs = {'contig1', 'contig2', 'contig3', 'contig4', 'contig5'}
+    expected_name = 'bin1 | bin2 | bin3'
+    expected_origin = 'union'
+
+    assert union_bin.contigs == expected_contigs
+    assert union_bin.name == expected_name
+    assert union_bin.origin == expected_origin
 
 
 def test_bin_difference():

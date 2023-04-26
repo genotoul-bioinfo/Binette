@@ -1,5 +1,5 @@
 # from . import bin_quality
-from binette import bin_quality
+import bin_quality
 
 
 def test_compute_N50():
