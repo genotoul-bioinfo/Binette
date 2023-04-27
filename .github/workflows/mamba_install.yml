@@ -1,4 +1,4 @@
-name: mamba_install
+name: env install with mamba
 
 on:
   push:
@@ -7,31 +7,29 @@ on:
   pull_request:
     branches: 
       - '*'
-
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
+  build:
 
-      - name: Install Conda environment with Micromamba
-        uses: mamba-org/provision-with-micromamba@main
-        with:
-          environment-file: binette_dev.yaml
-      - name: Install checkm2 from github
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [3.9] #["3.8", "3.9", "3.10"]
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v3
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install Conda environment with Micromamba
+      uses: mamba-org/provision-with-micromamba@main
+      with:
+        environment-file: binette_dev.yaml
+    - name: Install checkm2 from github
       run: |
         wget https://github.com/chklovski/CheckM2/archive/refs/tags/1.0.1.tar.gz
         tar -xf 1.0.1.tar.gz
         rm 1.0.1.tar.gz
         pip install CheckM2-1.0.1/
-    - name: Lint with flake8
-      run: |
-        conda install flake8
-        # stop the build if there are Python syntax errors or undefined names
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-    - name: Test with pytest
-      run: |
-        conda install pytest
-        pytest
+
