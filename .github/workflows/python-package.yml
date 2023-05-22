@@ -24,9 +24,12 @@ jobs:
       run: |
         # $CONDA is an environment variable pointing to the root of the miniconda directory
         echo $CONDA/bin >> $GITHUB_PATH
+    - name: Install mamba
+      run: |
+        conda install -c conda-forge mamba
     - name: Install binette dependencies
       run: |
-        conda env update --file binette_dev.yaml --name base
+        mamba env update --file binette_dev.yaml --name base
     - name: Install checkm2 from github
       run: |
         wget https://github.com/chklovski/CheckM2/archive/refs/tags/1.0.1.tar.gz
