@@ -32,10 +32,11 @@ jobs:
         mamba env update --file binette_dev.yaml --name base
     - name: Install checkm2 from github
       run: |
-        wget https://github.com/chklovski/CheckM2/archive/refs/tags/1.0.1.tar.gz
+        wget https://github.com/chklovski/CheckM2/archive/refs/tags/1.0.2.tar.gz
         tar -xf 1.0.1.tar.gz
         rm 1.0.1.tar.gz
         pip install CheckM2-1.0.1/
+        checkm2 -h
     - name: Lint with flake8
       run: |
         conda install flake8
