@@ -181,12 +181,12 @@ def main():
 
     logging.info(f"{len(bin_set_name_to_bins)} bin sets processed:")
     for bin_set_id, bins in bin_set_name_to_bins.items():
-        logging.info(f" {bin_set_id} - {len(bins)} ")
+        logging.info(f" {bin_set_id} - {len(bins)} bins")
 
     original_bins = bin_manager.dereplicate_bin_sets(bin_set_name_to_bins.values())
     contigs_in_bins = bin_manager.get_contigs_in_bins(original_bins)
 
-    logging.info("Parse fasta file of assembly.")
+    logging.info("Parsing contig fasta file: {contigs_fasta}")
     contigs_object = contig_manager.parse_fasta_file(contigs_fasta)
     contig_to_length = {seq.name: len(seq) for seq in contigs_object if seq.name in contigs_in_bins}
 
@@ -259,39 +259,8 @@ def main():
     logging.info("Assess quality for supplementary intermediate bins.")
     new_bins = bin_quality.add_bin_metrics(new_bins, contig_info, contamination_weight, threads)
 
-    # bin_quality.add_bin_size_and_N50(new_bins, contig_to_length)
-
-    # postProcessor = modelPostprocessing.modelProcessor(1)
-    # logging.info(f'Assess bin quality of {len(new_bins)} new bins created from intersection, difference or unions in \
-    # bin graph.')
-    # bin_quality.assess_bins_quality_by_chunk(new_bins, contig_to_kegg_counter, contig_to_cds_count,
-    #                                 contig_to_aa_counter, contig_to_aa_length,
-    #                                 postProcessor=postProcessor,  threads=threads)
-
     logging.info("Dereplicating input bins and new bins")
     all_bins = original_bins | new_bins
-
-    # if debug:
-    #     import pickle
-    #     # import networkx as nx
-    #     with open(os.path.join(out_tmp_dir, 'all_bin.p' ), "bw") as fl:
-    #         pickle.dump( all_bins, fl)
-    #     logging.debug('Writting all bins info ')
-    #     # write_bin_info_debug(all_bins, os.path.join(out_tmp_dir, 'all_bins.tsv'))
-
-    #     # G = bin_manager.get_bin_graph_with_attributes(all_bins, contig_to_length)
-
-    #     # nx.write_edgelist(G, os.path.join(out_tmp_dir, "bin_graph_edglist"))
-    #     # # df = nx.to_pandas_adjacency(G)
-    #     # # df.to_csv(os.path.join(out_tmp_dir, "bin_graph_edglist.tsv"), sep='\t')
-    #     # nx.write_weighted_edgelist(G, os.path.join(out_tmp_dir, "bin_graph_w_edglist.tsv"), delimiter='\t')
-
-    #     # with open(os.path.join(out_tmp_dir, "bin_graph_edglist"), "w") as fl:
-    #     #     for e in nx.edges(G):
-
-    #     #         print(e)
-    #     #         print(dir(e))
-    #     #         print(e)
 
     logging.info("Select best bins")
     selected_bins = bin_manager.select_best_bins(all_bins)

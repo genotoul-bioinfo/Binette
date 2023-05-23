@@ -35,13 +35,30 @@ Binette need checkm2 to be fully installed with pip.
 
 Follow Chekm2 installation instruction:
 
+You can install it with git: 
+
 ```
 git clone --recursive https://github.com/chklovski/checkm2.git
 
 pip install checkm2/
 
 ```
-and download its database
+Or download the archive from github:
+
+```bash
+# get the archive
+wget https://github.com/chklovski/CheckM2/archive/refs/tags/1.0.2.tar.gz
+
+# decompress
+tar -xf 1.0.2.tar.gz
+rm 1.0.2.tar.gz
+
+# install
+pip install CheckM2-1.0.2/
+
+```
+
+Download checkm2 database
 
 ```
 

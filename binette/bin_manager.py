@@ -180,6 +180,21 @@ def get_bins_from_directory(bin_dir: str, set_name: str) -> List[Bin]:
 
     :return: A list of Bin objects created from the bin FASTA files.
     """
+    bins = []
+
+    for bin_fasta_file in os.listdir(bin_dir):
+
+        bin_fasta_path = os.path.join(bin_dir, bin_fasta_file)
+        bin_name = bin_fasta_file
+
+        contigs = {name for name, _ in pyfastx.Fasta(bin_fasta_path, build_index=False)}
+
+        bin_obj = Bin(contigs, set_name, bin_name)
+
+        bins.append(bin_obj)
+
+    return bins
+
 
 
 def parse_bin_directories(bin_name_to_bin_dir: Dict[str, str]) -> Dict[str, list]:

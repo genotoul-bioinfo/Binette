@@ -14,13 +14,17 @@ export PATH=/opt/conda/envs/binette/bin:$PATH
 
 # /opt/conda/bin/conda activate binette 
 
-git clone --recursive https://github.com/chklovski/checkm2.git
+# get the archive
+wget https://github.com/chklovski/CheckM2/archive/refs/tags/1.0.1.tar.gz
 
-pip install checkm2/
+# decompress
+tar -xf 1.0.1.tar.gz
+rm 1.0.1.tar.gz
 
-export PATH=/opt/conda/envs/binette/bin:/CheckM2/bin/:$PATH
-checkm2 database --download --path '.' || echo checkm2 database failed but it is probably ok see Checkm2 issue 31 https://github.com/chklovski/CheckM2/issues/31  
+# install
+pip install CheckM2-1.0.1/
 
+checkm2 database --download --path checkm2/database/
 
 git clone https://github.com/genotoul-bioinfo/Binette
 pip install Binette/
