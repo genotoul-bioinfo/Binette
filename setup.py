@@ -11,7 +11,7 @@ if __name__ == "__main__":
 
     setup(
         name="binette",
-        version="0.1.2",
+        version="0.1.3",
         author="Jean Mainguy",
         author_email="jean.mainguy@inrae.fr",
         packages=find_packages(),
