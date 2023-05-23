@@ -1,0 +1,56 @@
+# This workflow will install Python dependencies, run tests and lint with a variety of Python versions
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
+
+name: Python Package using Conda
+
+on: [push] #to any branch
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [3.8] #["3.8", "3.9", "3.10"]
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v3
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Add conda to system path
+      run: |
+        # $CONDA is an environment variable pointing to the root of the miniconda directory
+        echo $CONDA/bin >> $GITHUB_PATH
+    - name: Install mamba
+      run: |
+        conda install -c conda-forge mamba
+    - name: Install binette dependencies
+      run: |
+        mamba env update --file binette_dev.yaml --name base
+    - name: Download checkm2 db v1.0.2
+      run: |
+          wget https://zenodo.org/api/files/fd3bc532-cd84-4907-b078-2e05a1e46803/checkm2_database.tar.gz
+          tar -xf checkm2_database.tar.gz
+          rm checkm2_database.tar.gz
+    - name: Install checkm2 from github
+      run: |
+        wget https://github.com/chklovski/CheckM2/archive/refs/tags/1.0.2.tar.gz
+        tar -xf 1.0.2.tar.gz
+        rm 1.0.2.tar.gz
+        pip install CheckM2-1.0.2/
+        checkm2 -h
+        checkm2 database --setdblocation CheckM2_database/uniref100.KO.1.dmnd 
+    - name: Lint with flake8
+      run: |
+        conda install flake8
+        # stop the build if there are Python syntax errors or undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    - name: Test with pytest
+      run: |
+        conda install pytest
+        pytest

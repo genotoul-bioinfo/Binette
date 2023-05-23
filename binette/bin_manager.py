@@ -10,15 +10,24 @@ import pyfastx
 
 import itertools
 import networkx as nx
-
-
-# from memory_profiler import profile
+from typing import List, Dict, Iterable, Tuple, Set
 
 
 class Bin:
     counter = 0
 
-    def __init__(self, contigs, origin, name):
+    def __init__(self, contigs: Iterable[str], origin: str, name: str) -> None:
+        """
+        Initialize a Bin object.
+
+        Args:
+            contigs (Iterable[str]): Contig names belonging to the bin.
+            origin (str): Origin/source of the bin.
+            name (str): Name of the bin.
+
+        Returns:
+            None
+        """
         Bin.counter += 1
 
         self.origin = origin
@@ -34,37 +43,96 @@ class Bin:
         self.contamination = None
         self.score = None
 
-    def __eq__(self, other):
+    def __eq__(self, other: 'Bin') -> bool:
+        """
+        Compare the Bin object with another object for equality.
+
+        
+        other (Any): The object to compare with.
+
+        Returns:
+            bool: True if the objects are equal, False otherwise.
+        """
         return self.contigs == other.contigs
 
-    def __hash__(self):
+    def __hash__(self) -> int:
+        """
+        Compute the hash value of the Bin object.
+
+        Returns:
+            int: The hash value.
+        """
         return self.hash
 
-    def __str__(self):
+    def __str__(self) -> str:
+        """
+        Return a string representation of the Bin object.
+
+        :return: The string representation of the Bin object.
+        """
         return f"{self.origin}_{self.id}  ({len(self.contigs)} contigs)"
 
-    def overlaps_with(self, other):
+    def overlaps_with(self, other: 'Bin') -> Set[str]:
+        """
+        Find the contigs that overlap between this bin and another bin.
+
+        :param other: The other Bin object.
+        :return: A set of contig names that overlap between the bins.
+        """
         return self.contigs & other.contigs
 
-    def __and__(self, other):
+    def __and__(self, other: 'Bin') -> 'Bin':
+        """
+        Perform a logical AND operation between this bin and another bin.
+
+        :param other: The other Bin object.
+        :return: A new Bin object representing the intersection of the bins.
+        """
         contigs = self.contigs & other.contigs
         name = f"{self.name} & {other.name}"
         origin = f"{self.origin} & {other.origin}"
 
         return Bin(contigs, origin, name)
 
-    def add_length(self, length):
+
+    def add_length(self, length: float) -> None:
+        """
+        Add the length attribute to the Bin object.
+
+        :param length: The length value to add.
+        :return: None
+        """
         self.length = length
 
-    def add_N50(self, n50):
+    def add_N50(self, n50: float) -> None:
+        """
+        Add the N50 attribute to the Bin object.
+
+        :param n50: The N50 value to add.
+        :return: None
+        """
         self.N50 = n50
 
-    def add_quality(self, completeness, contamination, contamination_weight):
+    def add_quality(self, completeness: float, contamination: float, contamination_weight: float) -> None:
+        """
+        Set the quality attributes of the bin.
+
+        :param completeness: The completeness value.
+        :param contamination: The contamination value.
+        :param contamination_weight: The weight assigned to contamination in the score calculation.
+        :return: None
+        """
         self.completeness = completeness
         self.contamination = contamination
         self.score = completeness - contamination_weight * contamination
 
-    def intersection(self, *others):
+    def intersection(self, *others: 'Bin') -> 'Bin':
+        """
+        Compute the intersection of the bin with other bins.
+
+        :param others: Other bins to compute the intersection with.
+        :return: A new Bin representing the intersection of the bins.
+        """
         other_contigs = (o.contigs for o in others)
         contigs = self.contigs.intersection(*other_contigs)
         name = f"{self.name} & {' & '.join([other.name for other in others])}"
@@ -72,7 +140,13 @@ class Bin:
 
         return Bin(contigs, origin, name)
 
-    def difference(self, *others):
+    def difference(self, *others: 'Bin') -> 'Bin':
+        """
+        Compute the difference between the bin and other bins.
+
+        :param others: Other bins to compute the difference with.
+        :return: A new Bin representing the difference between the bins.
+        """
         other_contigs = (o.contigs for o in others)
         contigs = self.contigs.difference(*other_contigs)
         name = f"{self.name} - {' - '.join([other.name for other in others])}"
@@ -80,7 +154,13 @@ class Bin:
 
         return Bin(contigs, origin, name)
 
-    def union(self, *others):
+    def union(self, *others: 'Bin') -> 'Bin':
+        """
+        Compute the union of the bin with other bins.
+
+        :param others: Other bins to compute the union with.
+        :return: A new Bin representing the union of the bins.
+        """
         other_contigs = (o.contigs for o in others)
         contigs = self.contigs.union(*other_contigs)
         name = f"{self.name} | {' | '.join([other.name for other in others])}"
@@ -89,8 +169,17 @@ class Bin:
         return Bin(contigs, origin, name)
 
 
-def get_bins_from_directory(bin_dir: str, set_name: str) -> list:
 
+
+def get_bins_from_directory(bin_dir: str, set_name: str) -> List[Bin]:
+    """
+    Retrieves a list of Bin objects from a directory containing bin FASTA files.
+
+    :param bin_dir: The directory path containing bin FASTA files.
+    :param set_name: The name of the set the bins belong to.
+
+    :return: A list of Bin objects created from the bin FASTA files.
+    """
     bins = []
 
     for bin_fasta_file in os.listdir(bin_dir):
@@ -107,8 +196,15 @@ def get_bins_from_directory(bin_dir: str, set_name: str) -> list:
     return bins
 
 
-def parse_bin_directories(bin_name_to_bin_dir: dict) -> dict:
 
+def parse_bin_directories(bin_name_to_bin_dir: Dict[str, str]) -> Dict[str, list]:
+    """
+    Parses multiple bin directories and returns a dictionary mapping bin names to a list of Bin objects.
+
+    :param bin_name_to_bin_dir: A dictionary mapping bin names to their respective bin directories.
+
+    :return: A dictionary mapping bin names to a list of Bin objects created from the bin directories.
+    """
     bin_name_to_bins = {}
 
     for name, bin_dir in bin_name_to_bin_dir.items():
@@ -117,7 +213,14 @@ def parse_bin_directories(bin_name_to_bin_dir: dict) -> dict:
     return bin_name_to_bins
 
 
-def parse_contig2bin_tables(bin_name_to_bin_tables: dict) -> dict:
+def parse_contig2bin_tables(bin_name_to_bin_tables: Dict[str, str]) -> Dict[str, list]:
+    """
+    Parses multiple contig-to-bin tables and returns a dictionary mapping bin names to a list of Bin objects.
+
+    :param bin_name_to_bin_tables: A dictionary mapping bin names to their respective contig-to-bin tables.
+
+    :return: A dictionary mapping bin names to a list of Bin objects created from the contig-to-bin tables.
+    """
     bin_name_to_bins = {}
 
     for name, contig2bin_table in bin_name_to_bin_tables.items():
@@ -126,7 +229,15 @@ def parse_contig2bin_tables(bin_name_to_bin_tables: dict) -> dict:
     return bin_name_to_bins
 
 
-def get_bins_from_contig2bin_table(contig2bin_table, set_name):
+def get_bins_from_contig2bin_table(contig2bin_table: str, set_name: str) -> List[Bin]:
+    """
+    Retrieves a list of Bin objects from a contig-to-bin table.
+
+    :param contig2bin_table: The path to the contig-to-bin table.
+    :param set_name: The name of the set the bins belong to.
+
+    :return: A list of Bin objects created from the contig-to-bin table.
+    """
     bin_name2contigs = defaultdict(set)
     with open(contig2bin_table) as fl:
         for line in fl:
@@ -144,7 +255,14 @@ def get_bins_from_contig2bin_table(contig2bin_table, set_name):
     return bins
 
 
-def from_bin_sets_to_bin_graph(bin_name_to_bin_set):
+def from_bin_sets_to_bin_graph(bin_name_to_bin_set: Dict[str, set]) -> nx.Graph:
+    """
+    Creates a bin graph from a dictionary of bin sets.
+
+    :param bin_name_to_bin_set: A dictionary mapping bin names to their respective bin sets.
+
+    :return: A networkx Graph representing the bin graph of overlapping bins.
+    """
     G = nx.Graph()
 
     for set1_name, set2_name in itertools.combinations(bin_name_to_bin_set, 2):
@@ -158,7 +276,14 @@ def from_bin_sets_to_bin_graph(bin_name_to_bin_set):
     return G
 
 
-def get_bin_graph(bins):
+def get_bin_graph(bins: List[Bin]) -> nx.Graph:
+    """
+    Creates a bin graph from a list of Bin objects.
+
+    :param bins: A list of Bin objects representing bins.
+
+    :return: A networkx Graph representing the bin graph of overlapping bins.
+    """
     G = nx.Graph()
     G.add_nodes_from((b.id for b in bins))
 
@@ -173,7 +298,15 @@ def get_bin_graph(bins):
     return G
 
 
-def get_bin_graph_with_attributes(bins, contig_to_length):
+def get_bin_graph_with_attributes(bins: List[Bin], contig_to_length: Dict[str, int]) -> nx.Graph:
+    """
+    Creates a graph from a list of Bin objects with additional attributes.
+
+    :param bins: A list of Bin objects representing bins.
+    :param contig_to_length: A dictionary mapping contig names to their lengths.
+
+    :return: A networkx Graph representing the bin graph with attributes.
+    """
     G = nx.Graph()
     G.add_nodes_from((b.id for b in bins))
 
@@ -184,18 +317,31 @@ def get_bin_graph_with_attributes(bins, contig_to_length):
             shared_length = sum((contig_to_length[c] for c in contigs))
             max_shared_length_prct = 100 - 100 * (shared_length / min((bin1.length, bin2.length)))
 
-            # logging.info(f"{bin1} overlaps with {bin2}")
             G.add_edge(bin1.id, bin2.id, weight=max_shared_length_prct)
     return G
 
 
-def get_all_possible_combinations(clique):
+def get_all_possible_combinations(clique: Iterable) -> Iterable[Tuple]:
+    """
+    Generates all possible combinations of elements from a given clique.
+
+    :param clique: An iterable representing a clique.
+
+    :return: An iterable of tuples representing all possible combinations of elements from the clique.
+    """
     return (c for r in range(2, len(clique) + 1) for c in itertools.combinations(clique, r))
 
 
-def get_intersection_bins(G):
+def get_intersection_bins(G: nx.Graph) -> Set[Bin]:
+    """
+    Retrieves the intersection bins from a given graph.
+
+    :param G: A networkx Graph representing the graph.
+
+    :return: A set of Bin objects representing the intersection bins.
+    """
     intersect_bins = set()
-    # nx.draw_shell(G, with_labels=True)
+
     for clique in nx.clique.find_cliques(G):
         bins_combinations = get_all_possible_combinations(clique)
         for bins in bins_combinations:
@@ -212,9 +358,16 @@ def get_intersection_bins(G):
     return intersect_bins
 
 
-def get_difference_bins(G):
+def get_difference_bins(G: nx.Graph) -> Set[Bin]:
+    """
+    Retrieves the difference bins from a given graph.
+
+    :param G: A networkx Graph representing the graph.
+
+    :return: A set of Bin objects representing the difference bins.
+    """
     difference_bins = set()
-    # nx.draw_shell(G, with_labels=True)
+    
     for clique in nx.clique.find_cliques(G):
         # TODO should not use combinations but another method of itertools
         # to get all possible combination in all possible order.
@@ -235,7 +388,15 @@ def get_difference_bins(G):
     return difference_bins
 
 
-def get_union_bins(G, max_conta=50):
+def get_union_bins(G: nx.Graph, max_conta: int = 50) -> Set[Bin]:
+    """
+    Retrieves the union bins from a given graph.
+
+    :param G: A networkx Graph representing the graph.
+    :param max_conta: Maximum allowed contamination value for a bin to be included in the union.
+
+    :return: A set of Bin objects representing the union bins.
+    """
     union_bins = set()
     for clique in nx.clique.find_cliques(G):
         bins_combinations = get_all_possible_combinations(clique)
@@ -255,7 +416,14 @@ def get_union_bins(G, max_conta=50):
     return union_bins
 
 
-def create_intersec_diff_bins(G):
+def create_intersec_diff_bins(G: nx.Graph) -> Set[Bin]:
+    """
+    Creates intersection and difference bins from a given graph.
+
+    :param G: A networkx Graph representing the graph.
+
+    :return: A set of Bin objects representing the intersection and difference bins.
+    """
     new_bins = set()
 
     for clique in nx.clique.find_cliques(G):
@@ -273,34 +441,20 @@ def create_intersec_diff_bins(G):
 
     return new_bins
 
+def select_best_bins(bins: List[Bin]) -> List[Bin]:
+    """
+    Selects the best bins from a list of bins based on their scores, N50 values, and IDs.
 
-# @profile
-# def select_best_bins(bins):
-#     logging.info(f'Building bin graph from {len(bins)} ins')
-#     G = get_bin_graph(bins)
+    :param bins: A list of Bin objects.
 
-#     nx.write_edgelist(G, "bin_graph_edglist")
+    :return: A list of selected Bin objects.
+    """
 
-#     sorted_bins = sorted(bins, key=lambda x: x.score, reverse=True)
-#     selected_bins = []
-#     for b in sorted_bins:
-#         if b.id in G:
-#             selected_bins.append(b)
-#             neigbors_bins = nx.neighbors(G, b.id)
-#             G.remove_nodes_from(list(neigbors_bins))
-
-#     return selected_bins
-
-
-def select_best_bins(bins):
-    logging.info(f"Building no bin graph from {len(bins)} ins")
-
-    logging.info("SORTNG")
-    # sort on score, N50 and id.
-    # smaller id are prefered to select in priority original bins.
+    logging.info("Sorting bins")
+    # Sort on score, N50, and ID. Smaller ID values are preferred to select original bins first.
     sorted_bins = sorted(bins, key=lambda x: (x.score, x.N50, -x.id), reverse=True)
 
-    logging.info("SELECTING")
+    logging.info("Selecting bins")
     selected_bins = []
     for b in sorted_bins:
         if b in bins:
@@ -309,39 +463,65 @@ def select_best_bins(bins):
 
             selected_bins.append(b)
 
-    logging.info(f"SELECTING {len(selected_bins)} bins")
+    logging.info(f"Selected {len(selected_bins)} bins")
     return selected_bins
 
 
 def dereplicate_bin_sets(bin_sets):
-    """Dereplicate bins from different bin sets to get a non redondant bin set."""
+    """
+    Dereplicates bins from different bin sets to obtain a non-redundant bin set.
+
+    :param bin_sets: A list of bin sets.
+
+    :return: A set of non-redundant bins.
+    """
     return set().union(*bin_sets)
 
 
-def get_contigs_in_bins(bins):
+def get_contigs_in_bins(bins: List[Bin]) -> Set[str]:
+    """
+    Retrieves all contigs present in the given list of bins.
+
+    :param bins: A list of Bin objects.
+
+    :return: A set of contigs present in the bins.
+    """
     return set().union(*(b.contigs for b in bins))
 
 
-def rename_bin_contigs(bins, contig_to_index):
+def rename_bin_contigs(bins: List[Bin], contig_to_index: dict):
+    """
+    Renames the contigs in the bins based on the provided mapping.
+
+    :param bins: A list of Bin objects.
+    :param contig_to_index: A dictionary mapping old contig names to new index names.
+    """
     for b in bins:
         b.contigs = {contig_to_index[contig] for contig in b.contigs}
 
 
-def create_intermediate_bins(bin_set_name_to_bins):
+def create_intermediate_bins(bin_set_name_to_bins: Dict[str, Set[Bin]]) -> Set[Bin]:
+    """
+    Creates intermediate bins from a dictionary of bin sets.
 
+    :param bin_set_name_to_bins: A dictionary mapping bin set names to corresponding bins.
+
+    :return: A set of intermediate bins created from intersections, differences, and unions.
+    """
     logging.info("Making bin graph...")
     connected_bins_graph = from_bin_sets_to_bin_graph(bin_set_name_to_bins)
 
-    logging.info("Create intersection bins...")
+    logging.info("Creating intersection bins...")
     intersection_bins = get_intersection_bins(connected_bins_graph)
     logging.info(f"{len(intersection_bins)} bins created on intersections.")
 
-    logging.info("Create difference bin...")
+    logging.info("Creating difference bins...")
     difference_bins = get_difference_bins(connected_bins_graph)
-    logging.info(f"{len(difference_bins)} bins created based on symetric difference.")
+    logging.info(f"{len(difference_bins)} bins created based on symmetric difference.")
 
-    logging.info("Create get_union_bins bin...")
+    logging.info("Creating union bins...")
     union_bins = get_union_bins(connected_bins_graph)
     logging.info(f"{len(union_bins)} bins created on unions.")
 
     return difference_bins | intersection_bins | union_bins
+
