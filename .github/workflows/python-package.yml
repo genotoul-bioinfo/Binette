@@ -42,7 +42,11 @@ jobs:
         rm 1.0.2.tar.gz
         pip install CheckM2-1.0.2/
         checkm2 -h
-        checkm2 database --setdblocation CheckM2_database/uniref100.KO.1.dmnd 
+        checkm2 database --setdblocation CheckM2_database/uniref100.KO.1.dmnd
+    - name: Install binette
+      run: |
+        pip install .
+        binette -h
     - name: Lint with flake8
       run: |
         conda install flake8
