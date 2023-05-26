@@ -5,7 +5,7 @@ Unit tests for binette.
 
 import pytest
 
-import bin_manager
+from binette import bin_manager
 
 
 def test_get_all_possible_combinations():
