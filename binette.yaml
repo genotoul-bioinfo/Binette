@@ -9,7 +9,7 @@ dependencies:
   - diamond=2.0.4
   - pandas=1.4.0
   - prodigal=2.6.3
-  - checkm2=1.0.2
+  - checkm2
   - setuptools
   - requests
   - packaging
