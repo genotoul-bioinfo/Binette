@@ -25,12 +25,12 @@ git clone https://github.com/genotoul-bioinfo/Binette
 cd Binette
 ```
 
-Then create a Conda environment using the `binette_dev.yaml` file:
+Then create a Conda environment using the `binette.yaml` file:
 ```
-conda env create -n binette -f binette_dev.yaml
+conda env create -n binette -f binette.yaml
 conda activate binette 
 ```
-
+<!-- 
 Binette need checkm2 to be fully installed with pip.
 
 Follow Chekm2 installation instruction:
@@ -56,13 +56,13 @@ rm 1.0.2.tar.gz
 # install
 pip install CheckM2-1.0.2/
 
-```
+``` -->
 
 Download checkm2 database
 
 ```
 
-checkm2 database --download --path checkm2/database/
+checkm2 database --download --path <checkm2/database/>
 ```
 
 Finally install binette with pip
