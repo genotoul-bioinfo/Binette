@@ -11,9 +11,8 @@ if __name__ == "__main__":
 
     setup(
         name="binette",
-        version="0.1.3",
+        version="0.1.4",
         author="Jean Mainguy",
-        author_email="jean.mainguy@inrae.fr",
         packages=find_packages(),
         entry_points={"console_scripts": ["binette = binette.binette:main"]},
         url="https://github.com/genotoul-bioinfo/Binette",
