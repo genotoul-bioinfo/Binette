@@ -98,6 +98,62 @@ singularity exec binette.sif binette -h
 
 # Usage 
 
+## Input Formats
+
+Binette supports two input formats for bin sets: 
+
+1. **Contig2bin Tables:** You can provide bin sets using contig2bin tables, which establish the relationship between each contig and its corresponding bin. In this format, you need to specify the `--contig2bin_tables` argument. 
+
+For example, consider the following two `contig2bin_tables`:
+
+- `bin_set1.tsv`:
+
+    ```tsv
+    contig_1   binA
+    contig_8   binA
+    contig_15  binB
+    contig_9   binC
+    ```
+    
+- `bin_set2.tsv`:
+
+    ```tsv
+    contig_1   bin.0
+    contig_8   bin.0
+    contig_15  bin.1
+    contig_9   bin.2
+    contig_10  bin.0
+    ```
+    
+    The `binette` command to process this input would be:
+    
+    ```bash
+    binette --contig2bin_tables bin_set1.tsv bin_set2.tsv --contigs assembly.fasta
+    ```
+
+2. **Bin Directories:** Alternatively, you can use bin directories, where each bin is represented by a separate FASTA file. For this format, you need to provide the `--bin_dirs` argument. Here's an example of two bin directories:
+
+    ```
+    bin_set1/
+    ├── binA.fa: contains sequences of contig_1, contig_8
+    ├── binB.fa: contains sequences of contig_15
+    └── binC.fa: contains sequences of contig_9
+    ```
+    
+    ```
+    bin_set2/
+    ├── binA.fa: contains sequences of contig_1, contig_8, contig_10
+    ├── binB.fa: contains sequences of contig_15
+    └── binC.fa: contains sequences of contig_9
+    ```
+    
+    The `binette` command to process this input would be:
+    
+    ```bash
+    binette --bin_dirs bin_set1 bin_set2 --contigs assembly.fasta
+    ```
+
+In both formats, the `--contigs` argument should specify a FASTA file containing all the contigs found in the bins. Typically, this file would be the assembly FASTA file used to generate the bins. In these exemple the `assembly.fasta` file should contain at least the five contigs mentioned in the `contig2bin_tables` files or in the bin fasta files: `contig_1`, `contig_8`, `contig_15`, `contig_9`, and `contig_10`.
 
 
 # Bug reporting and feature requests
@@ -109,3 +165,4 @@ Please submit bug reports and feature requests to the issue tracker:
 # Licence
 
 This program is released as an open source software under the terms of [MIT License](https://forgemia.inra.fr/jean.mainguy/binette/-/raw/main/LICENSE).
+
