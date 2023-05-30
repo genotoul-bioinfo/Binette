@@ -154,12 +154,12 @@ def add_bin_metrics(bins, contig_info, contamination_weight, threads=1):
     contig_to_length = contig_info["contig_to_length"]
 
     logging.info("Assess bin length and N50")
-    bin_and_contigsize_args = ((bin, contig_to_length) for bin in bins)
+    # bin_and_contigsize_args = ((bin, contig_to_length) for bin in bins)
 
-    with Pool(processes=threads) as pool:
-        pool.starmap(get_bin_size_and_N50, bin_and_contigsize_args)
+    # with Pool(processes=threads) as pool:
+    #     pool.starmap(get_bin_size_and_N50, bin_and_contigsize_args)
 
-    # add_bin_size_and_N50(bins, contig_to_length)
+    add_bin_size_and_N50(bins, contig_to_length)
 
     logging.info("Asses bin quality")
     assess_bins_quality_by_chunk(
