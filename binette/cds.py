@@ -62,10 +62,10 @@ def get_contig_cds_metadata_flat(contig_to_genes):
 
     contig_to_cds_count = {contig: len(genes) for contig, genes in contig_to_genes.items()}
 
-    contig_to_aa_counter = {contig: get_aa_composition(genes) for contig, genes in tqdm(contig_to_genes.items())}
+    contig_to_aa_counter = {contig: get_aa_composition(genes) for contig, genes in tqdm(contig_to_genes.items(), unit="contig")}
     logging.info("contig_to_aa_counter done. ")
 
-    contig_to_aa_length = {contig: sum(counter.values()) for contig, counter in contig_to_aa_counter.items()}
+    contig_to_aa_length = {contig: sum(counter.values()) for contig, counter in tqdm(contig_to_aa_counter.items(), unit="contig")}
     logging.info("contig_to_aa_length done. ")
 
     return contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length
@@ -81,12 +81,12 @@ def get_contig_cds_metadata(contig_to_genes, threads):
         for contig, genes in tqdm(contig_to_genes.items()):
             contig_to_future[contig] = tpe.submit(get_aa_composition, genes)
 
-    contig_to_aa_counter = {contig: future.result() for contig, future in tqdm(contig_to_future.items())}
+    contig_to_aa_counter = {contig: future.result() for contig, future in tqdm(contig_to_future.items(), unit="contig")}
 
     # contig_to_aa_counter = {contig:get_aa_composition(genes) for contig, genes in tqdm(contig_to_genes.items())}
     logging.info("contig_to_aa_counter done. ")
 
-    contig_to_aa_length = {contig: sum(counter.values()) for contig, counter in contig_to_aa_counter.items()}
+    contig_to_aa_length = {contig: sum(counter.values()) for contig, counter in  tqdm(contig_to_aa_counter.items(), unit="contig")}
     logging.info("contig_to_aa_length done. ")
 
     return contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length
