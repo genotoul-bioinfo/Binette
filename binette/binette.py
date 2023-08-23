@@ -15,12 +15,7 @@ import logging
 import os
 import pkg_resources
 
-PROGRAM_NAME = "Binette"
-PROGRAM_VERSION = "undefined_version"
-
 from binette import contig_manager, cds, diamond, bin_quality, bin_manager, io_manager as io
-
-PROGRAM_VERSION = pkg_resources.require(PROGRAM_NAME)[0].version
 
 
 def init_logging(verbose, debug):
@@ -46,8 +41,10 @@ def init_logging(verbose, debug):
 
 def parse_arguments():
     """Parse script arguments."""
+    program_version = pkg_resources.get_distribution("Binette").version
+
     parser = ArgumentParser(
-        description=f"Binette version={PROGRAM_VERSION}",
+        description=f"Binette version={program_version}",
         formatter_class=ArgumentDefaultsHelpFormatter,
     )
 
@@ -113,7 +110,7 @@ def parse_arguments():
 
     parser.add_argument("--low_mem", help="low mem mode", action="store_true")
 
-    parser.add_argument("--version", action="version", version=PROGRAM_VERSION)
+    parser.add_argument("--version", action="version", version=program_version)
 
     args = parser.parse_args()
     return args
