@@ -11,7 +11,7 @@ if __name__ == "__main__":
 
     setup(
         name="binette",
-        version="0.1.5",
+        version="0.1.6",
         author="Jean Mainguy",
         packages=find_packages(),
         entry_points={"console_scripts": ["binette = binette.binette:main"]},
