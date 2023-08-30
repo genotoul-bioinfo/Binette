@@ -407,7 +407,7 @@ def get_union_bins(G: nx.Graph, max_conta: int = 50) -> Set[Bin]:
                 continue
 
             bins = set(bins)
-            bin_a = set(bins).pop()
+            bin_a = bins.pop()
             bin_union = bin_a.union(*bins)
 
             if bin_union.contigs:
