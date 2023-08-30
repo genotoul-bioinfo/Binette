@@ -47,7 +47,7 @@ def parse_arguments():
         description=f"Binette version={program_version}",
         formatter_class=ArgumentDefaultsHelpFormatter,
     )
-
+    # TODO add catagory to better visualize the required and the optional args
     input_arg = parser.add_mutually_exclusive_group(required=True)
 
     input_arg.add_argument(
@@ -259,16 +259,28 @@ def main():
     logging.info("Dereplicating input bins and new bins")
     all_bins = original_bins | new_bins
 
+    if debug:
+        all_bins_for_debug = set(all_bins)
+        all_bin_compo_file = os.path.join(outdir, "all_bins_quality_reports.tsv")
+        
+        logging.info(f"Writing all bins in {all_bin_compo_file}")
+        
+        # all_high_quality_bins = [b for b in all_bins_for_debug if b.contamination <= 20 and b.completeness >= 50]
+        # logging.debug(f"{len(all_high_quality_bins)} bins have contamination < 20 and completeness > 50.")
+        io.write_bin_info(all_bins_for_debug, all_bin_compo_file, add_contigs=True)
+        
+
     logging.info("Select best bins")
     selected_bins = bin_manager.select_best_bins(all_bins)
-
+    
     logging.info(f"Filtering bins: only bins with completeness >= {min_completeness} are kept")
     selected_bins = [b for b in selected_bins if b.completeness >= min_completeness]
 
     logging.info(f"Writing selected bins in {final_bin_report}")
-
+    
     for b in selected_bins:
         b.contigs = {index_to_contig[c_index] for c_index in b.contigs}
+    
     io.write_bin_info(selected_bins, final_bin_report)
 
     io.write_bins_fasta(selected_bins, contigs_fasta, outdir_final_bin_set)
