@@ -269,6 +269,8 @@ def main():
         # logging.debug(f"{len(all_high_quality_bins)} bins have contamination < 20 and completeness > 50.")
         io.write_bin_info(all_bins_for_debug, all_bin_compo_file, add_contigs=True)
         
+        with open(os.path.join(outdir, "index_to_contig.tsv"), 'w') as flout:
+            flout.write('\n'.join((f'{i}\t{c}' for i, c in index_to_contig.items())))
 
     logging.info("Select best bins")
     selected_bins = bin_manager.select_best_bins(all_bins)
