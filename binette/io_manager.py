@@ -23,8 +23,8 @@ def infer_bin_name_from_bin_inputs(input_bins: List[str]) -> Dict[str, str]:
     bin_name_to_bin_dir = {d[commonprefix_len: len(d) - commonsufix_len]: d for d in input_bins}
 
     logging.debug(f"Input bins:  {' '.join(input_bins)}")
-    logging.debug(f"Common prefix to remove: {os.path.commonprefix(input_bins)}")
-    logging.debug(f"Common suffix to remove: {os.path.commonprefix(reversed_strings)[::-1]}")
+    logging.debug(f"Common prefix to remove: {os.path.commonprefix(reversed_strings)[::-1]}")
+    logging.debug(f"Common suffix to remove: {os.path.commonprefix(input_bins)}")
     logging.debug(f"bin_name_to_bin_dir: {bin_name_to_bin_dir}")
 
     return bin_name_to_bin_dir
