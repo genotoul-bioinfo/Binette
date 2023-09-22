@@ -16,4 +16,4 @@ dependencies:
   - tqdm
   - networkx
   - pyfastx
-  - pyrodigal
+  - pyrodigal>=3.0.0

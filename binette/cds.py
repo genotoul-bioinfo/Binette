@@ -31,7 +31,7 @@ def predict(contigs_iterator: Iterator, outfaa: str, threads: int =1) -> Dict[st
     :return: A dictionary mapping contig names to predicted genes.
     """
     future_per_contig = {}
-    orf_finder = pyrodigal.OrfFinder(meta="meta")
+    orf_finder = pyrodigal.GeneFinder(meta="meta")
 
     logging.info(f"Predicting CDS sequences with Pyrodigal using {threads} threads.")
     with cf.ProcessPoolExecutor(max_workers=threads) as tpe:
