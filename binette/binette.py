@@ -245,9 +245,6 @@ def main():
 
     logging.info("Add size and assess quality of input bins")
 
-    # TODO paralellize
-    # original_bins = bin_quality.add_bin_metrics_in_parallel(original_bins, contig_info, threads)
-
     bin_quality.add_bin_metrics(original_bins, contig_info, contamination_weight, threads)
 
     logging.info("Create intermediate bins:")
@@ -265,8 +262,6 @@ def main():
         
         logging.info(f"Writing all bins in {all_bin_compo_file}")
         
-        # all_high_quality_bins = [b for b in all_bins_for_debug if b.contamination <= 20 and b.completeness >= 50]
-        # logging.debug(f"{len(all_high_quality_bins)} bins have contamination < 20 and completeness > 50.")
         io.write_bin_info(all_bins_for_debug, all_bin_compo_file, add_contigs=True)
         
         with open(os.path.join(outdir, "index_to_contig.tsv"), 'w') as flout:
@@ -277,6 +272,8 @@ def main():
     
     logging.info(f"Filtering bins: only bins with completeness >= {min_completeness} are kept")
     selected_bins = [b for b in selected_bins if b.completeness >= min_completeness]
+
+    logging.info(f"Filtering bins: {len(selected_bins)} selected bins")
 
     logging.info(f"Writing selected bins in {final_bin_report}")
     

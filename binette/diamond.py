@@ -9,8 +9,12 @@ from collections import Counter
 from checkm2 import keggData
 
 
-def get_checkm2_db():
+def get_checkm2_db() -> str:
+    """
+    Get the path to the CheckM2 database.
 
+    :return: The path to the CheckM2 database.
+    """
     if shutil.which("checkm2") is None:
         logging.error("Make sure checkm2 is on your system path.")
         sys.exit(1)
@@ -25,7 +29,6 @@ def get_checkm2_db():
 
     try:
         db_path = reg_result.group(1)
-
     except AttributeError:
         logging.error(f"Something went wrong when retrieving checkm2 db path:\n{checkm2_database_raw.stderr}")
         sys.exit(1)
@@ -33,22 +36,37 @@ def get_checkm2_db():
     return db_path
 
 
-def check_diamond_exists():
-    """Check to see if Diamond is on the system before we try to run it."""
 
-    # Assume that a successful diamond help returns 0 and anything
-    # else returns something non-zero
+def check_tool_exists(tool_name: str):
+    """
+    Check if a specified tool is on the system's PATH.
 
-    if shutil.which("diamond") is None:
-        logging.error("Make sure diamond is on your system path.")
-        sys.exit(1)
+    :param tool_name: The name of the tool to check for.
+    :type tool_name: str
+    :raises FileNotFoundError: If the tool is not found on the system's PATH.
+    """
+    if shutil.which(tool_name) is None:
+        raise FileNotFoundError(f"The '{tool_name}' tool is not found on your system PATH.")
 
 
 def run(
-    faa_file, output, db, log, threads=1, query_cover=80, subject_cover=80, percent_id=30, evalue=1e-05, low_mem=False
-):
+    faa_file: str, output: str, db: str, log: str, threads: int = 1, query_cover: int = 80, subject_cover: int = 80,
+    percent_id: int = 30, evalue: float = 1e-05, low_mem: bool = False):
+    """
+    Run Diamond with specified parameters.
 
-    check_diamond_exists()
+    :param faa_file: Path to the input protein sequence file (FASTA format).
+    :param output: Path to the Diamond output file.
+    :param db: Path to the Diamond database.
+    :param log: Path to the log file.
+    :param threads: Number of CPU threads to use (default is 1).
+    :param query_cover: Minimum query coverage percentage (default is 80).
+    :param subject_cover: Minimum subject coverage percentage (default is 80).
+    :param percent_id: Minimum percent identity (default is 30).
+    :param evalue: Maximum e-value threshold (default is 1e-05).
+    :param low_mem: Use low memory mode if True (default is False).
+    """
+    check_tool_exists("diamond")
 
     blocksize = 0.5 if low_mem else 2
 
@@ -70,37 +88,33 @@ def run(
     run = subprocess.run(cmd, shell=True)
 
     if run.returncode != 0:
-        logging.error(f"An error occured while running DIAMOND. check log file: {log}")
+        logging.error(f"An error occurred while running DIAMOND. Check log file: {log}")
         sys.exit(1)
 
     logging.info("Finished Running DIAMOND")
 
+def get_contig_to_kegg_id(diamond_result_file: str) -> dict:
+    """
+    Get a dictionary mapping contig IDs to KEGG annotations from a Diamond result file.
 
-def get_contig_to_kegg_id(diamond_result_file):
-
+    :param diamond_result_file: Path to the Diamond result file.
+    :return: A dictionary mapping contig IDs to KEGG annotations.
+    """
     diamon_results_df = pd.read_csv(diamond_result_file, sep="\t", usecols=[0, 1], names=["ProteinID", "annotation"])
     diamon_results_df[["Ref100_hit", "Kegg_annotation"]] = diamon_results_df["annotation"].str.split(
         "~", n=1, expand=True
     )
-    diamon_results_df
 
-    """ Get a list of default KO id's from data
-        Available categories are the keys in DefaultValues.feature_ordering
-        Here, returns an ordered set of KEGG ID's and sets to 0 
-    """
     KeggCalc = keggData.KeggCalculator()
     defaultKOs = KeggCalc.return_default_values_from_category("KO_Genes")
 
-    # Remove from diamon_results_df any KOs not currently used by checkm2
     diamon_results_df = diamon_results_df.loc[diamon_results_df["Kegg_annotation"].isin(defaultKOs.keys())]
     diamon_results_df["contig"] = diamon_results_df["ProteinID"].str.split("_", n=-1).str[:-1].str.join("_")
-    # diamon_results_df[diamon_results_df['Kegg_annotation']]
-    # group by contig and create a counter with kegg_annotation
+
     contig_to_kegg_counter = (
         diamon_results_df.groupby("contig").agg({"Kegg_annotation": Counter}).reset_index()
-    )  # ['Kegg_annotation'].apply(Counter)
+    )
 
-    # create a simple dict with contig --> kegg_counter
     contig_to_kegg_counter = dict(zip(contig_to_kegg_counter["contig"], contig_to_kegg_counter["Kegg_annotation"]))
 
     return contig_to_kegg_counter
