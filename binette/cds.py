@@ -1,5 +1,6 @@
 
 import concurrent.futures as cf
+import multiprocessing.pool
 import logging
 from collections import Counter, defaultdict
 from typing import Dict, List, Iterator, Tuple
@@ -30,22 +31,29 @@ def predict(contigs_iterator: Iterator, outfaa: str, threads: int =1) -> Dict[st
 
     :return: A dictionary mapping contig names to predicted genes.
     """
-    future_per_contig = {}
+    
     orf_finder = pyrodigal.GeneFinder(meta="meta")
+    
+    logging.info(f"Predicting cds sequences with Pyrodigal using {threads} threads.")
+    
+    with multiprocessing.pool.ThreadPool(processes=threads) as pool: 
+        contig_and_genes = pool.starmap(predict_genes, ((orf_finder.find_genes, seq) for seq in contigs_iterator))
 
-    logging.info(f"Predicting CDS sequences with Pyrodigal using {threads} threads.")
-    with cf.ProcessPoolExecutor(max_workers=threads) as tpe:
-        for seq in contigs_iterator:
-            future_per_contig[seq.name] = tpe.submit(orf_finder.find_genes, seq.seq)
-
-    contig_to_pyrodigal_genes = {contig_id: future.result() for contig_id, future in future_per_contig.items()}
-    write_faa(outfaa, contig_to_pyrodigal_genes)
+    write_faa(outfaa, contig_and_genes)
+    
 
     contig_to_genes = {
         contig_id: [gene.translate() for gene in pyrodigal_genes]
-        for contig_id, pyrodigal_genes in contig_to_pyrodigal_genes.items()
+        for contig_id, pyrodigal_genes in contig_and_genes
     }
+
     return contig_to_genes
+
+def predict_genes(find_genes, seq):
+
+
+    return (seq.name, find_genes(seq.seq) )
+
 
 def write_faa(outfaa: str, contig_to_genes: Dict[str, List[str]]) -> None:
     """
@@ -57,7 +65,7 @@ def write_faa(outfaa: str, contig_to_genes: Dict[str, List[str]]) -> None:
     """
     logging.info("Writing predicted protein sequences.")
     with open(outfaa, "w") as fl:
-        for contig_id, genes in contig_to_genes.items():
+        for contig_id, genes in contig_to_genes:
             genes.write_translations(fl, contig_id)
 
 def parse_faa_file(faa_file: str) -> Dict[str, List]:
