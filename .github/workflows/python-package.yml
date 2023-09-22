@@ -30,19 +30,6 @@ jobs:
     - name: Install binette dependencies
       run: |
         mamba env update --file binette.yaml --name base
-    # - name: Download checkm2 db v1.0.2
-    #   run: |
-    #       wget https://zenodo.org/api/files/fd3bc532-cd84-4907-b078-2e05a1e46803/checkm2_database.tar.gz
-    #       tar -xf checkm2_database.tar.gz
-    #       rm checkm2_database.tar.gz
-    # - name: Install checkm2 from github
-    #   run: |
-    #     wget https://github.com/chklovski/CheckM2/archive/refs/tags/1.0.2.tar.gz
-    #     tar -xf 1.0.2.tar.gz
-    #     rm 1.0.2.tar.gz
-    #     pip install CheckM2-1.0.2/
-    #     checkm2 -h
-    #     checkm2 database --setdblocation CheckM2_database/uniref100.KO.1.dmnd
     - name: Install binette
       run: |
         pip install .
@@ -58,3 +45,14 @@ jobs:
       run: |
         conda install pytest
         pytest
+
+    - name: Download test data
+      uses: actions/checkout@v3
+      with:
+        repository: genotoul-bioinfo/Binette_TestData/
+        path: test_data
+
+    - name: Run simple test case
+      run: |
+        cd test_data
+        binette -b binning_results/* --contigs all_contigs.fna --checkm2_db checkm2_tiny_db/checkm2_tiny_db.dmnd  -v
