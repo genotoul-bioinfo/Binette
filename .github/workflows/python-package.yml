@@ -56,3 +56,7 @@ jobs:
       run: |
         cd test_data
         binette -b binning_results/* --contigs all_contigs.fna --checkm2_db checkm2_tiny_db/checkm2_tiny_db.dmnd  -v
+    - name: Compare results with expectation
+      run: |
+        cd test_data
+        diff <(cut -f2-8 expected_results/final_bins_quality_reports.tsv) <(cut -f2-8 results/final_bins_quality_reports.tsv)
