@@ -49,7 +49,7 @@ jobs:
     - name: Download test data
       uses: actions/checkout@v3
       with:
-        repository: genotoul-bioinfo/Binette_TestData/
+        repository: genotoul-bioinfo/Binette_TestData
         path: test_data
 
     - name: Run simple test case
