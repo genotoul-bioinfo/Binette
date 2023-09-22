@@ -498,7 +498,7 @@ def rename_bin_contigs(bins: List[Bin], contig_to_index: dict):
     """
     for b in bins:
         b.contigs = {contig_to_index[contig] for contig in b.contigs}
-
+        b.hash = hash(str(sorted(b.contigs)))
 
 def create_intermediate_bins(bin_set_name_to_bins: Dict[str, Set[Bin]]) -> Set[Bin]:
     """
