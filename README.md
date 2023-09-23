@@ -1,3 +1,7 @@
+[![install with bioconda](https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg?style=flat)](http://bioconda.github.io/recipes/binette/README.html)
+
+[![Anaconda-Server Badge](https://anaconda.org/bioconda/binette/badges/downloads.svg)](https://anaconda.org/bioconda/binette)
+
 # Overview 
 
 Binette is a fast and accurate binning refinement tool to constructs high quality MAGs from the output of multiple binning tools.
