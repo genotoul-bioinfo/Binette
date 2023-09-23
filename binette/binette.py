@@ -305,8 +305,3 @@ def main():
         f"{hq_bins_single}/{len(selected_bins)} selected bins have a high quality and are made of only one contig."
     )
 
-
-# If this script is run from the command line then call the main function.
-if __name__ == "__main__":
-    # main()
-    pass
