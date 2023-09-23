@@ -11,11 +11,21 @@ It then uses checkm2 to assess bins quality to finally select the best bins poss
 
 Binette is inspired from the metaWRAP bin-refinement tool but it effectively solves all the problems from that very tool. 
 - Enhanced Speed: Binette significantly improves the speed of the refinement process. It achieves this by launching the initial steps of checkm2, such as prodigal and diamond runs, only once on all contigs. These intermediate results are then utilized to assess the quality of any given bin, eliminating redundant computations and accelerating the refinement process.
-- No Limit on Input Bin Sets: Unlike its predecessor, Binette is not constrained by the number of input bin sets. It can handle and process multiple bin sets simultaneously, accommodating a broader range of data and experimental setups.
+- No Limit on Input Bin Sets: Unlike its predecessor, Binette is not constrained by the number of input bin sets. It can handle and process multiple bin sets simultaneously.
 <!-- - Bin selection have been improved. It selects the best bins in a more accurate and elegant manner.
 - It is easier to use. -->
 
 # Installation
+
+## With Bioconda
+
+Binette can be esailly installed with conda 
+
+```bash
+
+conda install -c bioconda binette
+
+```
 
 ## From a conda environnement
 
@@ -30,33 +40,6 @@ Then create a Conda environment using the `binette.yaml` file:
 conda env create -n binette -f binette.yaml
 conda activate binette 
 ```
-<!-- 
-Binette need checkm2 to be fully installed with pip.
-
-Follow Chekm2 installation instruction:
-
-You can install it with git: 
-
-```
-git clone --recursive https://github.com/chklovski/checkm2.git
-
-pip install checkm2/
-
-```
-Or download the archive from github:
-
-```bash
-# get the archive
-wget https://github.com/chklovski/CheckM2/archive/refs/tags/1.0.2.tar.gz
-
-# decompress
-tar -xf 1.0.2.tar.gz
-rm 1.0.2.tar.gz
-
-# install
-pip install CheckM2-1.0.2/
-
-``` -->
 
 Download checkm2 database
 
