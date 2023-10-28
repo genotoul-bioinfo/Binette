@@ -4,10 +4,10 @@ channels:
   - defaults
   - conda-forge
 dependencies:
-  - python>=3.7, <3.9
+  - python
   - numpy=1.19.2
   - diamond=2.0.4
-  - pandas=1.4.0
+  - pandas>=2
   - prodigal=2.6.3
   - checkm2
   - setuptools
