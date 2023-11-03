@@ -22,7 +22,7 @@ jobs:
         python-version: ['3.8','3.9']
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+        # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
       # Setting up miniconda
       - uses: conda-incubator/setup-miniconda@v2
