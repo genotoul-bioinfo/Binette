@@ -22,18 +22,19 @@ jobs:
         python-version: ['3.8','3.9']
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-        # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
       # Setting up miniconda
       - uses: conda-incubator/setup-miniconda@v2
         with:
-          condarc-file: .condarc.yml
-          activate-environment: test
+          mamba-version: "*"
           python-version: ${{ matrix.python-version }}
+          channels: conda-forge,bioconda,defaults
+          activate-environment: test
       - name: Set up test environment
         shell: bash -l {0}
         run: |
-            conda install -y binette
+            mamba install -y binette
       - name: check installation
         shell: bash -l {0}
         run: |
