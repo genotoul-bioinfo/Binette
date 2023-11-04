@@ -18,24 +18,24 @@ jobs:
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
     - uses: actions/checkout@v3
 
-    # Setting up miniconda
-    - uses: conda-incubator/setup-miniconda@v2
-      with:
-        mamba-version: "*"
-        python-version: ${{ matrix.python-version }}
-        channels: conda-forge,bioconda,defaults
-        activate-environment: test
+    # # Setting up miniconda
+    # - uses: conda-incubator/setup-miniconda@v2
+    #   with:
+    #     mamba-version: "*"
+    #     python-version: ${{ matrix.python-version }}
+    #     channels: conda-forge,bioconda,defaults
+    #     activate-environment: test
 
-    - name: Set up test environment
-      shell: bash -l {0}
-      run: |
-          mamba install -y binette
+    # - name: Set up test environment
+    #   shell: bash -l {0}
+    #   run: |
+    #       mamba install -y binette
 
-    - name: check installation
-      shell: bash -l {0}
-      run: |
-          python --version
-          binette --version
+    # - name: check installation
+    #   shell: bash -l {0}
+    #   run: |
+    #       python --version
+    #       binette --version
 
     # - uses: actions/checkout@v3
     # - name: Set up Python ${{ matrix.python-version }}
@@ -52,6 +52,16 @@ jobs:
     # - name: Install binette dependencies
     #   run: |
     #     mamba env update --file binette.yaml --name base
+
+    # Setting up miniconda
+    - uses: conda-incubator/setup-miniconda@v2
+      with:
+        mamba-version: "*"
+        python-version: ${{ matrix.python-version }}
+        channels: conda-forge,bioconda,defaults
+        environment-file: binette.yaml
+        activate-environment: binette
+  
     - name: Install binette
       run: |
         pip install .
