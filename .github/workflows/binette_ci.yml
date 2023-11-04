@@ -63,6 +63,7 @@ jobs:
         activate-environment: binette
   
     - name: Install binette
+    - shell: bash -el {0}
       run: |
         pip install .
         binette -h
