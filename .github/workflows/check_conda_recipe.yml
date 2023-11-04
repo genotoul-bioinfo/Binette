@@ -1,6 +1,6 @@
 name: conda recipe
 
-Controls when the workflow will run
+# Controls when the workflow will run
 on: 
   # Triggers the workflow on schedule but only for the default branch (which is master)
   schedule:
