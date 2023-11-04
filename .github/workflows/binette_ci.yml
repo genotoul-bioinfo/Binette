@@ -46,7 +46,7 @@ jobs:
     - name: Test with pytest
       run: |
         mamba install pytest
-        pytestconda
+        pytest
 
     - name: Download test data
       uses: actions/checkout@v3
