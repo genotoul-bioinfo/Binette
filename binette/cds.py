@@ -31,9 +31,12 @@ def predict(contigs_iterator: Iterator, outfaa: str, threads: int =1) -> Dict[st
 
     :return: A dictionary mapping contig names to predicted genes.
     """
-    
-    orf_finder = pyrodigal.GeneFinder(meta="meta")
-    
+    try:
+        # for version >=3 of pyrodigal
+        orf_finder = pyrodigal.GeneFinder(meta="meta")
+    except AttributeError:
+        orf_finder = pyrodigal.OrfFinder(meta="meta")
+
     logging.info(f"Predicting cds sequences with Pyrodigal using {threads} threads.")
     
     with multiprocessing.pool.ThreadPool(processes=threads) as pool: 
