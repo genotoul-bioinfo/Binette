@@ -20,5 +20,5 @@ if __name__ == "__main__":
         description="Binette: accurate binning refinement tool to constructs high quality MAGs.",
         long_description=(long_description),
         long_description_content_type="text/markdown",
-        install_requires=["pyrodigal>=3.0.0", "pyfastx", "networkx", "checkm2"],
+        install_requires=["pyrodigal", "pyfastx", "networkx", "checkm2"],
     )
