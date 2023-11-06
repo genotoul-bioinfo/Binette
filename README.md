@@ -155,11 +155,10 @@ The `final_bins_quality_reports.tsv` file contains the following columns:
 | **N50**             | Displays the N50 of the bin.                                                                                |
 | **contig_count**    | The number of contigs contained within the bin.                                                             |
 
-# Bug reporting and feature requests
+# Feature requests and bug reporting
 
-Please submit bug reports and feature requests to the issue tracker:
+Please submit bug reports and feature requests by opening an [issue](https://github.com/genotoul-bioinfo/Binette/issues). 
 
-[binette issue tracker](https://github.com/genotoul-bioinfo/Binette/issues)
 
 # Licence
 
