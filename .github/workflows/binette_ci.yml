@@ -1,0 +1,66 @@
+# This workflow will install Python dependencies, run tests and lint with a variety of Python versions
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
+
+name: Test Binette
+
+on: [push] #to any branch
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -el {0}
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [3.8] #["3.8", "3.9", "3.10"]
+
+    steps:
+    # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+    - uses: actions/checkout@v3
+
+    # Install requirements 
+    - uses: conda-incubator/setup-miniconda@v2
+      with:
+        mamba-version: "*"
+        python-version: ${{ matrix.python-version }}
+        channels: conda-forge,bioconda,defaults
+        environment-file: binette.yaml
+        activate-environment: binette
+  
+    - name: Install binette
+      run: |
+        pip install .
+        binette -h
+
+    - name: Lint with flake8
+      run: |
+        mamba install flake8
+        # stop the build if there are Python syntax errors or undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+    - name: Test with pytest
+      run: |
+        mamba install pytest
+        pytest
+
+    - name: Download test data
+      uses: actions/checkout@v3
+      with:
+        repository: genotoul-bioinfo/Binette_TestData
+        path: test_data
+
+    - name: Run simple test case
+      run: |
+        cd test_data
+        binette -b binning_results/* --contigs all_contigs.fna --checkm2_db checkm2_tiny_db/checkm2_tiny_db.dmnd  -v -o test_results
+
+    - name: Compare results with expectation
+      run: |
+        cd test_data
+        head  expected_results/final_bins_quality_reports.tsv test_results/final_bins_quality_reports.tsv
+        python scripts/compare_results.py expected_results/final_bins_quality_reports.tsv test_results/final_bins_quality_reports.tsv

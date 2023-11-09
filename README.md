@@ -1,4 +1,6 @@
-# Overview 
+[![install with bioconda](https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg?style=flat)](http://bioconda.github.io/recipes/binette/README.html)  [![Anaconda-Server Badge](https://anaconda.org/bioconda/binette/badges/downloads.svg)](https://anaconda.org/bioconda/binette)
+
+# Binette 
 
 Binette is a fast and accurate binning refinement tool to constructs high quality MAGs from the output of multiple binning tools.
 
@@ -11,11 +13,21 @@ It then uses checkm2 to assess bins quality to finally select the best bins poss
 
 Binette is inspired from the metaWRAP bin-refinement tool but it effectively solves all the problems from that very tool. 
 - Enhanced Speed: Binette significantly improves the speed of the refinement process. It achieves this by launching the initial steps of checkm2, such as prodigal and diamond runs, only once on all contigs. These intermediate results are then utilized to assess the quality of any given bin, eliminating redundant computations and accelerating the refinement process.
-- No Limit on Input Bin Sets: Unlike its predecessor, Binette is not constrained by the number of input bin sets. It can handle and process multiple bin sets simultaneously, accommodating a broader range of data and experimental setups.
+- No Limit on Input Bin Sets: Unlike its predecessor, Binette is not constrained by the number of input bin sets. It can handle and process multiple bin sets simultaneously.
 <!-- - Bin selection have been improved. It selects the best bins in a more accurate and elegant manner.
 - It is easier to use. -->
 
 # Installation
+
+## With Bioconda
+
+Binette can be esailly installed with conda 
+
+```bash
+
+conda install -c bioconda binette
+
+```
 
 ## From a conda environnement
 
@@ -30,33 +42,6 @@ Then create a Conda environment using the `binette.yaml` file:
 conda env create -n binette -f binette.yaml
 conda activate binette 
 ```
-<!-- 
-Binette need checkm2 to be fully installed with pip.
-
-Follow Chekm2 installation instruction:
-
-You can install it with git: 
-
-```
-git clone --recursive https://github.com/chklovski/checkm2.git
-
-pip install checkm2/
-
-```
-Or download the archive from github:
-
-```bash
-# get the archive
-wget https://github.com/chklovski/CheckM2/archive/refs/tags/1.0.2.tar.gz
-
-# decompress
-tar -xf 1.0.2.tar.gz
-rm 1.0.2.tar.gz
-
-# install
-pip install CheckM2-1.0.2/
-
-``` -->
 
 Download checkm2 database
 
@@ -155,6 +140,28 @@ For example, consider the following two `contig2bin_tables`:
 
 In both formats, the `--contigs` argument should specify a FASTA file containing all the contigs found in the bins. Typically, this file would be the assembly FASTA file used to generate the bins. In these exemple the `assembly.fasta` file should contain at least the five contigs mentioned in the `contig2bin_tables` files or in the bin fasta files: `contig_1`, `contig_8`, `contig_15`, `contig_9`, and `contig_10`.
 
+## Outputs
+
+Binette results are stored in the `results` directory. You can specify a different directory using the `--outdir` option.
+
+In this directory you will find:
+- `final_bins_quality_reports.tsv`: This is a TSV (tab-separated values) file containing quality information about the final selected bins.
+- `final_bins/`: This directory stores all the selected bins in fasta format.
+- `temporary_files/`: This directory contains intermediate files. If you choose to use the `--resume` option, Binette will utilize files in this directory to prevent the recomputation of time-consuming steps.
+
+
+The `final_bins_quality_reports.tsv` file contains the following columns:
+| Column Name         | Description                                                                                                  |
+|---------------------|--------------------------------------------------------------------------------------------------------------|
+| **bin_id**          | This column displays the unique ID of the bin.                                                             |
+| **origin**          | Indicates the source or origin of the bin, specifying from which bin set it originates or the intermediate set operation that created it. |
+| **name**            | The name of the bin.                                                                                        |
+| **completeness**    | The completeness of the bin, determined by CheckM2.                                                         |
+| **contamination**   | The contamination of the bin, determined by CheckM2.                                                       |
+| **score**           | This column displays the computed score, which is calculated as: `completeness - contamination * weight`. You can customize the contamination weight using the `--contamination_weight` option. |
+| **size**            | Represents the size of the bin in nucleotides.                                                              |
+| **N50**             | Displays the N50 of the bin.                                                                                |
+| **contig_count**    | The number of contigs contained within the bin.                                                             |
 
 # Bug reporting and feature requests
 

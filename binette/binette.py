@@ -47,7 +47,7 @@ def parse_arguments():
         description=f"Binette version={program_version}",
         formatter_class=ArgumentDefaultsHelpFormatter,
     )
-
+    # TODO add catagory to better visualize the required and the optional args
     input_arg = parser.add_mutually_exclusive_group(required=True)
 
     input_arg.add_argument(
@@ -245,9 +245,6 @@ def main():
 
     logging.info("Add size and assess quality of input bins")
 
-    # TODO paralellize
-    # original_bins = bin_quality.add_bin_metrics_in_parallel(original_bins, contig_info, threads)
-
     bin_quality.add_bin_metrics(original_bins, contig_info, contamination_weight, threads)
 
     logging.info("Create intermediate bins:")
@@ -259,16 +256,30 @@ def main():
     logging.info("Dereplicating input bins and new bins")
     all_bins = original_bins | new_bins
 
+    if debug:
+        all_bins_for_debug = set(all_bins)
+        all_bin_compo_file = os.path.join(outdir, "all_bins_quality_reports.tsv")
+        
+        logging.info(f"Writing all bins in {all_bin_compo_file}")
+        
+        io.write_bin_info(all_bins_for_debug, all_bin_compo_file, add_contigs=True)
+        
+        with open(os.path.join(outdir, "index_to_contig.tsv"), 'w') as flout:
+            flout.write('\n'.join((f'{i}\t{c}' for i, c in index_to_contig.items())))
+
     logging.info("Select best bins")
     selected_bins = bin_manager.select_best_bins(all_bins)
-
+    
     logging.info(f"Filtering bins: only bins with completeness >= {min_completeness} are kept")
     selected_bins = [b for b in selected_bins if b.completeness >= min_completeness]
 
-    logging.info(f"Writing selected bins in {final_bin_report}")
+    logging.info(f"Filtering bins: {len(selected_bins)} selected bins")
 
+    logging.info(f"Writing selected bins in {final_bin_report}")
+    
     for b in selected_bins:
         b.contigs = {index_to_contig[c_index] for c_index in b.contigs}
+    
     io.write_bin_info(selected_bins, final_bin_report)
 
     io.write_bins_fasta(selected_bins, contigs_fasta, outdir_final_bin_set)
@@ -294,8 +305,3 @@ def main():
         f"{hq_bins_single}/{len(selected_bins)} selected bins have a high quality and are made of only one contig."
     )
 
-
-# If this script is run from the command line then call the main function.
-if __name__ == "__main__":
-    # main()
-    pass

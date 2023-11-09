@@ -1,8 +1,3 @@
-"""
-
-
-"""
-
 import logging
 import os
 from collections import defaultdict
@@ -12,7 +7,6 @@ import itertools
 import networkx as nx
 from typing import List, Dict, Iterable, Tuple, Set
 
-
 class Bin:
     counter = 0
 
@@ -20,13 +14,9 @@ class Bin:
         """
         Initialize a Bin object.
 
-        Args:
-            contigs (Iterable[str]): Contig names belonging to the bin.
-            origin (str): Origin/source of the bin.
-            name (str): Name of the bin.
-
-        Returns:
-            None
+        :param contigs: Iterable of contig names belonging to the bin.
+        :param origin: Origin/source of the bin.
+        :param name: Name of the bin.
         """
         Bin.counter += 1
 
@@ -47,11 +37,8 @@ class Bin:
         """
         Compare the Bin object with another object for equality.
 
-        
-        other (Any): The object to compare with.
-
-        Returns:
-            bool: True if the objects are equal, False otherwise.
+        :param other: The object to compare with.
+        :return: True if the objects are equal, False otherwise.
         """
         return self.contigs == other.contigs
 
@@ -59,8 +46,7 @@ class Bin:
         """
         Compute the hash value of the Bin object.
 
-        Returns:
-            int: The hash value.
+        :return: The hash value.
         """
         return self.hash
 
@@ -167,9 +153,7 @@ class Bin:
         origin = "union"
 
         return Bin(contigs, origin, name)
-
-
-
+    
 
 def get_bins_from_directory(bin_dir: str, set_name: str) -> List[Bin]:
     """
@@ -407,7 +391,7 @@ def get_union_bins(G: nx.Graph, max_conta: int = 50) -> Set[Bin]:
                 continue
 
             bins = set(bins)
-            bin_a = set(bins).pop()
+            bin_a = bins.pop()
             bin_union = bin_a.union(*bins)
 
             if bin_union.contigs:
@@ -498,7 +482,7 @@ def rename_bin_contigs(bins: List[Bin], contig_to_index: dict):
     """
     for b in bins:
         b.contigs = {contig_to_index[contig] for contig in b.contigs}
-
+        b.hash = hash(str(sorted(b.contigs)))
 
 def create_intermediate_bins(bin_set_name_to_bins: Dict[str, Set[Bin]]) -> Set[Bin]:
     """
