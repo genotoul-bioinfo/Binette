@@ -49,14 +49,7 @@ conda env create -n binette -f binette.yaml
 conda activate binette 
 ```
 
-Download checkm2 database
-
-```
-
-checkm2 database --download --path <checkm2/database/>
-```
-
-Finally install binette with pip
+Finally install Binette with pip
 
 ```
 pip install .
