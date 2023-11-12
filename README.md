@@ -24,10 +24,16 @@ Binette is inspired from the metaWRAP bin-refinement tool but it effectively sol
 Binette can be esailly installed with conda 
 
 ```bash
+conda create -c bioconda -c defaults -c conda-forge -n binette binette
+conda activate binette
+```
 
-conda install -c bioconda binette
+Binette should be able to run :
 
 ```
+binette -h
+```
+
 
 ## From a conda environnement
 
@@ -63,23 +69,16 @@ binette -h
 ```
 
 
-<!-- ## Running binette using a singularity image
+## Downloading the CheckM2 database
 
-Singularity version 3 or above must be installed. See [here](https://sylabs.io/guides/3.7/user-guide/quick_start.html#quick-installation-steps) how to install Singularity >=v3.
+Before using Binette, it is necessary to download the CheckM2 database:
 
-Git clone binette repository and build the singularity image. 
-
-```
-git clone https://github.com/genotoul-bioinfo/Binette
-cd Binette
-sudo singularity build binette.sif singularity_recipe
+```bash
+checkm2 database --download --path <checkm2/database/>
 ```
 
-Then if the build succesfully finished, you should be able to run Binette:
+Make sure to replace `<checkm2/database/>` with the desired path where you want to store the CheckM2 database.
 
-```
-singularity exec binette.sif binette -h
-``` -->
 
 # Usage 
 
