@@ -131,9 +131,8 @@ def test_parse_faa_file(tmp_path):
         ">contig2_gene1\n"
         "TTTTTTTTTTTT\n"
     )
-    faa_file = "tests/mock_file.faa"
-    with open(faa_file, 'w') as fl:
-        fl.write(fasta_content)
+    faa_file = tmp_path / "mock_file.faa"
+    faa_file.write_text(fasta_content)
 
     # Call the function
     result = cds.parse_faa_file(faa_file)
