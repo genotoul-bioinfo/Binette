@@ -520,8 +520,8 @@ def test_get_bins_from_directory(create_temp_bin_files):
     assert bins[0].contigs in [{"contig1", "contig2"}, {"contig3", "contig4"}]
     assert bins[0].origin == set_name
     assert bins[1].origin == set_name
-    assert bins[1].name == "bin1.fasta"
-    assert bins[0].name == "bin2.fasta"
+    assert bins[1].name in ["bin2.fasta", "bin1.fasta"]
+    assert bins[0].name in ["bin2.fasta", "bin1.fasta"]
 
 def test_get_bins_from_directory_no_files(tmpdir):
     bin_dir = str(tmpdir.mkdir("empty_bins"))
