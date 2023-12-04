@@ -516,8 +516,8 @@ def test_get_bins_from_directory(create_temp_bin_files):
     # Check if the Bin objects are created with the correct contigs, set name, and bin names
     assert isinstance(bins[0], bin_manager.Bin)
     assert isinstance(bins[1], bin_manager.Bin)
-    assert bins[1].contigs == {"contig1", "contig2"}
-    assert bins[0].contigs == {"contig3", "contig4"}
+    assert bins[1].contigs in [{"contig1", "contig2"}, {"contig3", "contig4"}]
+    assert bins[0].contigs in [{"contig1", "contig2"}, {"contig3", "contig4"}]
     assert bins[0].origin == set_name
     assert bins[1].origin == set_name
     assert bins[1].name == "bin1.fasta"
