@@ -139,3 +139,35 @@ def test_check_contig_consistency_no_error():
     io_manager.check_contig_consistency(
             contigs_from_assembly, contigs_from_bins, assembly_file, elsewhere_file
         )
+
+@pytest.fixture
+def temp_files(tmp_path):
+    # Create temporary files for testing
+    faa_file = tmp_path / "test_protein.faa"
+    diamond_result_file = tmp_path / "test_diamond_result.txt"
+    faa_file.touch()
+    diamond_result_file.touch()
+    yield str(faa_file), str(diamond_result_file)
+
+def test_check_resume_file_exists(temp_files, caplog):
+    # Test when both files exist
+    faa_file, diamond_result_file = temp_files
+    io_manager.check_resume_file(faa_file, diamond_result_file)
+    assert "Protein file" not in caplog.text
+    assert "Diamond result file" not in caplog.text
+
+def test_check_resume_file_missing_faa(temp_files, caplog):
+    # Test when faa_file is missing
+    _, diamond_result_file = temp_files
+    with pytest.raises(FileNotFoundError):
+        io_manager.check_resume_file("nonexistent.faa", diamond_result_file)
+    assert "Protein file" in caplog.text
+    assert "Diamond result file" not in caplog.text
+
+def test_check_resume_file_missing_diamond(temp_files, caplog):
+    # Test when diamond_result_file is missing
+    faa_file, _ = temp_files
+    with pytest.raises(FileNotFoundError):
+        io_manager.check_resume_file(faa_file, "nonexistent_diamond_result.txt")
+    assert "Protein file" not in caplog.text
+    assert "Diamond result file" in caplog.text

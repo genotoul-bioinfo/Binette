@@ -13,6 +13,9 @@ import pytest
 
 from binette import diamond
 
+import pandas as pd
+from collections import Counter
+
 class CompletedProcess:
     def __init__(self, returncode, stderr):
         self.returncode = returncode
@@ -123,9 +126,6 @@ def test_check_tool_exists_tool_not_found(monkeypatch):
 
 
 def test_run_diamond_tool_found(monkeypatch):
-    # Mocking check_tool_exists
-    def mock_check_tool_exists(*args, **kwargs):
-        pass
 
     monkeypatch.setattr(sys, "exit", lambda x: None)  # Patch sys.exit to avoid test interruption
 
@@ -164,12 +164,6 @@ def test_run_diamond_tool_not_found(monkeypatch):
         )
 
     mock_exit.assert_called_once_with(1)
-
-
-import pandas as pd
-from collections import Counter
-
-# Import the function get_contig_to_kegg_id here
 
 
 def test_get_contig_to_kegg_id():

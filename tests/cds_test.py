@@ -171,8 +171,8 @@ def test_get_contig_cds_metadata():
     contig_to_genes = {"c1":["AAAA", "GGGG", "CCCC"],
                        "c2":["TTTT", "CCCC"]}
 
-    contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length = cds.get_contig_cds_metadata(contig_to_genes, 1)
+    contig_metadata = cds.get_contig_cds_metadata(contig_to_genes, 1)
     
-    assert contig_to_cds_count == {"c1":3, "c2":2}
-    assert contig_to_aa_counter == {"c1": {'A': 4, 'G': 4, "C":4} , "c2":{'C': 4, 'T': 4}}
-    assert contig_to_aa_length == {"c1":12, "c2":8}
+    assert contig_metadata['contig_to_cds_count'] == {"c1":3, "c2":2}
+    assert contig_metadata['contig_to_aa_counter'] == {"c1": {'A': 4, 'G': 4, "C":4} , "c2":{'C': 4, 'T': 4}}
+    assert contig_metadata['contig_to_aa_length'] == {"c1":12, "c2":8}

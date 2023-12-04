@@ -109,3 +109,28 @@ def check_contig_consistency(contigs_from_assembly: List[str],
     message = f"{issue_countigs} contigs found in file {elsewhere_file} \
                 were not found in assembly_file ({assembly_file})."
     assert are_contigs_consistent, message
+
+
+def check_resume_file(faa_file: str, diamond_result_file: str) -> None:
+    """
+    Check the existence of files required for resuming the process.
+
+    :param faa_file: Path to the protein file.
+    :param diamond_result_file: Path to the Diamond result file.
+    :raises FileNotFoundError: If the required files don't exist for resuming.
+    """
+
+    if os.path.isfile(faa_file) and os.path.isfile(diamond_result_file):
+        return
+
+    if not os.path.isfile(faa_file):
+        error_msg = f"Protein file '{faa_file}' does not exist. Resuming is not possible."
+        logging.error(error_msg)
+        raise FileNotFoundError(error_msg)
+
+    if not os.path.isfile(diamond_result_file):
+        error_msg = f"Diamond result file '{diamond_result_file}' does not exist. Resuming is not possible."
+        logging.error(error_msg)
+        raise FileNotFoundError(error_msg)
+
+
