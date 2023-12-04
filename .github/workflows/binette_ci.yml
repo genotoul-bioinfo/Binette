@@ -45,8 +45,19 @@ jobs:
 
     - name: Test with pytest
       run: |
-        mamba install pytest
-        pytest
+        mamba install pytest pytest-cov
+        pytest --cov=binette --cov-report=html --cov-report=xml
+
+    - name: Generate coverage badge
+      run: |
+        pip install genbadge[coverage]
+        genbadge coverage -i coverage.xml  -o htmlcov/coverage-badge.svg
+
+    - name: Publish coverage report to GitHub Pages
+      uses: JamesIves/github-pages-deploy-action@v4
+      with:
+        folder: htmlcov
+        branch: gh-pages
 
     - name: Download test data
       uses: actions/checkout@v3
