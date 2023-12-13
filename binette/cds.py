@@ -137,4 +137,10 @@ def get_contig_cds_metadata(contig_to_genes: Dict[str, List[str]], threads: int)
     contig_to_aa_length = {contig: sum(counter.values()) for contig, counter in  tqdm(contig_to_aa_counter.items(), unit="contig")}
     logging.info("Calculating total amino acid length in parallel.")
 
-    return contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length
+    contig_info = {
+        "contig_to_cds_count": contig_to_cds_count,
+        "contig_to_aa_counter": contig_to_aa_counter,
+        "contig_to_aa_length": contig_to_aa_length,
+    }
+
+    return contig_info

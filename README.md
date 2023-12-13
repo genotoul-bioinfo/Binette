@@ -1,4 +1,4 @@
-[![install with bioconda](https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg?style=flat)](http://bioconda.github.io/recipes/binette/README.html)  [![Anaconda-Server Badge](https://anaconda.org/bioconda/binette/badges/downloads.svg)](https://anaconda.org/bioconda/binette)
+[![install with bioconda](https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg?style=flat)](http://bioconda.github.io/recipes/binette/README.html)  [![Anaconda-Server Badge](https://anaconda.org/bioconda/binette/badges/downloads.svg)](https://anaconda.org/bioconda/binette) [![Test Coverage](https://genotoul-bioinfo.github.io/Binette/coverage-badge.svg)](https://genotoul-bioinfo.github.io/Binette/)
 
 # Binette 
 
@@ -24,10 +24,16 @@ Binette is inspired from the metaWRAP bin-refinement tool but it effectively sol
 Binette can be esailly installed with conda 
 
 ```bash
+conda create -c bioconda -c defaults -c conda-forge -n binette binette
+conda activate binette
+```
 
-conda install -c bioconda binette
+Binette should be able to run :
 
 ```
+binette -h
+```
+
 
 ## From a conda environnement
 
@@ -43,14 +49,7 @@ conda env create -n binette -f binette.yaml
 conda activate binette 
 ```
 
-Download checkm2 database
-
-```
-
-checkm2 database --download --path <checkm2/database/>
-```
-
-Finally install binette with pip
+Finally install Binette with pip
 
 ```
 pip install .
@@ -63,23 +62,16 @@ binette -h
 ```
 
 
-<!-- ## Running binette using a singularity image
+## Downloading the CheckM2 database
 
-Singularity version 3 or above must be installed. See [here](https://sylabs.io/guides/3.7/user-guide/quick_start.html#quick-installation-steps) how to install Singularity >=v3.
+Before using Binette, it is necessary to download the CheckM2 database:
 
-Git clone binette repository and build the singularity image. 
-
-```
-git clone https://github.com/genotoul-bioinfo/Binette
-cd Binette
-sudo singularity build binette.sif singularity_recipe
+```bash
+checkm2 database --download --path <checkm2/database/>
 ```
 
-Then if the build succesfully finished, you should be able to run Binette:
+Make sure to replace `<checkm2/database/>` with the desired path where you want to store the CheckM2 database.
 
-```
-singularity exec binette.sif binette -h
-``` -->
 
 # Usage 
 
@@ -163,11 +155,10 @@ The `final_bins_quality_reports.tsv` file contains the following columns:
 | **N50**             | Displays the N50 of the bin.                                                                                |
 | **contig_count**    | The number of contigs contained within the bin.                                                             |
 
-# Bug reporting and feature requests
+# Feature requests and bug reporting
 
-Please submit bug reports and feature requests to the issue tracker:
+Please submit bug reports and feature requests by opening an [issue](https://github.com/genotoul-bioinfo/Binette/issues). 
 
-[binette issue tracker](https://github.com/genotoul-bioinfo/Binette/issues)
 
 # Licence
 

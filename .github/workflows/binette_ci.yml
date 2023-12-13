@@ -3,8 +3,13 @@
 
 name: Test Binette
 
-on: [push] #to any branch
-
+on:
+  pull_request:
+    branches: 
+      - '*'
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+    
 jobs:
   build:
 
@@ -45,8 +50,21 @@ jobs:
 
     - name: Test with pytest
       run: |
-        mamba install pytest
-        pytest
+        mamba install pytest pytest-cov
+        pytest --cov=binette --cov-report=html --cov-report=xml
+
+    - name: Generate coverage badge
+      run: |
+        pip install genbadge[coverage]
+        genbadge coverage -i coverage.xml  -o htmlcov/coverage-badge.svg
+        rm htmlcov/.gitignore
+
+    - name: Publish coverage report to GitHub Pages
+      if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+      uses: JamesIves/github-pages-deploy-action@v4
+      with:
+        folder: htmlcov
+        branch: gh-pages
 
     - name: Download test data
       uses: actions/checkout@v3

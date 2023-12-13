@@ -135,51 +135,6 @@ def add_bin_size_and_N50(bins: Iterable[Bin], contig_to_size: Dict[str,int]):
         bin_obj.add_N50(n50)
 
 
-
-def get_bin_size_and_N50(bin_obj, contig_to_size: Dict[str, int]):
-    """
-    Calculate and add bin size and N50 to a bin object.
-
-    :param bin_obj: The bin object to calculate size and N50 for.
-    :type bin_obj: Any
-    :param contig_to_size: Dictionary mapping contig names to their sizes.
-    :type contig_to_size: Dict[str, int]
-    """
-    lengths = [contig_to_size[c] for c in bin_obj.contigs]
-    n50 = compute_N50(lengths)
-
-    bin_obj.add_length(sum(lengths))
-    bin_obj.add_N50(n50)
-
-
-def add_bin_metrics_in_parallel(bins: List, contig_info: Dict, threads: int, contamination_weight: float):
-    """
-    Add bin metrics in parallel for a list of bins.
-
-    :param bins: List of bin objects.
-    :type bins: List
-    :param contig_info: Dictionary containing contig information.
-    :type contig_info: Dict
-    :param threads: Number of threads to use for parallel processing.
-    :type threads: int
-    :param contamination_weight: Weight for contamination assessment.
-    :type contamination_weight: float
-    :return: Set of processed bin objects.
-    :rtype: Set
-    """
-    chunk_size = int(len(bins) / threads) + 1
-    print("CHUNK SIZE TO PARALLELIZE", chunk_size)
-    results = []
-    with cf.ProcessPoolExecutor(max_workers=threads) as tpe:
-        for i, bins_chunk in enumerate(chunks(bins, chunk_size)):
-            print(f"chunk {i}, {len(bins_chunk)} bins")
-            results.append(tpe.submit(add_bin_metrics, *(bins_chunk, contig_info, contamination_weight)))
-
-    processed_bins = {bin_o for r in results for bin_o in r.result()}
-    return processed_bins
-
-
-
 def add_bin_metrics(bins: List, contig_info: Dict, contamination_weight: float, threads: int = 1):
     """
     Add metrics to a list of bins.
@@ -235,7 +190,8 @@ def assess_bins_quality_by_chunk(bins: List,
     contig_to_aa_length: Dict,
     contamination_weight: float,
     postProcessor:modelPostprocessing.modelProcessor = None,
-    threads: int = 1,):
+    threads: int = 1,
+    chunk_size: int = 2500):
     """
     Assess the quality of bins in chunks.
 
@@ -249,10 +205,10 @@ def assess_bins_quality_by_chunk(bins: List,
     :param contamination_weight: Weight for contamination assessment.
     :param postProcessor: post-processor from checkm2
     :param threads: Number of threads for parallel processing (default is 1).
+    :param chunk_size: The size of each chunk. 
     """
-    n = 2500
 
-    for i, chunk_bins_iter in enumerate(chunks(bins, n)):
+    for i, chunk_bins_iter in enumerate(chunks(bins, chunk_size)):
         chunk_bins = set(chunk_bins_iter)
         logging.debug(f"chunk {i}: assessing quality of {len(chunk_bins)}")
         assess_bins_quality(

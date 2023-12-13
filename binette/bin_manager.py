@@ -81,23 +81,30 @@ class Bin:
         return Bin(contigs, origin, name)
 
 
-    def add_length(self, length: float) -> None:
+    def add_length(self, length: int) -> None:
         """
-        Add the length attribute to the Bin object.
+        Add the length attribute to the Bin object if the provided length is a positive integer.
 
         :param length: The length value to add.
         :return: None
         """
-        self.length = length
+        if isinstance(length, int) and length > 0:
+            self.length = length
+        else:
+            raise ValueError("Length should be a positive integer.")
 
-    def add_N50(self, n50: float) -> None:
+    def add_N50(self, n50: int) -> None:
         """
         Add the N50 attribute to the Bin object.
 
         :param n50: The N50 value to add.
         :return: None
         """
-        self.N50 = n50
+        if isinstance(n50, int) and n50 >= 0:
+            self.N50 = n50
+        else:
+            raise ValueError("N50 should be a positive integer.")
+        
 
     def add_quality(self, completeness: float, contamination: float, contamination_weight: float) -> None:
         """
@@ -106,7 +113,6 @@ class Bin:
         :param completeness: The completeness value.
         :param contamination: The contamination value.
         :param contamination_weight: The weight assigned to contamination in the score calculation.
-        :return: None
         """
         self.completeness = completeness
         self.contamination = contamination
@@ -260,50 +266,6 @@ def from_bin_sets_to_bin_graph(bin_name_to_bin_set: Dict[str, set]) -> nx.Graph:
     return G
 
 
-def get_bin_graph(bins: List[Bin]) -> nx.Graph:
-    """
-    Creates a bin graph from a list of Bin objects.
-
-    :param bins: A list of Bin objects representing bins.
-
-    :return: A networkx Graph representing the bin graph of overlapping bins.
-    """
-    G = nx.Graph()
-    G.add_nodes_from((b.id for b in bins))
-
-    for i, (bin1, bin2) in enumerate(itertools.combinations(bins, 2)):
-
-        if bin1.overlaps_with(bin2):
-            # logging.info(f"{bin1} overlaps with {bin2}")
-            G.add_edge(
-                bin1.id,
-                bin2.id,
-            )
-    return G
-
-
-def get_bin_graph_with_attributes(bins: List[Bin], contig_to_length: Dict[str, int]) -> nx.Graph:
-    """
-    Creates a graph from a list of Bin objects with additional attributes.
-
-    :param bins: A list of Bin objects representing bins.
-    :param contig_to_length: A dictionary mapping contig names to their lengths.
-
-    :return: A networkx Graph representing the bin graph with attributes.
-    """
-    G = nx.Graph()
-    G.add_nodes_from((b.id for b in bins))
-
-    for i, (bin1, bin2) in enumerate(itertools.combinations(bins, 2)):
-        if bin1.overlaps_with(bin2):
-
-            contigs = bin1.contigs & bin2.contigs
-            shared_length = sum((contig_to_length[c] for c in contigs))
-            max_shared_length_prct = 100 - 100 * (shared_length / min((bin1.length, bin2.length)))
-
-            G.add_edge(bin1.id, bin2.id, weight=max_shared_length_prct)
-    return G
-
 
 def get_all_possible_combinations(clique: Iterable) -> Iterable[Tuple]:
     """
@@ -353,8 +315,7 @@ def get_difference_bins(G: nx.Graph) -> Set[Bin]:
     difference_bins = set()
     
     for clique in nx.clique.find_cliques(G):
-        # TODO should not use combinations but another method of itertools
-        # to get all possible combination in all possible order.
+
         bins_combinations = get_all_possible_combinations(clique)
         for bins in bins_combinations:
 
@@ -376,7 +337,7 @@ def get_union_bins(G: nx.Graph, max_conta: int = 50) -> Set[Bin]:
     """
     Retrieves the union bins from a given graph.
 
-    :param G: A networkx Graph representing the graph.
+    :param G: A networkx Graph representing the graph of bins.
     :param max_conta: Maximum allowed contamination value for a bin to be included in the union.
 
     :return: A set of Bin objects representing the union bins.
@@ -399,31 +360,6 @@ def get_union_bins(G: nx.Graph, max_conta: int = 50) -> Set[Bin]:
 
     return union_bins
 
-
-def create_intersec_diff_bins(G: nx.Graph) -> Set[Bin]:
-    """
-    Creates intersection and difference bins from a given graph.
-
-    :param G: A networkx Graph representing the graph.
-
-    :return: A set of Bin objects representing the intersection and difference bins.
-    """
-    new_bins = set()
-
-    for clique in nx.clique.find_cliques(G):
-        bins_combinations = get_all_possible_combinations(clique)
-        for bins in bins_combinations:
-
-            # intersection
-            intersec_bin = bins[0].intersection(*bins[1:])
-            new_bins.add(intersec_bin)
-
-            # difference
-            for bin_a in bins:
-                bin_diff = bin_a.difference(*(b for b in bins if b != bin_a))
-                new_bins.add(bin_diff)
-
-    return new_bins
 
 def select_best_bins(bins: List[Bin]) -> List[Bin]:
     """
