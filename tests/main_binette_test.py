@@ -9,7 +9,7 @@ import sys
 from unittest.mock import patch
 
 from collections import Counter
-from bin_manager_test import create_temp_bin_directories, create_temp_bin_files
+from tests.bin_manager_test import create_temp_bin_directories, create_temp_bin_files
 
 @pytest.fixture
 def bins():
