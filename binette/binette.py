@@ -40,35 +40,48 @@ def init_logging(verbose, debug):
     )
 
 
+
 def parse_arguments(args):
     """Parse script arguments."""
-
 
     parser = ArgumentParser(
         description=f"Binette version={binette.__version__}",
         formatter_class=ArgumentDefaultsHelpFormatter,
     )
-    # TODO add catagory to better visualize the required and the optional args
-    input_arg = parser.add_mutually_exclusive_group(required=True)
+
+    # Input arguments category
+    input_group = parser.add_argument_group('Input Arguments')
+    input_arg = input_group.add_mutually_exclusive_group(required=True)
 
     input_arg.add_argument(
         "-d",
         "--bin_dirs",
         nargs="+",
-        help="list of bin folders containing each bin in a fasta file.",
+        help="List of bin folders containing each bin in a fasta file.",
     )
 
     input_arg.add_argument(
         "-b",
         "--contig2bin_tables",
         nargs="+",
-        help="list of contig2bin table with two columns separated\
+        help="List of contig2bin table with two columns separated\
             with a tabulation: contig, bin",
     )
 
-    parser.add_argument("-c", "--contigs", required=True, help="Contigs in fasta format.")
+    input_group.add_argument("-c", "--contigs", required=True, help="Contigs in fasta format.")
 
-    parser.add_argument(
+    # Other parameters category
+    other_group = parser.add_argument_group('Other Arguments')
+    
+    other_group.add_argument(
+        "-e",
+        "--extension",
+        default="fasta",
+        help="Extension of fasta files in bin folders "
+            "(necessary when --bin_dirs is used).",
+    )
+
+    other_group.add_argument(
         "-m",
         "--min_completeness",
         default=40,
@@ -76,11 +89,11 @@ def parse_arguments(args):
         help="Minimum completeness required for final bin selections.",
     )
 
-    parser.add_argument("-t", "--threads", default=1, type=int, help="Number of threads.")
+    other_group.add_argument("-t", "--threads", default=1, type=int, help="Number of threads to use.")
 
-    parser.add_argument("-o", "--outdir", default="results", help="Output directory.")
+    other_group.add_argument("-o", "--outdir", default="results", help="Output directory.")
 
-    parser.add_argument(
+    other_group.add_argument(
         "-w",
         "--contamination_weight",
         default=2,
@@ -89,33 +102,24 @@ def parse_arguments(args):
              "A low contamination_weight favor complete bins over low contaminated bins.",
     )
 
-    parser.add_argument(
-        "-e",
-        "--extension",
-        default="fasta",
-        help="Extension of fasta files in bin folders "
-             "(necessary when --bin_dirs is used).",
-    )
-
-    parser.add_argument(
+    other_group.add_argument(
         "--checkm2_db",
         help="Provide a path for the CheckM2 diamond database. "
         "By default the database set via <checkm2 database> is used.",
     )
 
-    parser.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
+    other_group.add_argument("--low_mem", help="Use low mem mode when running diamond", action="store_true")
 
-    parser.add_argument("--debug", help="active debug mode", action="store_true")
+    other_group.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
 
-    parser.add_argument("--resume", help="active resume mode", action="store_true")
+    other_group.add_argument("--debug", help="Active debug mode", action="store_true")
 
-    parser.add_argument("--low_mem", help="low mem mode", action="store_true")
+    other_group.add_argument("--resume", help="Active resume mode", action="store_true")
 
-    parser.add_argument("--version", action="version", version=binette.__version__)
+    other_group.add_argument("--version", action="version", version=binette.__version__)
 
     args = parser.parse_args(args)
     return args
-
 
 def parse_input_files(bin_dirs: List[str], contig2bin_tables: List[str], contigs_fasta: str) -> Tuple[Dict[str, List], List, Dict[str, List], Dict[str, int]]:
     """
