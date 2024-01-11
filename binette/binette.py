@@ -71,7 +71,7 @@ def parse_arguments(args):
     parser.add_argument(
         "-m",
         "--min_completeness",
-        default=10,
+        default=40,
         type=int,
         help="Minimum completeness required for final bin selections.",
     )
@@ -83,7 +83,7 @@ def parse_arguments(args):
     parser.add_argument(
         "-w",
         "--contamination_weight",
-        default=5,
+        default=2,
         type=float,
         help="Bin are scored as follow: completeness - weight * contamination. "
              "A low contamination_weight favor complete bins over low contaminated bins.",
