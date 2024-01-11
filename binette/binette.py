@@ -13,8 +13,8 @@ from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 import sys
 import logging
 import os
-import pkg_resources
 
+import binette
 from binette import contig_manager, cds, diamond, bin_quality, bin_manager, io_manager as io
 from typing import List, Dict, Set, Tuple
 
@@ -42,10 +42,10 @@ def init_logging(verbose, debug):
 
 def parse_arguments(args):
     """Parse script arguments."""
-    program_version = pkg_resources.get_distribution("Binette").version
+
 
     parser = ArgumentParser(
-        description=f"Binette version={program_version}",
+        description=f"Binette version={binette.__version__}",
         formatter_class=ArgumentDefaultsHelpFormatter,
     )
     # TODO add catagory to better visualize the required and the optional args
@@ -111,7 +111,7 @@ def parse_arguments(args):
 
     parser.add_argument("--low_mem", help="low mem mode", action="store_true")
 
-    parser.add_argument("--version", action="version", version=program_version)
+    parser.add_argument("--version", action="version", version=binette.__version__)
 
     args = parser.parse_args(args)
     return args
