@@ -72,14 +72,6 @@ def parse_arguments(args):
 
     # Other parameters category
     other_group = parser.add_argument_group('Other Arguments')
-    
-    other_group.add_argument(
-        "-e",
-        "--extension",
-        default="fasta",
-        help="Extension of fasta files in bin folders "
-            "(necessary when --bin_dirs is used).",
-    )
 
     other_group.add_argument(
         "-m",
