@@ -104,9 +104,14 @@ def parse_arguments(args):
 
     other_group.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
 
-    other_group.add_argument("--debug", help="Active debug mode", action="store_true")
+    other_group.add_argument("--debug", help="Activate debug mode", action="store_true")
 
-    other_group.add_argument("--resume", help="Active resume mode", action="store_true")
+    other_group.add_argument("--resume",
+                            action="store_true",
+                            help="Activate resume mode. Binette will examine the 'temporary_files' directory "
+                                "within the output directory and reuse any existing files if possible."
+                        )
+
 
     other_group.add_argument("--version", action="version", version=binette.__version__)
 
