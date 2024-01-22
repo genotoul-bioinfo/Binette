@@ -17,29 +17,43 @@ binette -h
 ```
 
 
-## From a conda environnement
+```{tip}
+For quicker installation and potential resolution of conflicting dependencies, consider using [Mamba](https://github.com/mamba-org/mamba), an efficient alternative to conda.
 
-Clone this repository: 
 ```
+
+
+## Installing from Source Code within a conda environnement
+
+A straightforward method to install Binette from the source code is by utilizing a conda environment that includes all the necessary dependencies.
+
+**1. Clone the Binette Repository**
+
+```bash
 git clone https://github.com/genotoul-bioinfo/Binette
 cd Binette
 ```
 
-Then create a Conda environment using the `binette.yaml` file:
-```
+**2. Installing Dependencies with a Conda Environment File**
+
+Install Binette dependencies listed in the [binette.yaml](https://github.com/genotoul-bioinfo/Binette/blob/main/binette.yaml) file located at the root of the repository, using conda:
+
+```bash
 conda env create -n binette -f binette.yaml
-conda activate binette 
+conda activate binette
 ```
 
-Finally install Binette with pip
+**3. Installing Binette**
 
-```
+Finally, install Binette using **pip**:
+
+```bash
 pip install .
 ```
 
 Binette should be able to run :
 
-```
+```bash
 binette -h
 ```
 
