@@ -10,49 +10,52 @@ You can check the [Issues](https://github.com/genotoul-bioinfo/Binette/issues) p
 
 If it's not reported, create a new [issue](https://github.com/genotoul-bioinfo/Binette/issues).
 
-
 ## Adding a New Feature to Binette
-
 
 ### Starting with an Issue
 
-If you have ideas for new features or improvements, initiating a discussion in an issue. This allows us to evaluate and discuss your suggestions together.
+If you have ideas for new features or improvements, initiate a discussion in an issue. This allows us to evaluate and discuss your suggestions together.
 
-For minor changes like fixing typos or making small edits, feel free to create a new Pull Request (PR) directly with your proposed changes. 
+For minor changes like fixing typos or making small edits, create a new Pull Request (PR) directly with your proposed changes.
 
 ### Setting Up the Development Environment
 
-1. **Fork the Repository:** Start by forking the repository to your GitHub account. 🍴
+1. **Fork and Clone the Repository:**
+   - Fork the repository to your GitHub account. 🍴
+   - Clone your forked repository to your local machine.
 
-2. **Clone the Forked Repository:** Clone your forked repository to your local machine.
+2. **Get an Environment:**
+   Create an environment with all Binette prerequisites installed by following the installation instructions [here](./installation.md#installing-from-source-code-within-a-conda-environment).
 
-3. **Get an Environment:** Create an environment with all Binette prerequisites installed. For that, you can follow installation instructions [here](./installation.md#installing-from-source-code-within-a-conda-environnement).
+3. **Install in Editable Mode:**
+   To enable seamless code editing and testing of new functionality, install PPanGGOLiN in editable mode using the following command:
 
-4. **Install in Editable Mode:** To enable seamless code editing and testing of new functionality, install PPanGGOLiN in editable mode using the following command:
+   ```bash
+   pip install -e .
+   ```
 
-    ```bash
-    pip install -e .
-    ```
+   This allows you to modify the code and experiment with new features directly.
 
-    This allows you to modify the code and experiment with new features directly. 
 
-    ```{note}
-    Note: Currently, we are not utilizing any auto formatters (like autopep8 or black). Kindly refrain from using them, as it could introduce extensive changes across the project, making code review challenging for us.
-    ```
+```{note}
+Currently, we are not utilizing any auto formatters (like autopep8 or black). Kindly refrain from using them, as it could introduce extensive changes across the project, making code review challenging for us.
+```
+
 
 ### Making Your Changes
 
-We encourage consistency in code formatting; when adding new code, try to follow the existing code structure as closely as possible. Functions should include descriptive docstrings explaining their purpose and detailing the parameters. Ensure that argument types are specified in the function definitions. 
+Maintain consistency in code formatting. When adding new code, closely follow the existing structure. Functions should include descriptive docstrings explaining their purpose and detailing the parameters. Ensure that argument types are specified in the function definitions.
 
 ### Update Documentation
 
-If your changes change the behavior of the tool, it's essential to update the documentation to reflect your changes. Provide clear descriptions and, if necessary, examples of commands and their respective outputs.
+If your changes alter the tool's behavior, update the documentation to reflect them. Provide clear descriptions and, if necessary, examples of commands and their respective outputs.
+
 
 ### Tests
 
 #### Continuous Integration (CI) Workflow
 
-We've set up a CI workflow in the Actions tab, which executes Binette on a small dataset and tests its results. If you've introduced a new feature, consider updating  the CI YAML file to test it and ensure its seamless integration.
+We've configured a CI workflow in the Actions tab, executing Binette on a small dataset and testing its results. If you've introduced a new feature, consider updating the CI YAML file to test it and ensure seamless integration.
 
 #### Unit Tests
 
