@@ -26,6 +26,18 @@ requires-python = ">=3.8"
 license = {file="LICENCE"}
 
 [project.optional-dependencies]
+main_deps = [
+    "checkm2==1.*",
+    "networkx==3.*",
+    "numpy==1.19.2",
+    "packaging==23.*",
+    "pandas==1.4.0",
+    "pyfastx==2.*",
+    "pyrodigal==2.*",
+    "requests==2.*",
+    "tqdm==4.*",
+]
+
 doc = [
     "sphinx==6.2.1",
     "sphinx_rtd_theme==1.2.2",
