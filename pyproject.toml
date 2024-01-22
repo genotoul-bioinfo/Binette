@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=61.0.0", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "Binette"
+description = "Binette: accurate binning refinement tool to constructs high quality MAGs."
+dynamic = ["version"]
+authors = [
+    {name = "Jean Mainguy"},
+]
+maintainers = [
+    {name = "Jean Mainguy"},
+]
+
+readme = "README.md"
+keywords = ["Bioinformatics", "Prokaryote", "Binning", "Refinement", "Metagenomics"]
+classifiers=[
+    "Environment :: Console",
+    "Intended Audience :: Science/Research",
+    "Natural Language :: English",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Bio-Informatics"]
+requires-python = ">=3.8"
+license = {file="LICENCE"}
+
+[project.optional-dependencies]
+doc = [
+    "sphinx==6.2.1",
+    "sphinx_rtd_theme==1.2.2",
+    "readthedocs-sphinx-search==0.3.1",
+    "sphinx-autobuild==2021.3.14",
+    "myst-parser==1.0.0",
+    "docutils==0.18.1"
+]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov"
+]
+#
+[project.urls]
+Repository = "https://github.com/genotoul-bioinfo/Binette"
+#Changelog = "https://github.com/me/spam/blob/master/CHANGELOG.md"
+Documentation = "https://binette.readthedocs.io"
+#
+#
+[project.scripts]
+binette = "binette.main:main"
+
+[tool.setuptools]
+packages = ["binette"]
+
+
+[tool.setuptools.dynamic]
+version = {attr = "binette.__version__"}
