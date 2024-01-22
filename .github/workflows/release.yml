@@ -8,11 +8,11 @@
 
 name: Upload Python Package
 
-# on:
-#   release:
-#     types: [published]
+on:
+  release:
+    types: [published]
 
-on: [push]
+# on: [push]
 
 permissions:
   contents: read
@@ -41,7 +41,7 @@ jobs:
       with:
         user: __token__
         password: ${{ secrets.PYPI_API_TOKEN }}
-        repository-url: https://test.pypi.org/legacy/
+        # repository-url: https://test.pypi.org/legacy/
         
 
 
