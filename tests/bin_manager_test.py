@@ -5,7 +5,7 @@ Unit tests for binette.
 
 import pytest
 
-from binette import bin_manager, binette
+from binette import bin_manager
 import networkx as nx
 
 def test_get_all_possible_combinations():

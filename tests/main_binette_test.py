@@ -1,7 +1,7 @@
 
 import pytest
 import logging
-from binette.binette import log_selected_bin_info, select_bins_and_write_them, manage_protein_alignement, parse_input_files, parse_arguments, init_logging, main
+from binette.main import log_selected_bin_info, select_bins_and_write_them, manage_protein_alignement, parse_input_files, parse_arguments, init_logging, main
 from binette.bin_manager import Bin
 from binette import diamond
 import os
