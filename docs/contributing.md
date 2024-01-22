@@ -21,11 +21,11 @@ For minor changes like fixing typos or making small edits, create a new Pull Req
 ### Setting Up the Development Environment
 
 1. **Fork and Clone the Repository:**
-   - Fork the repository to your GitHub account. 🍴
+   - Fork the repository to your GitHub account.
    - Clone your forked repository to your local machine.
 
 2. **Get an Environment:**
-   Create an environment with all Binette prerequisites installed by following the installation instructions [here](./installation.md#installing-from-source-code-within-a-conda-environment).
+   Create an environment with all Binette prerequisites installed by following the installation instructions [here](./installation.md#installing-from-source-code-within-a-conda-environnement).
 
 3. **Install in Editable Mode:**
    To enable seamless code editing and testing of new functionality, install PPanGGOLiN in editable mode using the following command:
@@ -61,13 +61,13 @@ We've configured a CI workflow in the Actions tab, executing Binette on a small 
 
 It is recommended to add unit test to any additions to the code. The test suite is located in the 'tests' directory at the root of the project.
 
-### Creating a Pull Request
+### Creating a Pull Request 🚀
 
 Once you've made your changes:
 
-1. **Create a Pull Request:** Submit a pull request from your forked repository to the 'dev' branch on GitHub. 🚀
+1. **Create a Pull Request:** Submit a pull request from your forked repository to the 'dev' branch on GitHub. 
 
-2. **Describe Your Changes:** Clearly describe the modifications you've made and link any associated issue(s) in the PR description. 📝
+2. **Describe Your Changes:** Clearly describe the modifications you've made and link any associated issue(s) in the PR description.
 
-3. **Collaborative Review:** We will review your changes, offer feedback, and engage in discussions until we collectively agree on the implementation. 🤝
+3. **Collaborative Review:** We will review your changes, offer feedback, and engage in discussions until we collectively agree on the implementation.
 
