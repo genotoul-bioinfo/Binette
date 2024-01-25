@@ -47,7 +47,7 @@ Binette serves as the bin refinement tool within the [metagWGS](https://forgemia
 
 # Availability
 
-Binette is accessible through [PyPI](https://pypi.org/project/Binette/), and a Conda [package](https://anaconda.org/bioconda/binette) can be found in the Bioconda channel [gruning2018bioconda]. The source code for Binette is available on [GitHub](https://github.com/genotoul-bioinfo/binette) under the MIT license. The GitHub repository includes continuous integration tests, test coverage, and employs continuous deployment through GitHub actions.
+Binette is accessible through [PyPI](https://pypi.org/project/Binette/), and a Conda [package](https://anaconda.org/bioconda/binette) can be found in the Bioconda channel [@gruning2018bioconda]. The source code for Binette is available on [GitHub](https://github.com/genotoul-bioinfo/binette) under the MIT license. The GitHub repository includes continuous integration tests, test coverage, and employs continuous deployment through GitHub actions.
 
 
 # Acknowledgements
