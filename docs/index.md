@@ -37,6 +37,7 @@ Binette is inspired from the metaWRAP bin-refinement tool but it effectively sol
 installation
 usage
 contributing
+tests.md
 api/api_ref
 ```
 
