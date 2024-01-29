@@ -1,7 +1,9 @@
 
 # Installation
 
-## With Bioconda
+## Installation of Binette
+
+### With Bioconda
 
 Binette can be esailly installed with conda 
 
@@ -23,7 +25,7 @@ For quicker installation and potential resolution of conflicting dependencies, c
 ```
 
 
-## Installing from Source Code within a conda environnement
+### From the source code within a conda environnement
 
 A straightforward method to install Binette from the source code is by utilizing a conda environment that includes all the necessary dependencies.
 
@@ -56,6 +58,19 @@ Binette should be able to run :
 ```bash
 binette -h
 ```
+
+
+### With PyPI
+
+Binette is available on [PyPI](https://pypi.org/project/Binette/) and can be installed using pip as follows:
+
+```bash
+pip install binette[main_deps]
+```
+
+Omitting the `[main_deps]` option will result in the installation of Binette without any Python dependencies.
+
+In addition to Python dependencies, Binette requires [Diamond](https://github.com/bbuchfink/diamond) to be installed and executable.
 
 
 ## Downloading the CheckM2 database
