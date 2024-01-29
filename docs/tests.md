@@ -30,8 +30,10 @@ pytest --cov=binette
 ```
 
 
-```note
+```{note}
+
 Test coverage is updated by a github workflow in the Action Tab. The test coverage report is then deployed on the github-pages and avaible [here](https://genotoul-bioinfo.github.io/Binette/). 
+
 ```
 
 
@@ -40,7 +42,7 @@ Test coverage is updated by a github workflow in the Action Tab. The test covera
 
 A functional test has been implemented in the CI github workflow. It performs an execution of binette on a toy dataset consisting of 4 small genomes. The test uses a checkm2 database that has been shrunk to the minimum to make diamond run faster. Finally, the results are compared with the expected results.
 
-The test dataset is stored in this github repository: https://github.com/genotoul-bioinfo/Binette_TestData 
+The test dataset is stored in this github repository: [Binette TestData](https://github.com/genotoul-bioinfo/Binette_TestData).
 
 You can replicate this test locally by following the next steps:
 
@@ -94,7 +96,7 @@ python scripts/compare_results.py expected_results/final_bins_quality_reports.ts
 ```
 
 
-```warning
+```{warning}
 The CheckM2 database used for the test dataset is very small and is only valid for the 4 genomes included in the test datasets. It should not be used elsewhere.
 
 ```
