@@ -2,6 +2,7 @@
 [![Anaconda-Server Badge](https://anaconda.org/bioconda/binette/badges/license.svg)](https://anaconda.org/bioconda/binette) 
 [![Anaconda-Server Badge](https://anaconda.org/bioconda/binette/badges/version.svg)](https://anaconda.org/bioconda/binette)
 [![PyPI version](https://badge.fury.io/py/Binette.svg)](https://badge.fury.io/py/Binette)
+[![status](https://joss.theoj.org/papers/ad304709d59f1a51a31614393b09ba2b/status.svg)](https://joss.theoj.org/papers/ad304709d59f1a51a31614393b09ba2b)
 
 [![Test Coverage](https://genotoul-bioinfo.github.io/Binette/coverage-badge.svg)](https://genotoul-bioinfo.github.io/Binette/) 
 [![CI Status](https://github.com/genotoul-bioinfo/Binette/actions/workflows/binette_ci.yml/badge.svg)](https://github.com/genotoul-bioinfo/Binette/actions/workflows)
