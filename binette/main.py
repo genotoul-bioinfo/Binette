@@ -151,6 +151,13 @@ def parse_input_files(bin_dirs: List[str], contig2bin_tables: List[str], contigs
 
     logging.info(f"Parsing contig fasta file: {contigs_fasta}")
     contigs_object = contig_manager.parse_fasta_file(contigs_fasta)
+
+    unexpected_contigs = {contig for contig in contigs_in_bins if contig not in contigs_object}
+
+    if len(unexpected_contigs):
+        raise ValueError(f"{len(unexpected_contigs)} contigs from the input bins were not found in the contigs file '{contigs_fasta}'. "
+                        f"The missing contigs are: {', '.join(unexpected_contigs)}. Please ensure all contigs from input bins are present in contig file.")
+
     contig_to_length = {seq.name: len(seq) for seq in contigs_object if seq.name in contigs_in_bins}
 
     return bin_set_name_to_bins, original_bins, contigs_in_bins, contig_to_length
