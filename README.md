@@ -30,7 +30,7 @@ Binette is inspired from the metaWRAP bin-refinement tool but it effectively sol
 
 ## With Bioconda
 
-Binette can be esailly installed with conda 
+Binette can be easilly installed with conda 
 
 ```bash
 conda create -c bioconda -c defaults -c conda-forge -n binette binette

@@ -3,10 +3,10 @@ import pytest
 import logging
 from binette.main import log_selected_bin_info, select_bins_and_write_them, manage_protein_alignement, parse_input_files, parse_arguments, init_logging, main
 from binette.bin_manager import Bin
-from binette import diamond
+from binette import diamond, contig_manager, cds
 import os
 import sys
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 from collections import Counter
 from tests.bin_manager_test import create_temp_bin_directories, create_temp_bin_files
@@ -60,7 +60,7 @@ def test_select_bins_and_write_them(tmp_path, tmpdir, bins):
 
     # Run the function with test data
     selected_bins = select_bins_and_write_them(
-        set(bins), str(contigs_fasta), final_bin_report, min_completeness=60, index_to_contig=index_to_contig, outdir=str(outdir), debug=False
+        set(bins), str(contigs_fasta), final_bin_report, min_completeness=60, index_to_contig=index_to_contig, outdir=str(outdir), debug=True
     )
 
     # Assertions to check the function output or file existence
@@ -164,14 +164,12 @@ def test_manage_protein_alignement_not_resume(tmpdir, tmp_path):
     assert len(contig_to_genes) == 3
 
 
-def test_parse_input_files_bin_dirs(create_temp_bin_directories, tmp_path):
+def test_parse_input_files_with_contig2bin_tables(tmp_path):
 
-    set_name_to_bin_dir = create_temp_bin_directories
-    bin_dirs = list(create_temp_bin_directories.values())
-
-    contig2bin_tables = []
-
-    # Create temporary directories and files for testing
+    bin_set1 = tmp_path / "bin_set1.tsv"
+    bin_set1.write_text("contig1\tbin1A\ncontig2\tbin1B\n")
+    bin_set2 = tmp_path / "bin_set2.tsv"
+    bin_set2.write_text("contig3\tbin2A\ncontig4\ttbin2B\n")
 
     fasta_file = tmp_path / "assembly.fasta"
     fasta_file_content = (
@@ -180,7 +178,7 @@ def test_parse_input_files_bin_dirs(create_temp_bin_directories, tmp_path):
     fasta_file.write_text(fasta_file_content)
 
     # Call the function and capture the return values
-    bin_set_name_to_bins, original_bins, contigs_in_bins, contig_to_length = parse_input_files(bin_dirs, contig2bin_tables, str(fasta_file))
+    bin_set_name_to_bins, original_bins, contigs_in_bins, contig_to_length = parse_input_files(None, [str(bin_set1), str(bin_set2)], str(fasta_file))
 
 
     # # Perform assertions on the returned values
@@ -191,14 +189,26 @@ def test_parse_input_files_bin_dirs(create_temp_bin_directories, tmp_path):
 
 
     assert set(bin_set_name_to_bins) == {'1', "2"}
-    assert len(original_bins) == 3
-    assert contigs_in_bins == {"contig1","contig2", "contig3","contig4","contig5",}
-    assert len(contig_to_length) == 5
+    assert len(original_bins) == 4
+    assert contigs_in_bins == {"contig1","contig2", "contig3","contig4"}
+    assert len(contig_to_length) == 4
+
+def test_parse_input_files_with_contig2bin_tables_with_unknown_contig(tmp_path):
+
+    bin_set3 = tmp_path / "bin_set3.tsv"
+    bin_set3.write_text("contig3\tbin3A\ncontig44\ttbin3B\n")
+    fasta_file = tmp_path / "assembly.fasta"
+    fasta_file_content = (
+    ">contig1\nACGT\n>contig2\nTGCA\n>contig3\nAAAA\n>contig4\nCCCC\n>contig5\nCGTCGCT\n"
+    )
+    fasta_file.write_text(fasta_file_content)
+
+    with pytest.raises(ValueError):
+        parse_input_files(None, [str(bin_set3)], str(fasta_file))
 
 
 def test_parse_input_files_bin_dirs(create_temp_bin_directories, tmp_path):
 
-    set_name_to_bin_dir = create_temp_bin_directories
     bin_dirs = list(create_temp_bin_directories.values())
 
     contig2bin_tables = []
@@ -267,8 +277,45 @@ def test_init_logging_command_line(caplog):
     assert expected_log_message in caplog.text
 
 
+# @patch('diamond.run')
+def test_manage_protein_alignment_no_resume():
+    # Set up the input parameters
+    faa_file = "test.faa"
+    contigs_fasta = "test.fasta"
+    contig_to_length = {"contig1": [1000]}
+    contigs_in_bins = {"bin1": ["contig1"]}
+    diamond_result_file = "test_diamond_result.txt"
+    checkm2_db = "checkm2_db"
+    threads = 4
+    resume = False
+    low_mem = False
 
-def test_main_functionality_resume_when_not_possible(monkeypatch):
+    # Mock the necessary functions
+    with patch('binette.contig_manager.parse_fasta_file') as mock_parse_fasta_file, \
+         patch('binette.cds.predict') as mock_predict, \
+         patch('binette.diamond.get_checkm2_db') as mock_get_checkm2_db, \
+         patch('binette.diamond.run') as mock_diamond_run, \
+         patch('binette.diamond.get_contig_to_kegg_id') as mock_diamond_get_contig_to_kegg_id:
+        
+        # Set the return value of the mocked functions
+        mock_parse_fasta_file.return_value = [MagicMock(name="contig1")]
+        mock_predict.return_value = {"contig1": ["gene1"]}
+        
+        # Call the function
+        contig_to_kegg_counter, contig_to_genes = manage_protein_alignement(
+            faa_file, contigs_fasta, contig_to_length, contigs_in_bins,
+            diamond_result_file, checkm2_db, threads, resume, low_mem
+        )
+        
+        # Assertions to check if functions were called
+        mock_parse_fasta_file.assert_called_once_with(contigs_fasta)
+        mock_predict.assert_called_once()
+        mock_diamond_get_contig_to_kegg_id.assert_called_once()
+        mock_diamond_run.assert_called_once_with(
+            faa_file, diamond_result_file, "checkm2_db", f"{os.path.splitext(diamond_result_file)[0]}.log", threads, low_mem=low_mem
+        )
+
+def test_main_resume_when_not_possible(monkeypatch):
     # Define or mock the necessary inputs/arguments
 
     # Mock sys.argv to use test_args
@@ -281,39 +328,54 @@ def test_main_functionality_resume_when_not_possible(monkeypatch):
     ]
     monkeypatch.setattr(sys, 'argv', ['your_script.py'] + test_args)
 
-    # You may also need to mock certain functions to avoid actual file operations or to simulate their behavior
-    # For example, mock the functions parse_input_files, manage_protein_alignement, select_bins_and_write_them, etc.
-
     # Call the main function
-    with pytest.raises(FileNotFoundError) as e_info:
+    with pytest.raises(FileNotFoundError):
+        main()
+
+def test_main(monkeypatch):
+    # Define or mock the necessary inputs/arguments
+
+    # Mock sys.argv to use test_args
+    test_args = [
+        "-d", "bin_dir1", "bin_dir2",
+        "-c", "contigs.fasta",
+        # ... more arguments as required ...
+        "--debug"
+    ]
+    monkeypatch.setattr(sys, 'argv', ['your_script.py'] + test_args)
+
+    # Mock the necessary functions
+    with patch('binette.main.parse_input_files') as mock_parse_input_files, \
+         patch('binette.main.manage_protein_alignement') as mock_manage_protein_alignement, \
+         patch('binette.contig_manager.apply_contig_index') as mock_apply_contig_index, \
+         patch('binette.bin_manager.rename_bin_contigs') as mock_rename_bin_contigs, \
+         patch('binette.bin_manager.create_intermediate_bins') as mock_create_intermediate_bins, \
+         patch('binette.bin_quality.add_bin_metrics') as mock_add_bin_metrics, \
+         patch('binette.main.log_selected_bin_info') as mock_log_selected_bin_info, \
+         patch('binette.contig_manager.make_contig_index') as mock_make_contig_index, \
+         patch('binette.main.select_bins_and_write_them') as mock_select_bins_and_write_them:
+        
+        # Set return values for mocked functions if needed
+        mock_parse_input_files.return_value = (None, None, None, None)
+        mock_manage_protein_alignement.return_value = ({"contig1": 1}, {"contig1": ["gene1"]})
+        mock_make_contig_index.return_value = ({}, {})
+        mock_apply_contig_index.return_value = MagicMock()
+        mock_rename_bin_contigs.return_value = MagicMock()
+        mock_create_intermediate_bins.return_value = MagicMock()
+        mock_add_bin_metrics.return_value = MagicMock()
+        mock_log_selected_bin_info.return_value = MagicMock()
+        
+        
         main()
 
 
-# def test_main_functionality_(monkeypatch, create_temp_bin_directories, tmp_path):
-#     # Define or mock the necessary inputs/arguments
-
-#     bin_dirs = list(create_temp_bin_directories.values())
-#     fasta_file = tmp_path / "assembly.fasta"
-#     fasta_file_content = (
-#     ">contig1\nACGT\n>contig2\nTGCA\n>contig3\nAAAA\n>contig4\nCCCC\n>contig5\nCGTCGCT\n"
-#     )
-#     fasta_file.write_text(fasta_file_content)
-
-#     # Mock sys.argv to use test_args
-#     test_args = [
-#         "-d"] + bin_dirs + ["-c", str(fasta_file),
-#         # ... more arguments as required ...
-#         "--debug"
-#     ]
-
-#     monkeypatch.setattr(sys, 'argv', ['your_script.py'] + test_args)
-
-#     # You may also need to mock certain functions to avoid actual file operations or to simulate their behavior
-#     # For example, mock the functions parse_input_files, manage_protein_alignement, select_bins_and_write_them, etc.
-
-#     # Call the main function
-#     with patch("binette.diamond.get_contig_to_kegg_id", return_value=contig_to_kegg_id), \
-#                             patch("binette.diamond.run", return_value=None):
-#         result = main()
-#         assert result == 0
+        # Add assertions to ensure the mocks were called as expected
+        mock_parse_input_files.assert_called_once()
+        mock_manage_protein_alignement.assert_called_once()
+        mock_rename_bin_contigs.assert_called_once()
+        mock_create_intermediate_bins.assert_called_once()
         
+        mock_log_selected_bin_info.assert_called_once()
+        mock_select_bins_and_write_them.assert_called_once()
+        assert mock_apply_contig_index.call_count == 3
+        assert mock_add_bin_metrics.call_count == 2

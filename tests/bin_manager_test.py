@@ -509,7 +509,7 @@ def test_get_bins_from_directory(create_temp_bin_files):
     bin_dir = create_temp_bin_files
     set_name = "TestSet"
 
-    bins = bin_manager.get_bins_from_directory(str(bin_dir), set_name)
+    bins = bin_manager.get_bins_from_directory(str(bin_dir), set_name, fasta_extensions={'.fasta'})
 
     assert len(bins) == 2  # Ensure that the correct number of Bin objects is returned
 
@@ -527,9 +527,18 @@ def test_get_bins_from_directory_no_files(tmpdir):
     bin_dir = str(tmpdir.mkdir("empty_bins"))
     set_name = "EmptySet"
 
-    bins = bin_manager.get_bins_from_directory(bin_dir, set_name)
+    bins = bin_manager.get_bins_from_directory(bin_dir, set_name, fasta_extensions={'.fasta'})
 
     assert len(bins) == 0  # Ensure that no Bin objects are returned for an empty directory
+
+def test_get_bins_from_directory_no_wrong_extensions(create_temp_bin_files):
+    bin_dir = create_temp_bin_files
+    set_name = "TestSet"
+
+    bins = bin_manager.get_bins_from_directory(bin_dir, set_name, fasta_extensions={'.fna'})
+
+    assert len(bins) == 0  # Ensure that no Bin objects are returned for an empty directory
+
 
 
 
@@ -537,7 +546,7 @@ def test_get_bins_from_directory_no_files(tmpdir):
 def test_parse_bin_directories(create_temp_bin_directories):
     set_name_to_bin_dir = create_temp_bin_directories
 
-    bins = bin_manager.parse_bin_directories(set_name_to_bin_dir)
+    bins = bin_manager.parse_bin_directories(set_name_to_bin_dir, fasta_extensions={'.fasta'})
 
     assert len(bins) == 2  # Ensure that the correct number of bin directories is parsed
 
