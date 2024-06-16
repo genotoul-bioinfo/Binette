@@ -1,6 +1,8 @@
 import logging
 import os
 from collections import defaultdict
+from pathlib import Path
+
 import pyfastx
 
 import itertools
@@ -161,23 +163,25 @@ class Bin:
         return Bin(contigs, origin, name)
     
 
-def get_bins_from_directory(bin_dir: str, set_name: str) -> List[Bin]:
+def get_bins_from_directory(bin_dir: str, set_name: str, fasta_extensions: Set[str]) -> List[Bin]:
     """
     Retrieves a list of Bin objects from a directory containing bin FASTA files.
 
     :param bin_dir: The directory path containing bin FASTA files.
     :param set_name: The name of the set the bins belong to.
+    :fasta_extensions: Possible fasta extensions to look for in the bin directory.
 
     :return: A list of Bin objects created from the bin FASTA files.
     """
     bins = []
+    fasta_extensions |= {f".{ext}" for ext in fasta_extensions if not ext.startswith(".")} # adding a dot in case given extension are lacking one
+    bin_fasta_files = (fasta_file for fasta_file in Path(bin_dir).glob("*") if set(fasta_file.suffixes) & fasta_extensions)
 
-    for bin_fasta_file in os.listdir(bin_dir):
+    for bin_fasta_path in bin_fasta_files:
 
-        bin_fasta_path = os.path.join(bin_dir, bin_fasta_file)
-        bin_name = bin_fasta_file
+        bin_name = bin_fasta_path.name
 
-        contigs = {name for name, _ in pyfastx.Fasta(bin_fasta_path, build_index=False)}
+        contigs = {name for name, _ in pyfastx.Fasta(str(bin_fasta_path), build_index=False)}
 
         bin_obj = Bin(contigs, set_name, bin_name)
 
@@ -187,18 +191,19 @@ def get_bins_from_directory(bin_dir: str, set_name: str) -> List[Bin]:
 
 
 
-def parse_bin_directories(bin_name_to_bin_dir: Dict[str, str]) -> Dict[str, list]:
+def parse_bin_directories(bin_name_to_bin_dir: Dict[str, str], fasta_extensions:Set[str]) -> Dict[str, list]:
     """
     Parses multiple bin directories and returns a dictionary mapping bin names to a list of Bin objects.
 
     :param bin_name_to_bin_dir: A dictionary mapping bin names to their respective bin directories.
+    :fasta_extensions: Possible fasta extensions to look for in the bin directory.
 
     :return: A dictionary mapping bin names to a list of Bin objects created from the bin directories.
     """
     bin_name_to_bins = {}
 
     for name, bin_dir in bin_name_to_bin_dir.items():
-        bin_name_to_bins[name] = get_bins_from_directory(bin_dir, name)
+        bin_name_to_bins[name] = get_bins_from_directory(bin_dir, name, fasta_extensions)
 
     return bin_name_to_bins
 

@@ -93,6 +93,15 @@ def parse_arguments(args):
         help="Bin are scored as follow: completeness - weight * contamination. "
              "A low contamination_weight favor complete bins over low contaminated bins.",
     )
+    
+    other_group.add_argument(
+        "-e",
+        "--fasta_extensions",
+        nargs="+",
+        default={".fasta", ".fa", ".fna"},
+        type=str,
+        help="Specify the FASTA file extensions to search for in bin directories when using the --bin_dirs option.",
+    )
 
     other_group.add_argument(
         "--checkm2_db",
@@ -118,13 +127,14 @@ def parse_arguments(args):
     args = parser.parse_args(args)
     return args
 
-def parse_input_files(bin_dirs: List[str], contig2bin_tables: List[str], contigs_fasta: str) -> Tuple[Dict[str, List], List, Dict[str, List], Dict[str, int]]:
+def parse_input_files(bin_dirs: List[str], contig2bin_tables: List[str], contigs_fasta: str, fasta_extensions:Set[str] = {".fasta", ".fna", ".fa"}) -> Tuple[Dict[str, List], List, Dict[str, List], Dict[str, int]]:
     """
     Parses input files to retrieve information related to bins and contigs.
 
     :param bin_dirs: List of paths to directories containing bin FASTA files.
     :param contig2bin_tables: List of paths to contig-to-bin tables.
     :param contigs_fasta: Path to the contigs FASTA file.
+    :fasta_extensions: Possible fasta extensions to look for in the bin directory.
 
     :return: A tuple containing:
         - Dictionary mapping bin set names to lists of bins.
@@ -136,7 +146,7 @@ def parse_input_files(bin_dirs: List[str], contig2bin_tables: List[str], contigs
     if bin_dirs:
         logging.info("Parsing bin directories.")
         bin_name_to_bin_dir = io.infer_bin_name_from_bin_inputs(bin_dirs)
-        bin_set_name_to_bins = bin_manager.parse_bin_directories(bin_name_to_bin_dir)
+        bin_set_name_to_bins = bin_manager.parse_bin_directories(bin_name_to_bin_dir, fasta_extensions)
     else:
         logging.info("Parsing bin2contig files.")
         bin_name_to_bin_table = io.infer_bin_name_from_bin_inputs(contig2bin_tables)
@@ -321,12 +331,12 @@ def main():
     if args.resume:
         io.check_resume_file(faa_file, diamond_result_file)
 
-    bin_set_name_to_bins, original_bins, contigs_in_bins, contig_to_length = parse_input_files(args.bin_dirs, args.contig2bin_tables, args.contigs)
+    bin_set_name_to_bins, original_bins, contigs_in_bins, contig_to_length = parse_input_files(args.bin_dirs, args.contig2bin_tables, args.contigs, fasta_extensions=set(args.fasta_extensions))
 
     contig_to_kegg_counter, contig_to_genes = manage_protein_alignement(faa_file=faa_file, contigs_fasta=args.contigs, contig_to_length=contig_to_length,
-                                contigs_in_bins=contigs_in_bins,
-                                diamond_result_file=diamond_result_file, checkm2_db=args.checkm2_db,
-                                threads=args.threads, resume=args.resume, low_mem=args.low_mem)
+                                                                        contigs_in_bins=contigs_in_bins,
+                                                                        diamond_result_file=diamond_result_file, checkm2_db=args.checkm2_db,
+                                                                        threads=args.threads, resume=args.resume, low_mem=args.low_mem)
     
     # Use contig index instead of contig name to save memory
     contig_to_index, index_to_contig = contig_manager.make_contig_index(contigs_in_bins)
