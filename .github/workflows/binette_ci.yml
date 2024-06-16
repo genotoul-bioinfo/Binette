@@ -75,7 +75,7 @@ jobs:
     - name: Run simple test case from bin2table
       run: |
         cd test_data
-        binette -b binning_results/* --contigs all_contigs.fna --checkm2_db checkm2_tiny_db/checkm2_tiny_db.dmnd  -v -o test_results
+        binette -b binning_results/*binning --contigs all_contigs.fna --checkm2_db checkm2_tiny_db/checkm2_tiny_db.dmnd  -v -o test_results
 
     - name: Compare results from bin2table with expectation
       run: |
@@ -94,4 +94,5 @@ jobs:
         cd test_data
         head  expected_results/final_bins_quality_reports.tsv test_results_from_dirs/final_bins_quality_reports.tsv
         python scripts/compare_results.py expected_results/final_bins_quality_reports.tsv test_results_from_dirs/final_bins_quality_reports.tsv
+
 
