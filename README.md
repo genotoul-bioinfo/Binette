@@ -26,6 +26,8 @@ Binette is inspired from the metaWRAP bin-refinement tool but it effectively sol
 <!-- - Bin selection have been improved. It selects the best bins in a more accurate and elegant manner.
 - It is easier to use. -->
 
+A comprehensive documentation of Binette is avalaible here: https://binette.readthedocs.io/
+
 # Installation
 
 ## With Bioconda
@@ -164,12 +166,12 @@ The `final_bins_quality_reports.tsv` file contains the following columns:
 | **N50**             | Displays the N50 of the bin.                                                                                |
 | **contig_count**    | The number of contigs contained within the bin.                                                             |
 
-# Feature requests and bug reporting
+# Help, feature requests and bug reporting
 
-Please submit bug reports and feature requests by opening an [issue](https://github.com/genotoul-bioinfo/Binette/issues). 
+To report bugs, request new features, or seek help and support, please open an [issue](https://github.com/genotoul-bioinfo/Binette/issues). 
 
 
 # Licence
 
-This program is released as an open source software under the terms of [MIT License](https://forgemia.inra.fr/jean.mainguy/binette/-/raw/main/LICENSE).
+This program is released as an open source software under the terms of [MIT License](LICENSE).
 

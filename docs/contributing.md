@@ -1,18 +1,19 @@
 # Contributing
 
-Thank you for your interest in contributing to Binette! This is an open-source project and everyone is welcome to contribute to it. 
+Thank you for your interest in contributing to Binette! This is an open-source project, and we welcome everyone to get involved.
 
-## Reporting a Bug
+## Help or Reporting a Bug
 
-If you have any question, if you found a bug. Please open an issue. 
+If you have a question or found a bug? Please open an issue.
 
-You can check the [Issues](https://github.com/genotoul-bioinfo/Binette/issues) page to see if the bug or question has been already reported.
+Before you do, check the [Issues](https://github.com/genotoul-bioinfo/Binette/issues) page to see if it's already been reported.
 
-If it's not reported, create a new [issue](https://github.com/genotoul-bioinfo/Binette/issues).
+If you don’t see it there, create a new [issue](https://github.com/genotoul-bioinfo/Binette/issues). We appreciate your input!
 
-## Adding a New Feature to Binette
 
-### Starting with an Issue
+## Adding a new feature to Binette
+
+### Starting with an issue
 
 If you have ideas for new features or improvements, initiate a discussion in an issue. This allows us to evaluate and discuss your suggestions together.
 
@@ -28,7 +29,7 @@ For minor changes like fixing typos or making small edits, create a new Pull Req
    Create an environment with all Binette prerequisites installed by following the installation instructions [here](./installation.md#installing-from-source-code-within-a-conda-environnement).
 
 3. **Install in Editable Mode:**
-   To enable seamless code editing and testing of new functionality, install PPanGGOLiN in editable mode using the following command:
+   To enable code editing and testing of new functionality, you can install Binette in editable mode using the following command:
 
    ```bash
    pip install -e .
