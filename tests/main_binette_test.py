@@ -1,7 +1,7 @@
 
 import pytest
 import logging
-from binette.main import log_selected_bin_info, select_bins_and_write_them, manage_protein_alignement, parse_input_files, parse_arguments, init_logging, main
+from binette.main import log_selected_bin_info, select_bins_and_write_them, manage_protein_alignement, parse_input_files, parse_arguments, init_logging, main, UniqueStore
 from binette.bin_manager import Bin
 from binette import diamond, contig_manager, cds
 import os
@@ -10,6 +10,8 @@ from unittest.mock import patch, MagicMock
 
 from collections import Counter
 from tests.bin_manager_test import create_temp_bin_directories, create_temp_bin_files
+from argparse import ArgumentParser
+
 
 @pytest.fixture
 def bins():
@@ -236,6 +238,20 @@ def test_parse_input_files_bin_dirs(create_temp_bin_directories, tmp_path):
     assert contigs_in_bins == {"contig1","contig2", "contig3","contig4","contig5",}
     assert len(contig_to_length) == 5
 
+
+def test_argument_used_once():
+    # Test UniqueStore class 
+    parser = ArgumentParser(description='Test parser')
+    parser.add_argument('--example', action=UniqueStore, help='Example argument')
+    args = parser.parse_args(['--example', 'value'])
+    assert args.example == 'value'
+
+def test_argument_used_multiple_times():
+    # Test UniqueStore class 
+    parser = ArgumentParser(description='Test parser')
+    parser.add_argument('--example', action=UniqueStore, help='Example argument')
+    with pytest.raises(SystemExit):
+        parser.parse_args(['--example', 'value', '--example', 'value2'])
 
 
 def test_parse_arguments_required_arguments():

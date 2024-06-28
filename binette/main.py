@@ -8,7 +8,7 @@ Maintainer  : Jean Mainguy
 Portability : POSIX
 """
 
-from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, Action, Namespace
 
 import sys
 import logging
@@ -39,6 +39,26 @@ def init_logging(verbose, debug):
         f'command line: {" ".join(sys.argv)}',
     )
 
+class UniqueStore(Action):
+    """
+    Custom argparse action to ensure an argument is provided only once.
+    """
+
+    def __call__(self, parser: ArgumentParser, namespace: Namespace, values: str, option_string: str = None) -> None:
+        """
+        Ensures the argument is only used once. Raises an error if the argument appears multiple times.
+
+        :param parser: The argparse parser instance.
+        :param namespace: The namespace object that will contain the parsed arguments.
+        :param values: The value associated with the argument.
+        :param option_string: The option string that was used to invoke this action.
+        """
+        # Check if the argument has already been set
+        if getattr(namespace, self.dest, self.default) is not self.default:
+            parser.error(f"Error: The argument {option_string} can only be specified once.")
+        
+        # Set the argument value
+        setattr(namespace, self.dest, values)
 
 
 def parse_arguments(args):
@@ -57,6 +77,7 @@ def parse_arguments(args):
         "-d",
         "--bin_dirs",
         nargs="+",
+        action=UniqueStore,
         help="List of bin folders containing each bin in a fasta file.",
     )
 
@@ -64,6 +85,7 @@ def parse_arguments(args):
         "-b",
         "--contig2bin_tables",
         nargs="+",
+        action=UniqueStore,
         help="List of contig2bin table with two columns separated\
             with a tabulation: contig, bin",
     )
