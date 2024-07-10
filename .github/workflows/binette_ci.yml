@@ -12,14 +12,14 @@ on:
     
 jobs:
   build:
-
-    os: ['ubuntu-latest', 'macos-13']
     defaults:
       run:
         shell: bash -el {0}
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: ['ubuntu-latest', 'macos-13']
         python-version: [3.8] #["3.8", "3.9", "3.10"]
 
     steps:
