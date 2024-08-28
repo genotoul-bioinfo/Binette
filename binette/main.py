@@ -160,7 +160,7 @@ def parse_arguments(args):
 def parse_input_files(bin_dirs: List[str], 
                       contig2bin_tables: List[str],
                       contigs_fasta: str,
-                      fasta_extensions:Set[str] = {".fasta", ".fna", ".fa"}) -> Tuple[Dict[str, List[bin_manager.Bin]], Set[bin_manager.Bin], Set[str], Dict[str, int]]:
+                      fasta_extensions:Set[str] = {".fasta", ".fna", ".fa"}) -> Tuple[Dict[str, Set[bin_manager.Bin]], Set[bin_manager.Bin], Set[str], Dict[str, int]]:
     """
     Parses input files to retrieve information related to bins and contigs.
 
@@ -185,12 +185,12 @@ def parse_input_files(bin_dirs: List[str],
         bin_name_to_bin_table = io.infer_bin_name_from_bin_inputs(contig2bin_tables)
         bin_set_name_to_bins = bin_manager.parse_contig2bin_tables(bin_name_to_bin_table)
 
-    logging.info(f"{len(bin_set_name_to_bins)} bin sets processed:")
+    logging.info(f"Processing {len(bin_set_name_to_bins)} bin sets.")
     for bin_set_id, bins in bin_set_name_to_bins.items():
         logging.info(f" {bin_set_id} - {len(bins)} bins")
 
+    contigs_in_bins = bin_manager.get_contigs_in_bin_sets(bin_set_name_to_bins)
     original_bins = bin_manager.dereplicate_bin_sets(bin_set_name_to_bins.values())
-    contigs_in_bins = bin_manager.get_contigs_in_bins(original_bins)
 
     logging.info(f"Parsing contig fasta file: {contigs_fasta}")
     contigs_object = contig_manager.parse_fasta_file(contigs_fasta)
@@ -405,7 +405,7 @@ def main():
     #             matching_bins = [bin_with_metric for bin_with_metric in original_bins if bin_obj == bin_with_metric]
     #             assert len(matching_bins) == 1, len(matching_bins) 
     #             bins_with_metric.append(matching_bins[0])
-    #             print("HAS NOT USE MATCHING BIN IN ORIGINAL SET",matching_bins[0].id, matching_bins[0].score, matching_bins[0].N50)
+    #             print("HAS NOT USE MATCHING BIN IN ORIGINAL SET", matching_bins[0].id, matching_bins[0].score, matching_bins[0].N50)
                 
     #         else:
     #             print("has score")
