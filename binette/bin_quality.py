@@ -7,14 +7,16 @@ from typing import Dict, Iterable, Optional, Tuple, Iterator, Set
 
 import numpy as np
 import pandas as pd
+from binette.bin_manager import Bin
+
 
 # Suppress unnecessary TensorFlow warnings
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 logging.getLogger("tensorflow").setLevel(logging.FATAL)
 
 
-from checkm2 import keggData, modelPostprocessing, modelProcessing
-from binette.bin_manager import Bin
+from checkm2 import keggData, modelPostprocessing, modelProcessing  # noqa: E402
+
 
 def get_bins_metadata_df(bins: Iterable[Bin], contig_to_cds_count: Dict[str, int], contig_to_aa_counter: Dict[str, Counter], contig_to_aa_length: Dict[str, int]) -> pd.DataFrame:
     """
