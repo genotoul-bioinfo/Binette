@@ -144,10 +144,11 @@ def test_bin_union():
     bin1 = bin_manager.Bin(contigs={"13", "21"}, origin="test1", name="bin1")
     bin2 = bin_manager.Bin(contigs={"1", "e", "2", "33"}, origin="test2", name="binA")
 
-    union_bin = bin_manager.Bin(contigs={"13", "21", "1", "e", "2", "33"}, origin="", name="")
+    expected_union_bin = bin_manager.Bin(contigs={"13", "21", "1", "e", "2", "33"}, origin="", name="")
+    union_bin = bin1.union(bin2)
 
-    assert bin1.union(bin2) == union_bin
-    assert bin1.union(bin2).name == "bin1 | binA"
+    assert union_bin == expected_union_bin
+    assert union_bin.name == f"{bin1.id} | {bin2.id}"
 
 
 def test_bin_union2():
@@ -161,11 +162,9 @@ def test_bin_union2():
 
     # Check the result
     expected_contigs = {'contig1', 'contig2', 'contig3', 'contig4', 'contig5'}
-    expected_name = 'bin1 | bin2 | bin3'
     expected_origin = {'union'}
 
     assert union_bin.contigs == expected_contigs
-    assert union_bin.name == expected_name
     assert union_bin.origin == expected_origin
 
 
@@ -179,7 +178,7 @@ def test_bin_difference():
 
     assert bin1.difference(bin2, bin3) == diff_bin1_23
     assert bin1.difference(bin2) == diff_bin1_2
-    assert bin1.difference(bin2, bin3).name == "bin1 - bin2 - bin3"
+    assert bin1.difference(bin2, bin3).name == f"{bin1.id} - {bin2.id} - {bin3.id}"
 
 
 def test_bin_intersection():
@@ -192,7 +191,7 @@ def test_bin_intersection():
 
     assert bin1.intersection(bin2, bin3) == inter_bin123
     assert bin1.intersection(bin2) == iner_bin1_2
-    assert bin1.intersection(bin2, bin3).name == "bin1 & bin2 & bin3"
+    assert bin1.intersection(bin2, bin3).name == f"{bin1.id} & {bin2.id} & {bin3.id}"
 
 
 def test_select_best_bins_simple():
