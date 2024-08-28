@@ -3,7 +3,7 @@ import concurrent.futures as cf
 import multiprocessing.pool
 import logging
 from collections import Counter, defaultdict
-from typing import Dict, List, Iterator, Tuple, Any
+from typing import Dict, List, Iterator, Tuple, Any, Union
 
 import pyfastx
 import pyrodigal
@@ -33,9 +33,9 @@ def predict(contigs_iterator: Iterator, outfaa: str, threads: int =1) -> Dict[st
     """
     try:
         # for version >=3 of pyrodigal
-        orf_finder = pyrodigal.GeneFinder(meta="meta")
+        orf_finder = pyrodigal.GeneFinder(meta="meta") # type: ignore
     except AttributeError:
-        orf_finder = pyrodigal.OrfFinder(meta="meta")
+        orf_finder = pyrodigal.OrfFinder(meta="meta") # type: ignore
 
     logging.info(f"Predicting cds sequences with Pyrodigal using {threads} threads.")
     
@@ -115,7 +115,7 @@ def get_contig_cds_metadata_flat(contig_to_genes: Dict[str, List[str]]) -> Tuple
 
     return contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length
 
-def get_contig_cds_metadata(contig_to_genes:  Dict[int, Any | List[Any]], threads: int) -> Dict[str, Dict]:
+def get_contig_cds_metadata(contig_to_genes:  Dict[int, Union[Any, List[Any]]], threads: int) -> Dict[str, Dict]:
     """
     Calculate metadata for contigs in parallel, including CDS count, amino acid composition, and total amino acid length.
 
