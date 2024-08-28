@@ -27,11 +27,11 @@ def get_checkm2_db() -> str:
 
     reg_result = re.search("INFO: (/.*.dmnd)", checkm2_database_raw.stderr)
 
-    try:
-        db_path = reg_result.group(1)
-    except AttributeError:
+    if reg_result is None:
         logging.error(f"Something went wrong when retrieving checkm2 db path:\n{checkm2_database_raw.stderr}")
         sys.exit(1)
+    else:
+        db_path = reg_result.group(1)
 
     return db_path
 

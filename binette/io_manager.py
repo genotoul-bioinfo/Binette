@@ -1,7 +1,7 @@
 import logging
 import os
 import pyfastx
-from typing import List, Dict
+from typing import Iterable, List, Dict
 import csv
 
 from binette.bin_manager import Bin
@@ -14,7 +14,7 @@ def infer_bin_name_from_bin_inputs(input_bins: List[str]) -> Dict[str, str]:
     :param input_bins: List of input bin directories.
     :return: Dictionary mapping inferred bin names to their corresponding directories.
     """
-    logging.debug(f"Inferring bin names from input bins:")
+    logging.debug("Inferring bin names from input bins:")
 
     commonprefix_len = len(os.path.commonprefix(input_bins))
     reversed_strings = [s[::-1] for s in input_bins]
@@ -30,7 +30,7 @@ def infer_bin_name_from_bin_inputs(input_bins: List[str]) -> Dict[str, str]:
     return bin_name_to_bin_dir
 
 
-def write_bin_info(bins: List[Bin], output: str, add_contigs: bool = False):
+def write_bin_info(bins: Iterable[Bin], output: str, add_contigs: bool = False):
     """
     Write bin information to a TSV file.
 
@@ -86,8 +86,8 @@ def write_bins_fasta(selected_bins: List[Bin], contigs_fasta: str, outdir: str):
             outfl.write("\n".join(sequences) + "\n")
 
 
-def check_contig_consistency(contigs_from_assembly: List[str],
-                             contigs_from_elsewhere: List[str],
+def check_contig_consistency(contigs_from_assembly: Iterable[str],
+                             contigs_from_elsewhere: Iterable[str],
                              assembly_file: str,
                              elsewhere_file: str ):
     """

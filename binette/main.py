@@ -16,7 +16,7 @@ import os
 
 import binette
 from binette import contig_manager, cds, diamond, bin_quality, bin_manager, io_manager as io
-from typing import List, Dict, Set, Tuple
+from typing import List, Dict, Optional, Set, Tuple, Union, Sequence, Any
 
 
 def init_logging(verbose, debug):
@@ -39,12 +39,19 @@ def init_logging(verbose, debug):
         f'command line: {" ".join(sys.argv)}',
     )
 
+
 class UniqueStore(Action):
     """
     Custom argparse action to ensure an argument is provided only once.
     """
 
-    def __call__(self, parser: ArgumentParser, namespace: Namespace, values: str, option_string: str = None) -> None:
+    def __call__(
+        self, 
+        parser: ArgumentParser, 
+        namespace: Namespace, 
+        values: Union[str, Sequence[Any], None], 
+        option_string: Optional[str] = None
+    ) -> None:
         """
         Ensures the argument is only used once. Raises an error if the argument appears multiple times.
 
@@ -59,6 +66,7 @@ class UniqueStore(Action):
         
         # Set the argument value
         setattr(namespace, self.dest, values)
+
 
 
 def parse_arguments(args):
@@ -149,7 +157,10 @@ def parse_arguments(args):
     args = parser.parse_args(args)
     return args
 
-def parse_input_files(bin_dirs: List[str], contig2bin_tables: List[str], contigs_fasta: str, fasta_extensions:Set[str] = {".fasta", ".fna", ".fa"}) -> Tuple[Dict[str, List], List, Dict[str, List], Dict[str, int]]:
+def parse_input_files(bin_dirs: List[str], 
+                      contig2bin_tables: List[str],
+                      contigs_fasta: str,
+                      fasta_extensions:Set[str] = {".fasta", ".fna", ".fa"}) -> Tuple[Dict[str, List[bin_manager.Bin]], Set[bin_manager.Bin], Set[str], Dict[str, int]]:
     """
     Parses input files to retrieve information related to bins and contigs.
 
@@ -195,9 +206,9 @@ def parse_input_files(bin_dirs: List[str], contig2bin_tables: List[str], contigs
     return bin_set_name_to_bins, original_bins, contigs_in_bins, contig_to_length
 
 
-def manage_protein_alignement(faa_file: str, contigs_fasta: str, contig_to_length: Dict[str, List],
-                                contigs_in_bins: Dict[str, List], diamond_result_file: str,
-                                checkm2_db: str, threads: int, resume: bool, low_mem: bool) -> Tuple[Dict[str, int], Dict[str, int]]:
+def manage_protein_alignement(faa_file: str, contigs_fasta: str, contig_to_length: Dict[str, int],
+                                contigs_in_bins: Set[str], diamond_result_file: str,
+                                checkm2_db: str, threads: int, resume: bool, low_mem: bool) -> Tuple[Dict[str, int], Dict[str, List[str]]]:
     """
     Predicts or reuses proteins prediction and runs diamond on them.
     
@@ -285,7 +296,7 @@ def select_bins_and_write_them(all_bins: Set[bin_manager.Bin], contigs_fasta: st
     logging.info(f"Bin Selection: {len(selected_bins)} selected bins")
 
     logging.info(f"Filtering bins: only bins with completeness >= {min_completeness} are kept")
-    selected_bins = [b for b in selected_bins if b.completeness >= min_completeness]
+    selected_bins = [b for b in selected_bins if b.is_complete_enough(min_completeness)]
 
     logging.info(f"Filtering bins: {len(selected_bins)} selected bins")
 
@@ -317,11 +328,11 @@ def log_selected_bin_info(selected_bins: List[bin_manager.Bin], hq_min_completen
     # Log completeness and contamination in debug log
     logging.debug("High quality bins:")
     for sb in selected_bins:
-        if sb.completeness >= hq_min_completeness and sb.contamination <= hq_max_conta:
+        if sb.is_high_quality(min_completeness=hq_min_completeness, max_contamination=hq_max_conta):
             logging.debug(f"> {sb} completeness={sb.completeness}, contamination={sb.contamination}")
 
     # Count high-quality bins and single-contig high-quality bins
-    hq_bins = len([sb for sb in selected_bins if sb.completeness >= hq_min_completeness and sb.contamination <= hq_max_conta])
+    hq_bins = len([sb for sb in selected_bins if sb.is_high_quality(min_completeness=hq_min_completeness, max_contamination=hq_max_conta)])
 
     # Log information about high-quality bins
     thresholds = f"(completeness >= {hq_min_completeness} and contamination <= {hq_max_conta})"
@@ -348,7 +359,7 @@ def main():
 
     # Output files #
     final_bin_report = os.path.join(args.outdir, "final_bins_quality_reports.tsv")
-
+    original_bin_report  = os.path.join(args.outdir, "original_bins_quality_reports.tsv")
 
     if args.resume:
         io.check_resume_file(faa_file, diamond_result_file)
@@ -380,6 +391,29 @@ def main():
 
     logging.info("Add size and assess quality of input bins")
     bin_quality.add_bin_metrics(original_bins, contig_metadat, args.contamination_weight, args.threads)
+
+
+    # for bin_set, bins in bin_set_name_to_bins.items():
+    #     print(bin_set)
+    #     bin_set_name = bin_set.replace("/", "_")
+    #     original_bin_report  = os.path.join(args.outdir, f"{bin_set_name}_bins_quality_reports.tsv")
+    #     bins_with_metric = []
+    #     for bin_obj in bins:
+    #         print(bin_obj.id, bin_obj.score, bin_obj.N50)
+    #         if bin_obj.score is None:
+
+    #             matching_bins = [bin_with_metric for bin_with_metric in original_bins if bin_obj == bin_with_metric]
+    #             assert len(matching_bins) == 1, len(matching_bins) 
+    #             bins_with_metric.append(matching_bins[0])
+    #             print("HAS NOT USE MATCHING BIN IN ORIGINAL SET",matching_bins[0].id, matching_bins[0].score, matching_bins[0].N50)
+                
+    #         else:
+    #             print("has score")
+    #             print(bin_obj.id, bin_obj.score, bin_obj.N50)
+    #             bins_with_metric.append(bin_obj)
+
+                
+        # io.write_bin_info(bins_with_metric, original_bin_report)
 
     logging.info("Create intermediate bins:")
     new_bins = bin_manager.create_intermediate_bins(bin_set_name_to_bins)

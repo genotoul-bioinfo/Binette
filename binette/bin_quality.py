@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-import concurrent.futures as cf
 import logging
 import os
 from collections import Counter
 from itertools import islice
-from typing import Dict, Iterable, List, Tuple, Iterator
+from typing import Dict, Iterable, Optional, Tuple, Iterator, Set
 
 import numpy as np
 import pandas as pd
@@ -17,7 +16,7 @@ logging.getLogger("tensorflow").setLevel(logging.FATAL)
 from checkm2 import keggData, modelPostprocessing, modelProcessing
 from binette.bin_manager import Bin
 
-def get_bins_metadata_df(bins: List, contig_to_cds_count: Dict[str, int], contig_to_aa_counter: Dict[str, Counter], contig_to_aa_length: Dict[str, int]) -> pd.DataFrame:
+def get_bins_metadata_df(bins: Iterable[Bin], contig_to_cds_count: Dict[str, int], contig_to_aa_counter: Dict[str, Counter], contig_to_aa_length: Dict[str, int]) -> pd.DataFrame:
     """
     Generate a DataFrame containing metadata for a list of bins.
 
@@ -56,7 +55,7 @@ def get_bins_metadata_df(bins: List, contig_to_cds_count: Dict[str, int], contig
     metadata_df = metadata_df.set_index("Name", drop=False)
     return metadata_df
 
-def get_diamond_feature_per_bin_df(bins: List, contig_to_kegg_counter: Dict[str, Counter]) -> Tuple[pd.DataFrame, int]:
+def get_diamond_feature_per_bin_df(bins: Iterable[Bin], contig_to_kegg_counter: Dict[str, Counter]) -> Tuple[pd.DataFrame, int]:
     """
     Generate a DataFrame containing Diamond feature counts per bin and completeness information for pathways, categories, and modules.
 
@@ -135,11 +134,11 @@ def add_bin_size_and_N50(bins: Iterable[Bin], contig_to_size: Dict[str,int]):
         bin_obj.add_N50(n50)
 
 
-def add_bin_metrics(bins: List, contig_info: Dict, contamination_weight: float, threads: int = 1):
+def add_bin_metrics(bins: Set[Bin], contig_info: Dict, contamination_weight: float, threads: int = 1):
     """
-    Add metrics to a list of bins.
+    Add metrics to a Set of bins.
 
-    :param bins: List of bin objects.
+    :param bins: Set of bin objects.
     :param contig_info: Dictionary containing contig information.
     :param contamination_weight: Weight for contamination assessment.
     :param threads: Number of threads for parallel processing (default is 1).
@@ -183,13 +182,13 @@ def chunks(iterable: Iterable, size: int) -> Iterator[Tuple]:
     return iter(lambda: tuple(islice(it, size)), ())
 
 
-def assess_bins_quality_by_chunk(bins: List,
+def assess_bins_quality_by_chunk(bins: Iterable[Bin],
     contig_to_kegg_counter: Dict,
     contig_to_cds_count: Dict,
     contig_to_aa_counter: Dict,
     contig_to_aa_length: Dict,
     contamination_weight: float,
-    postProcessor:modelPostprocessing.modelProcessor = None,
+    postProcessor:Optional[modelPostprocessing.modelProcessor] = None,
     threads: int = 1,
     chunk_size: int = 2500):
     """
@@ -223,13 +222,13 @@ def assess_bins_quality_by_chunk(bins: List,
         )
 
 def assess_bins_quality(
-    bins: List,
+    bins: Iterable[Bin],
     contig_to_kegg_counter: Dict,
     contig_to_cds_count: Dict,
     contig_to_aa_counter: Dict,
     contig_to_aa_length: Dict,
     contamination_weight: float,
-    postProcessor: modelPostprocessing.modelProcessor = None,
+    postProcessor: Optional[modelPostprocessing.modelProcessor] = None,
     threads: int = 1,):
     """
     Assess the quality of bins.
@@ -284,7 +283,7 @@ def assess_bins_quality(
     final_results["Contamination"] = np.round(final_cont, 2)
 
     for bin_obj in bins:
-        completeness = final_results.loc[bin_obj.id, "Completeness"]
-        contamination = final_results.loc[bin_obj.id, "Contamination"]
+        completeness = final_results.at[bin_obj.id, "Completeness"]
+        contamination = final_results.at[bin_obj.id, "Contamination"]
 
         bin_obj.add_quality(completeness, contamination, contamination_weight)

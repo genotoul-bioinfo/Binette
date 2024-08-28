@@ -7,12 +7,12 @@ import pyfastx
 
 import itertools
 import networkx as nx
-from typing import List, Dict, Iterable, Tuple, Set
+from typing import List, Dict, Iterable, Tuple, Set, Mapping
 
 class Bin:
     counter = 0
 
-    def __init__(self, contigs: Iterable[str], origin: str, name: str) -> None:
+    def __init__(self, contigs: Iterable[str], origin: str, name: str, is_original:bool=False) -> None:
         """
         Initialize a Bin object.
 
@@ -34,6 +34,8 @@ class Bin:
         self.completeness = None
         self.contamination = None
         self.score = None
+
+        self.is_original = is_original
 
     def __eq__(self, other: 'Bin') -> bool:
         """
@@ -163,6 +165,47 @@ class Bin:
         return Bin(contigs, origin, name)
     
 
+    def is_complete_enough(self, min_completeness: float) -> bool:
+        """
+        Determine if a bin is complete enough based on completeness threshold.
+
+        :param min_completeness: The minimum completeness required for a bin.
+        
+        :raises ValueError: If completeness has not been set (is None).
+
+        :return: True if the bin meets the min_completeness threshold; False otherwise.
+        """
+
+        if self.completeness is None:
+            raise ValueError(
+                f"The bin '{self.name}' with ID '{self.id}' has not been evaluated for completeness or contamination, "
+                "and therefore cannot be assessed."
+            )
+
+        return self.completeness >= min_completeness
+    
+
+    def is_high_quality(self, min_completeness: float, max_contamination: float) -> bool:
+        """
+        Determine if a bin is considered high quality based on completeness and contamination thresholds.
+
+        :param min_completeness: The minimum completeness required for a bin to be considered high quality.
+        :param max_contamination: The maximum allowed contamination for a bin to be considered high quality.
+        
+        :raises ValueError: If either completeness or contamination has not been set (is None).
+
+        :return: True if the bin meets the high quality criteria; False otherwise.
+        """
+        if self.completeness is None or self.contamination is None:
+            raise ValueError(
+                f"The bin '{self.name}' with ID '{self.id}' has not been evaluated for completeness or contamination, "
+                "and therefore cannot be assessed for high quality."
+            )
+
+        return self.completeness >= min_completeness and self.contamination <= max_contamination
+
+
+
 def get_bins_from_directory(bin_dir: str, set_name: str, fasta_extensions: Set[str]) -> List[Bin]:
     """
     Retrieves a list of Bin objects from a directory containing bin FASTA files.
@@ -239,7 +282,7 @@ def get_bins_from_contig2bin_table(contig2bin_table: str, set_name: str) -> List
             if line.startswith("#") or line.startswith("@"):
                 logging.debug(f"Ignoring a line from {contig2bin_table}: {line}")
                 continue
-            contig_name = line.strip().split("\t")[0]
+            contig_name = line.strip().split()[0]
             bin_name = line.strip().split("\t")[1]
             bin_name2contigs[bin_name].add(contig_name)
 
@@ -250,7 +293,7 @@ def get_bins_from_contig2bin_table(contig2bin_table: str, set_name: str) -> List
     return bins
 
 
-def from_bin_sets_to_bin_graph(bin_name_to_bin_set: Dict[str, set]) -> nx.Graph:
+def from_bin_sets_to_bin_graph(bin_name_to_bin_set: Mapping[str, Iterable[Bin]]) -> nx.Graph:
     """
     Creates a bin graph from a dictionary of bin sets.
 
@@ -272,7 +315,7 @@ def from_bin_sets_to_bin_graph(bin_name_to_bin_set: Dict[str, set]) -> nx.Graph:
 
 
 
-def get_all_possible_combinations(clique: Iterable) -> Iterable[Tuple]:
+def get_all_possible_combinations(clique: List) -> Iterable[Tuple]:
     """
     Generates all possible combinations of elements from a given clique.
 
@@ -366,7 +409,7 @@ def get_union_bins(G: nx.Graph, max_conta: int = 50) -> Set[Bin]:
     return union_bins
 
 
-def select_best_bins(bins: List[Bin]) -> List[Bin]:
+def select_best_bins(bins: Set[Bin]) -> List[Bin]:
     """
     Selects the best bins from a list of bins based on their scores, N50 values, and IDs.
 
@@ -392,7 +435,7 @@ def select_best_bins(bins: List[Bin]) -> List[Bin]:
     return selected_bins
 
 
-def dereplicate_bin_sets(bin_sets):
+def dereplicate_bin_sets(bin_sets) -> Set[Bin]:
     """
     Dereplicates bins from different bin sets to obtain a non-redundant bin set.
 
@@ -403,7 +446,7 @@ def dereplicate_bin_sets(bin_sets):
     return set().union(*bin_sets)
 
 
-def get_contigs_in_bins(bins: List[Bin]) -> Set[str]:
+def get_contigs_in_bins(bins: Iterable[Bin]) -> Set[str]:
     """
     Retrieves all contigs present in the given list of bins.
 
@@ -414,7 +457,7 @@ def get_contigs_in_bins(bins: List[Bin]) -> Set[str]:
     return set().union(*(b.contigs for b in bins))
 
 
-def rename_bin_contigs(bins: List[Bin], contig_to_index: dict):
+def rename_bin_contigs(bins: Iterable[Bin], contig_to_index: dict):
     """
     Renames the contigs in the bins based on the provided mapping.
 
@@ -425,7 +468,7 @@ def rename_bin_contigs(bins: List[Bin], contig_to_index: dict):
         b.contigs = {contig_to_index[contig] for contig in b.contigs}
         b.hash = hash(str(sorted(b.contigs)))
 
-def create_intermediate_bins(bin_set_name_to_bins: Dict[str, Set[Bin]]) -> Set[Bin]:
+def create_intermediate_bins(bin_set_name_to_bins: Mapping[str, Iterable[Bin]]) -> Set[Bin]:
     """
     Creates intermediate bins from a dictionary of bin sets.
 
