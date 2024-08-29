@@ -108,7 +108,7 @@ def write_bin_info(bins: Iterable[Bin], output: Path, add_contigs: bool = False)
     for bin_obj in sorted(bins, key=lambda x: (x.score, x.N50, -x.id), reverse=True):
         bin_info = [
             bin_obj.id,
-            bin_obj.origin,
+            ';'.join(bin_obj.origin),
             bin_obj.name,
             bin_obj.completeness,
             bin_obj.contamination,

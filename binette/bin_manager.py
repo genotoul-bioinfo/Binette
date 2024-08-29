@@ -205,7 +205,7 @@ class Bin:
 
 
 
-def get_bins_from_directory(bin_dir: str, set_name: str, fasta_extensions: Set[str]) -> List[Bin]:
+def get_bins_from_directory(bin_dir: Path, set_name: str, fasta_extensions: Set[str]) -> List[Bin]:
     """
     Retrieves a list of Bin objects from a directory containing bin FASTA files.
 
@@ -217,7 +217,7 @@ def get_bins_from_directory(bin_dir: str, set_name: str, fasta_extensions: Set[s
     """
     bins = []
     fasta_extensions |= {f".{ext}" for ext in fasta_extensions if not ext.startswith(".")} # adding a dot in case given extension are lacking one
-    bin_fasta_files = (fasta_file for fasta_file in Path(bin_dir).glob("*") if set(fasta_file.suffixes) & fasta_extensions)
+    bin_fasta_files = (fasta_file for fasta_file in bin_dir.glob("*") if set(fasta_file.suffixes) & fasta_extensions)
 
     for bin_fasta_path in bin_fasta_files:
 
@@ -233,7 +233,7 @@ def get_bins_from_directory(bin_dir: str, set_name: str, fasta_extensions: Set[s
 
 
 
-def parse_bin_directories(bin_name_to_bin_dir: Dict[str, str], fasta_extensions:Set[str]) -> Dict[str, Set[Bin]]:
+def parse_bin_directories(bin_name_to_bin_dir: Dict[str, Path], fasta_extensions:Set[str]) -> Dict[str, Set[Bin]]:
     """
     Parses multiple bin directories and returns a dictionary mapping bin names to a list of Bin objects.
 
@@ -263,7 +263,7 @@ def parse_bin_directories(bin_name_to_bin_dir: Dict[str, str], fasta_extensions:
 
     return bin_set_name_to_bins
 
-def parse_contig2bin_tables(bin_name_to_bin_tables: Dict[str, str]) -> Dict[str, Set['Bin']]:
+def parse_contig2bin_tables(bin_name_to_bin_tables: Dict[str, Path]) -> Dict[str, Set['Bin']]:
     """
     Parses multiple contig-to-bin tables and returns a dictionary mapping bin names to a set of unique Bin objects.
 
@@ -296,7 +296,7 @@ def parse_contig2bin_tables(bin_name_to_bin_tables: Dict[str, str]) -> Dict[str,
     return bin_set_name_to_bins
 
 
-def get_bins_from_contig2bin_table(contig2bin_table: str, set_name: str) -> List[Bin]:
+def get_bins_from_contig2bin_table(contig2bin_table: Path, set_name: str) -> List[Bin]:
     """
     Retrieves a list of Bin objects from a contig-to-bin table.
 

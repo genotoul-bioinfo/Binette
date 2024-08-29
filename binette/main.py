@@ -17,7 +17,7 @@ import os
 import binette
 from binette import contig_manager, cds, diamond, bin_quality, bin_manager, io_manager as io
 from typing import List, Dict, Optional, Set, Tuple, Union, Sequence, Any
-
+from pathlib import Path
 
 def init_logging(verbose, debug):
     """Initialise logging."""
@@ -85,6 +85,7 @@ def parse_arguments(args):
         "-d",
         "--bin_dirs",
         nargs="+",
+        type=Path,
         action=UniqueStore,
         help="List of bin folders containing each bin in a fasta file.",
     )
@@ -94,11 +95,12 @@ def parse_arguments(args):
         "--contig2bin_tables",
         nargs="+",
         action=UniqueStore,
+        type=Path,
         help="List of contig2bin table with two columns separated\
             with a tabulation: contig, bin",
     )
 
-    input_group.add_argument("-c", "--contigs", required=True, help="Contigs in fasta format.")
+    input_group.add_argument("-c", "--contigs", required=True, type=Path, help="Contigs in fasta format.")
 
     # Other parameters category
     other_group = parser.add_argument_group('Other Arguments')
@@ -113,7 +115,7 @@ def parse_arguments(args):
 
     other_group.add_argument("-t", "--threads", default=1, type=int, help="Number of threads to use.")
 
-    other_group.add_argument("-o", "--outdir", default="results", help="Output directory.")
+    other_group.add_argument("-o", "--outdir", default=Path("results"), type=Path, help="Output directory.")
 
     other_group.add_argument(
         "-w",
@@ -135,8 +137,9 @@ def parse_arguments(args):
 
     other_group.add_argument(
         "--checkm2_db",
+        type=Path,
         help="Provide a path for the CheckM2 diamond database. "
-        "By default the database set via <checkm2 database> is used.",
+        "By default the database set via <checkm2 database> is used."
     )
 
     other_group.add_argument("--low_mem", help="Use low mem mode when running diamond", action="store_true")
@@ -157,9 +160,9 @@ def parse_arguments(args):
     args = parser.parse_args(args)
     return args
 
-def parse_input_files(bin_dirs: List[str], 
-                      contig2bin_tables: List[str],
-                      contigs_fasta: str,
+def parse_input_files(bin_dirs: List[Path], 
+                      contig2bin_tables: List[Path],
+                      contigs_fasta: Path,
                       fasta_extensions:Set[str] = {".fasta", ".fna", ".fa"}) -> Tuple[Dict[str, Set[bin_manager.Bin]], Set[bin_manager.Bin], Set[str], Dict[str, int]]:
     """
     Parses input files to retrieve information related to bins and contigs.
@@ -178,11 +181,11 @@ def parse_input_files(bin_dirs: List[str],
 
     if bin_dirs:
         logging.info("Parsing bin directories.")
-        bin_name_to_bin_dir = io.infer_bin_name_from_bin_inputs(bin_dirs)
+        bin_name_to_bin_dir = io.infer_bin_set_names_from_input_paths(bin_dirs)
         bin_set_name_to_bins = bin_manager.parse_bin_directories(bin_name_to_bin_dir, fasta_extensions)
     else:
         logging.info("Parsing bin2contig files.")
-        bin_name_to_bin_table = io.infer_bin_name_from_bin_inputs(contig2bin_tables)
+        bin_name_to_bin_table = io.infer_bin_set_names_from_input_paths(contig2bin_tables)
         bin_set_name_to_bins = bin_manager.parse_contig2bin_tables(bin_name_to_bin_table)
 
     logging.info(f"Processing {len(bin_set_name_to_bins)} bin sets.")
@@ -193,7 +196,7 @@ def parse_input_files(bin_dirs: List[str],
     original_bins = bin_manager.dereplicate_bin_sets(bin_set_name_to_bins.values())
 
     logging.info(f"Parsing contig fasta file: {contigs_fasta}")
-    contigs_object = contig_manager.parse_fasta_file(contigs_fasta)
+    contigs_object = contig_manager.parse_fasta_file(contigs_fasta.as_posix())
 
     unexpected_contigs = {contig for contig in contigs_in_bins if contig not in contigs_object}
 
@@ -206,9 +209,9 @@ def parse_input_files(bin_dirs: List[str],
     return bin_set_name_to_bins, original_bins, contigs_in_bins, contig_to_length
 
 
-def manage_protein_alignement(faa_file: str, contigs_fasta: str, contig_to_length: Dict[str, int],
-                                contigs_in_bins: Set[str], diamond_result_file: str,
-                                checkm2_db: str, threads: int, resume: bool, low_mem: bool) -> Tuple[Dict[str, int], Dict[str, List[str]]]:
+def manage_protein_alignement(faa_file: Path, contigs_fasta: Path, contig_to_length: Dict[str, int],
+                                contigs_in_bins: Set[str], diamond_result_file: Path,
+                                checkm2_db: Optional[Path], threads: int, resume: bool, low_mem: bool) -> Tuple[Dict[str, int], Dict[str, List[str]]]:
     """
     Predicts or reuses proteins prediction and runs diamond on them.
     
@@ -228,41 +231,45 @@ def manage_protein_alignement(faa_file: str, contigs_fasta: str, contig_to_lengt
     # Predict or reuse proteins prediction and run diamond on them
     if resume:
         logging.info(f"Parsing faa file: {faa_file}.")
-        contig_to_genes = cds.parse_faa_file(faa_file)
-        io.check_contig_consistency(contig_to_length, contig_to_genes, contigs_fasta, faa_file)
+        contig_to_genes = cds.parse_faa_file(faa_file.as_posix())
+        io.check_contig_consistency(contig_to_length, contig_to_genes, contigs_fasta.as_posix(), faa_file.as_posix())
 
     else:
-        contigs_iterator = (s for s in contig_manager.parse_fasta_file(contigs_fasta) if s.name in contigs_in_bins)
-        contig_to_genes = cds.predict(contigs_iterator, faa_file, threads)
+        contigs_iterator = (s for s in contig_manager.parse_fasta_file(contigs_fasta.as_posix()) if s.name in contigs_in_bins)
+        contig_to_genes = cds.predict(contigs_iterator, faa_file.as_posix(), threads)
 
-        if checkm2_db:
-            diamond_db_path = checkm2_db
-        else:
+        if checkm2_db is None:
             # get checkm2 db stored in checkm2 install
             diamond_db_path = diamond.get_checkm2_db()
-        
-        diamond_log = f"{os.path.splitext(diamond_result_file)[0]}.log"
+        elif checkm2_db.exists():
+            diamond_db_path = checkm2_db.as_posix()
+        else:
+            raise FileNotFoundError(checkm2_db)
+
+        diamond_log =  diamond_result_file.parents[0] / f"{diamond_result_file.stem}.log"
 
         diamond.run(
-            faa_file,
-            diamond_result_file,
+            faa_file.as_posix(),
+            diamond_result_file.as_posix(),
             diamond_db_path,
-            diamond_log,
+            diamond_log.as_posix(),
             threads,
             low_mem=low_mem,
         )
 
     logging.info("Parsing diamond results.")
-    contig_to_kegg_counter = diamond.get_contig_to_kegg_id(diamond_result_file)
+    contig_to_kegg_counter = diamond.get_contig_to_kegg_id(diamond_result_file.as_posix())
 
     # Check contigs from diamond vs input assembly consistency
-    io.check_contig_consistency(contig_to_length, contig_to_kegg_counter, contigs_fasta, diamond_result_file)
+    io.check_contig_consistency(contig_to_length, contig_to_kegg_counter, contigs_fasta.as_posix(), diamond_result_file.as_posix())
 
     return contig_to_kegg_counter, contig_to_genes
 
 
-def select_bins_and_write_them(all_bins: Set[bin_manager.Bin], contigs_fasta: str, final_bin_report: str, min_completeness: float,
-                               index_to_contig: dict, outdir: str, debug: bool) -> List[bin_manager.Bin]:
+def select_bins_and_write_them(all_bins: Set[bin_manager.Bin],
+                               contigs_fasta: Path,
+                               final_bin_report: Path, min_completeness: float,
+                               index_to_contig: dict, outdir: Path, debug: bool) -> List[bin_manager.Bin]:
     """
     Selects and writes bins based on specific criteria.
 
@@ -276,12 +283,12 @@ def select_bins_and_write_them(all_bins: Set[bin_manager.Bin], contigs_fasta: st
     :return: Selected bins that meet the completeness threshold.
     """
 
-    outdir_final_bin_set = os.path.join(outdir, "final_bins")
+    outdir_final_bin_set = outdir / "final_bins"
     os.makedirs(outdir_final_bin_set, exist_ok=True)
 
     if debug:
         all_bins_for_debug = set(all_bins)
-        all_bin_compo_file = os.path.join(outdir, "all_bins_quality_reports.tsv")
+        all_bin_compo_file = outdir / "all_bins_quality_reports.tsv"
         
         logging.info(f"Writing all bins in {all_bin_compo_file}")
         
@@ -338,6 +345,23 @@ def log_selected_bin_info(selected_bins: List[bin_manager.Bin], hq_min_completen
     thresholds = f"(completeness >= {hq_min_completeness} and contamination <= {hq_max_conta})"
     logging.info(f"{hq_bins}/{len(selected_bins)} selected bins have a high quality {thresholds}.")
 
+def write_original_bin_metrics(bin_set_name_to_bins:Dict[str, Set[bin_manager.Bin]], original_bin_report_dir:Path):
+    """
+    
+    """
+    
+    logging.info(f"Writing original input bins metrics in {original_bin_report_dir}")
+    
+
+    original_bin_report_dir.mkdir(parents=True, exist_ok=True)
+
+    for i, (set_name, bins) in enumerate(sorted(bin_set_name_to_bins.items())):
+        bins_metric_file = original_bin_report_dir / f"input_bins_{i+1}.{set_name.replace('/', '_')}.tsv"
+
+        logging.info(f"Writing bin_set {set_name} input bins metrics in {bins_metric_file}")
+        io.write_bin_info(bins, bins_metric_file)
+
+
 
 def main():
     "Orchestrate the execution of the program"
@@ -351,15 +375,15 @@ def main():
     hq_min_completeness = 90
 
     # Temporary files #
-    out_tmp_dir = os.path.join(args.outdir, "temporary_files")
+    out_tmp_dir:Path = args.outdir / "temporary_files"
     os.makedirs(out_tmp_dir, exist_ok=True)
 
-    faa_file = os.path.join(out_tmp_dir, "assembly_proteins.faa")
-    diamond_result_file = os.path.join(out_tmp_dir, "diamond_result.tsv")
+    faa_file = out_tmp_dir / "assembly_proteins.faa"
+    diamond_result_file = out_tmp_dir / "diamond_result.tsv"
 
     # Output files #
-    final_bin_report = os.path.join(args.outdir, "final_bins_quality_reports.tsv")
-    original_bin_report  = os.path.join(args.outdir, "original_bins_quality_reports.tsv")
+    final_bin_report:Path = args.outdir / "final_bins_quality_reports.tsv"
+    original_bin_report_dir:Path  = args.outdir / "input_bins_quality_reports"
 
     if args.resume:
         io.check_resume_file(faa_file, diamond_result_file)
@@ -392,28 +416,8 @@ def main():
     logging.info("Add size and assess quality of input bins")
     bin_quality.add_bin_metrics(original_bins, contig_metadat, args.contamination_weight, args.threads)
 
+    write_original_bin_metrics(bin_set_name_to_bins, original_bin_report_dir)
 
-    # for bin_set, bins in bin_set_name_to_bins.items():
-    #     print(bin_set)
-    #     bin_set_name = bin_set.replace("/", "_")
-    #     original_bin_report  = os.path.join(args.outdir, f"{bin_set_name}_bins_quality_reports.tsv")
-    #     bins_with_metric = []
-    #     for bin_obj in bins:
-    #         print(bin_obj.id, bin_obj.score, bin_obj.N50)
-    #         if bin_obj.score is None:
-
-    #             matching_bins = [bin_with_metric for bin_with_metric in original_bins if bin_obj == bin_with_metric]
-    #             assert len(matching_bins) == 1, len(matching_bins) 
-    #             bins_with_metric.append(matching_bins[0])
-    #             print("HAS NOT USE MATCHING BIN IN ORIGINAL SET", matching_bins[0].id, matching_bins[0].score, matching_bins[0].N50)
-                
-    #         else:
-    #             print("has score")
-    #             print(bin_obj.id, bin_obj.score, bin_obj.N50)
-    #             bins_with_metric.append(bin_obj)
-
-                
-        # io.write_bin_info(bins_with_metric, original_bin_report)
 
     logging.info("Create intermediate bins:")
     new_bins = bin_manager.create_intermediate_bins(bin_set_name_to_bins)
