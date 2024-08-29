@@ -11,7 +11,7 @@ from unittest.mock import patch, MagicMock
 from collections import Counter
 from tests.bin_manager_test import create_temp_bin_directories, create_temp_bin_files
 from argparse import ArgumentParser
-
+from pathlib import Path
 
 @pytest.fixture
 def bins():
@@ -62,7 +62,7 @@ def test_select_bins_and_write_them(tmp_path, tmpdir, bins):
 
     # Run the function with test data
     selected_bins = select_bins_and_write_them(
-        set(bins), str(contigs_fasta), final_bin_report, min_completeness=60, index_to_contig=index_to_contig, outdir=str(outdir), debug=True
+        set(bins), contigs_fasta, Path(final_bin_report), min_completeness=60, index_to_contig=index_to_contig, outdir=outdir, debug=True
     )
 
     # Assertions to check the function output or file existence
@@ -104,11 +104,11 @@ def test_manage_protein_alignement_resume(tmp_path):
 
         # Run the function with test data
         contig_to_kegg_counter, contig_to_genes = manage_protein_alignement(
-            faa_file=str(faa_file),
-            contigs_fasta="contigs_fasta",
+            faa_file=Path(faa_file),
+            contigs_fasta=Path("contigs_fasta"),
             contig_to_length=contig_to_length,
-            contigs_in_bins={},
-            diamond_result_file="diamond_result_file",
+            contigs_in_bins=set(),
+            diamond_result_file=Path("diamond_result_file"),
             checkm2_db=None,
             threads=1,
             resume=True,
@@ -149,11 +149,11 @@ def test_manage_protein_alignement_not_resume(tmpdir, tmp_path):
         # Call the function
 
         contig_to_kegg_counter, contig_to_genes = manage_protein_alignement(
-            faa_file=str(faa_file),
-            contigs_fasta=contigs_fasta,
+            faa_file=Path(faa_file),
+            contigs_fasta=Path(contigs_fasta),
             contig_to_length=contig_to_length,
-            contigs_in_bins={},
-            diamond_result_file=diamond_result_file,
+            contigs_in_bins=set(),
+            diamond_result_file=Path(diamond_result_file),
             checkm2_db=None,
             threads=1,
             resume=True,
@@ -180,7 +180,7 @@ def test_parse_input_files_with_contig2bin_tables(tmp_path):
     fasta_file.write_text(fasta_file_content)
 
     # Call the function and capture the return values
-    bin_set_name_to_bins, original_bins, contigs_in_bins, contig_to_length = parse_input_files(None, [str(bin_set1), str(bin_set2)], str(fasta_file))
+    bin_set_name_to_bins, original_bins, contigs_in_bins, contig_to_length = parse_input_files(None, [bin_set1, bin_set2], fasta_file)
 
 
     # # Perform assertions on the returned values
@@ -190,7 +190,7 @@ def test_parse_input_files_with_contig2bin_tables(tmp_path):
     assert isinstance(contig_to_length, dict)
 
 
-    assert set(bin_set_name_to_bins) == {'1', "2"}
+    assert set(bin_set_name_to_bins) == {'bin_set1', "bin_set2"}
     assert len(original_bins) == 4
     assert contigs_in_bins == {"contig1","contig2", "contig3","contig4"}
     assert len(contig_to_length) == 4
@@ -206,12 +206,12 @@ def test_parse_input_files_with_contig2bin_tables_with_unknown_contig(tmp_path):
     fasta_file.write_text(fasta_file_content)
 
     with pytest.raises(ValueError):
-        parse_input_files(None, [str(bin_set3)], str(fasta_file))
+        parse_input_files(None, [bin_set3], fasta_file)
 
 
 def test_parse_input_files_bin_dirs(create_temp_bin_directories, tmp_path):
 
-    bin_dirs = list(create_temp_bin_directories.values())
+    bin_dirs = [Path(d) for d in create_temp_bin_directories.values()]
 
     contig2bin_tables = []
 
@@ -224,7 +224,7 @@ def test_parse_input_files_bin_dirs(create_temp_bin_directories, tmp_path):
     fasta_file.write_text(fasta_file_content)
 
     # Call the function and capture the return values
-    bin_set_name_to_bins, original_bins, contigs_in_bins, contig_to_length = parse_input_files(bin_dirs, contig2bin_tables, str(fasta_file))
+    bin_set_name_to_bins, original_bins, contigs_in_bins, contig_to_length = parse_input_files(bin_dirs, contig2bin_tables, fasta_file)
 
     # # Perform assertions on the returned values
     assert isinstance(bin_set_name_to_bins, dict)
@@ -233,7 +233,7 @@ def test_parse_input_files_bin_dirs(create_temp_bin_directories, tmp_path):
     assert isinstance(contig_to_length, dict)
 
 
-    assert set(bin_set_name_to_bins) == {'1', "2"}
+    assert set(bin_set_name_to_bins) == {'set1', 'set2'}
     assert len(original_bins) == 3
     assert contigs_in_bins == {"contig1","contig2", "contig3","contig4","contig5",}
     assert len(contig_to_length) == 5
@@ -257,16 +257,16 @@ def test_argument_used_multiple_times():
 def test_parse_arguments_required_arguments():
     # Test when only required arguments are provided
     args = parse_arguments(["-d", "folder1", "folder2", "-c", "contigs.fasta"])
-    assert args.bin_dirs == ["folder1", "folder2"]
-    assert args.contigs == "contigs.fasta"
+    assert args.bin_dirs == [Path("folder1"), Path("folder2")]
+    assert args.contigs == Path("contigs.fasta")
 
 def test_parse_arguments_optional_arguments():
     # Test when required and optional arguments are provided
     args = parse_arguments(["-d", "folder1", "folder2", "-c", "contigs.fasta", "--threads", "4", "--outdir", "output"])
-    assert args.bin_dirs == ["folder1", "folder2"]
-    assert args.contigs == "contigs.fasta"
+    assert args.bin_dirs == [Path("folder1"), Path("folder2")]
+    assert args.contigs == Path("contigs.fasta")
     assert args.threads == 4
-    assert args.outdir == "output"
+    assert args.outdir == Path("output")
 
 def test_parse_arguments_invalid_arguments():
     # Test when invalid arguments are provided
@@ -294,14 +294,16 @@ def test_init_logging_command_line(caplog):
 
 
 # @patch('diamond.run')
-def test_manage_protein_alignment_no_resume():
+def test_manage_protein_alignment_no_resume(tmp_path):
     # Set up the input parameters
-    faa_file = "test.faa"
-    contigs_fasta = "test.fasta"
+    faa_file = Path("test.faa")
+    contigs_fasta = Path("test.fasta")
     contig_to_length = {"contig1": [1000]}
     contigs_in_bins = {"bin1": ["contig1"]}
-    diamond_result_file = "test_diamond_result.txt"
-    checkm2_db = "checkm2_db"
+    diamond_result_file = Path("test_diamond_result.txt")
+    checkm2_db = tmp_path / "checkm2_db"
+    with open(checkm2_db, "w"):
+        pass
     threads = 4
     resume = False
     low_mem = False
@@ -324,11 +326,11 @@ def test_manage_protein_alignment_no_resume():
         )
         
         # Assertions to check if functions were called
-        mock_parse_fasta_file.assert_called_once_with(contigs_fasta)
+        mock_parse_fasta_file.assert_called_once_with(contigs_fasta.as_posix())
         mock_predict.assert_called_once()
         mock_diamond_get_contig_to_kegg_id.assert_called_once()
         mock_diamond_run.assert_called_once_with(
-            faa_file, diamond_result_file, "checkm2_db", f"{os.path.splitext(diamond_result_file)[0]}.log", threads, low_mem=low_mem
+            faa_file.as_posix(), diamond_result_file.as_posix(), checkm2_db.as_posix(), f"{os.path.splitext(diamond_result_file.as_posix())[0]}.log", threads, low_mem=low_mem
         )
 
 def test_main_resume_when_not_possible(monkeypatch):
