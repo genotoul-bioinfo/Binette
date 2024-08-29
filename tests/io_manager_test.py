@@ -1,7 +1,7 @@
 import pytest
 from binette import io_manager
 from pathlib import Path
-
+from unittest.mock import patch
 
 
 
@@ -9,7 +9,7 @@ from pathlib import Path
 class Bin:
     def __init__(self, bin_id, origin, name, completeness, contamination, score, length, N50, contigs):
         self.id = bin_id
-        self.origin = origin
+        self.origin = {origin}
         self.name = name
         self.completeness = completeness
         self.contamination = contamination
@@ -65,7 +65,7 @@ def test_infer_bin_name_from_single_path():
     # Check if the output matches the expected dictionary
     assert result == expected_result
 
-    
+
 def test_infer_bin_name_from_bin_table_inputs():
     # Mock input data
     input_bins = [
@@ -283,3 +283,33 @@ def test_check_resume_file_missing_diamond(temp_files, caplog):
         io_manager.check_resume_file(Path(faa_file), Path("nonexistent_diamond_result.txt"))
     assert "Protein file" not in caplog.text
     assert "Diamond result file" in caplog.text
+
+
+@patch('binette.io_manager.write_bin_info')
+def test_write_original_bin_metrics(mock_write_bin_info, bin1,bin2, tmp_path):
+    # Test that `write_original_bin_metrics` correctly writes bin metrics to files
+
+    temp_directory =  tmp_path / "test_output"
+
+    mock_bins = {"set1":{bin1},
+                 "set2":{bin2}}
+    # Call the function with mock data
+    io_manager.write_original_bin_metrics(mock_bins, temp_directory)
+
+    # Check if the output directory was created
+    assert temp_directory.exists(), "Output directory should be created."
+
+    # Check that the correct files are created
+    expected_files = [
+        temp_directory / "input_bins_1.set1.tsv",
+        temp_directory / "input_bins_2.set2.tsv"
+    ]
+
+    assert temp_directory.exists(), f"Expected temp_directory {temp_directory} was not created."
+
+    # Check if `write_bin_info` was called correctly
+    assert mock_write_bin_info.call_count == 2, "write_bin_info should be called once for each bin set."
+
+    # Verify the specific calls to `write_bin_info`
+    mock_write_bin_info.assert_any_call(mock_bins['set1'], expected_files[0])
+    mock_write_bin_info.assert_any_call(mock_bins['set2'], expected_files[1])

@@ -1,6 +1,6 @@
 import logging
 import pyfastx
-from typing import Iterable, List, Dict, Tuple
+from typing import Iterable, List, Dict, Tuple, Set
 import csv
 
 from binette.bin_manager import Bin
@@ -195,3 +195,25 @@ def check_resume_file(faa_file: Path, diamond_result_file: Path) -> None:
         raise FileNotFoundError(error_msg)
 
 
+def write_original_bin_metrics(bin_set_name_to_bins: Dict[str, Set[Bin]], original_bin_report_dir: Path):
+    """
+    Write metrics of original input bins to a specified directory.
+
+    This function takes a dictionary mapping bin set names to sets of bins and writes
+    the metrics for each bin set to a TSV file in the specified directory. Each bin set
+    will have its own TSV file named according to its set name.
+
+    :param bin_set_name_to_bins: A dictionary where the keys are bin set names (str) and 
+                                 the values are sets of Bin objects representing bins.
+    :param original_bin_report_dir: The directory path (Path) where the bin metrics will be saved.
+    """
+
+    original_bin_report_dir.mkdir(parents=True, exist_ok=True)
+
+    for i, (set_name, bins) in enumerate(sorted(bin_set_name_to_bins.items())):
+        bins_metric_file = original_bin_report_dir / f"input_bins_{i + 1}.{set_name.replace('/', '_')}.tsv"
+        
+        logging.debug(f"Writing metrics for bin set '{set_name}' to file: {bins_metric_file}")
+        write_bin_info(bins, bins_metric_file)
+
+    logging.debug("Completed writing all original input bin metrics.")

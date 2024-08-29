@@ -345,23 +345,6 @@ def log_selected_bin_info(selected_bins: List[bin_manager.Bin], hq_min_completen
     thresholds = f"(completeness >= {hq_min_completeness} and contamination <= {hq_max_conta})"
     logging.info(f"{hq_bins}/{len(selected_bins)} selected bins have a high quality {thresholds}.")
 
-def write_original_bin_metrics(bin_set_name_to_bins:Dict[str, Set[bin_manager.Bin]], original_bin_report_dir:Path):
-    """
-    
-    """
-    
-    logging.info(f"Writing original input bins metrics in {original_bin_report_dir}")
-    
-
-    original_bin_report_dir.mkdir(parents=True, exist_ok=True)
-
-    for i, (set_name, bins) in enumerate(sorted(bin_set_name_to_bins.items())):
-        bins_metric_file = original_bin_report_dir / f"input_bins_{i+1}.{set_name.replace('/', '_')}.tsv"
-
-        logging.info(f"Writing bin_set {set_name} input bins metrics in {bins_metric_file}")
-        io.write_bin_info(bins, bins_metric_file)
-
-
 
 def main():
     "Orchestrate the execution of the program"
@@ -416,7 +399,10 @@ def main():
     logging.info("Add size and assess quality of input bins")
     bin_quality.add_bin_metrics(original_bins, contig_metadat, args.contamination_weight, args.threads)
 
-    write_original_bin_metrics(bin_set_name_to_bins, original_bin_report_dir)
+
+
+    logging.info(f"Writting original input bin metrics to directory: {original_bin_report_dir}")
+    io.write_original_bin_metrics(bin_set_name_to_bins, original_bin_report_dir)
 
 
     logging.info("Create intermediate bins:")

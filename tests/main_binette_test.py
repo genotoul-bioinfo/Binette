@@ -371,6 +371,7 @@ def test_main(monkeypatch):
          patch('binette.bin_quality.add_bin_metrics') as mock_add_bin_metrics, \
          patch('binette.main.log_selected_bin_info') as mock_log_selected_bin_info, \
          patch('binette.contig_manager.make_contig_index') as mock_make_contig_index, \
+         patch('binette.io_manager.write_original_bin_metrics') as mock_write_original_bin_metrics, \
          patch('binette.main.select_bins_and_write_them') as mock_select_bins_and_write_them:
         
         # Set return values for mocked functions if needed
@@ -395,5 +396,7 @@ def test_main(monkeypatch):
         
         mock_log_selected_bin_info.assert_called_once()
         mock_select_bins_and_write_them.assert_called_once()
+        mock_write_original_bin_metrics.assert_called_once()
+
         assert mock_apply_contig_index.call_count == 3
         assert mock_add_bin_metrics.call_count == 2

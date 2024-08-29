@@ -9,6 +9,7 @@ from binette import bin_manager
 import networkx as nx
 
 import logging
+from pathlib import Path
 
 def test_get_all_possible_combinations():
     input_list = ["2", "3", "4"]
@@ -524,14 +525,14 @@ def create_temp_bin_directories(tmpdir, create_temp_bin_files):
     bin2 = bin_dir2.join("binA.fasta")
     bin2.write(">contig3\nTTAG\n>contig4\nCGAT\n>contig5\nCGGC")
 
-    return {"set1": str(bin_dir1), "set2": str(bin_dir2)}
+    return {"set1": Path(bin_dir1), "set2": Path(bin_dir2)}
 
 
 def test_get_bins_from_directory(create_temp_bin_files):
     bin_dir = create_temp_bin_files
     set_name = "TestSet"
 
-    bins = bin_manager.get_bins_from_directory(str(bin_dir), set_name, fasta_extensions={'.fasta'})
+    bins = bin_manager.get_bins_from_directory(Path(bin_dir), set_name, fasta_extensions={'.fasta'})
 
     assert len(bins) == 2  # Ensure that the correct number of Bin objects is returned
 
@@ -546,7 +547,7 @@ def test_get_bins_from_directory(create_temp_bin_files):
     assert bins[0].name in ["bin2.fasta", "bin1.fasta"]
 
 def test_get_bins_from_directory_no_files(tmpdir):
-    bin_dir = str(tmpdir.mkdir("empty_bins"))
+    bin_dir = Path(tmpdir.mkdir("empty_bins"))
     set_name = "EmptySet"
 
     bins = bin_manager.get_bins_from_directory(bin_dir, set_name, fasta_extensions={'.fasta'})
@@ -554,7 +555,7 @@ def test_get_bins_from_directory_no_files(tmpdir):
     assert len(bins) == 0  # Ensure that no Bin objects are returned for an empty directory
 
 def test_get_bins_from_directory_no_wrong_extensions(create_temp_bin_files):
-    bin_dir = create_temp_bin_files
+    bin_dir = Path(create_temp_bin_files)
     set_name = "TestSet"
 
     bins = bin_manager.get_bins_from_directory(bin_dir, set_name, fasta_extensions={'.fna'})
