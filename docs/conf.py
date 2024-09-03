@@ -31,9 +31,22 @@ extensions = [
     # 'sphinx.ext.napoleon',
     # 'sphinx.ext.viewcode',
     "myst_parser",
-
+    'sphinxcontrib.mermaid'
 ]
-
+myst_enable_extensions = [
+    "amsmath",
+    "colon_fence",
+    "deflist",
+    "dollarmath",
+    "fieldlist",
+    "html_admonition",
+    "html_image",
+    "replacements",
+    "smartquotes",
+    "strikethrough",
+    "substitution",
+    "tasklist",
+]
 
 source_suffix = {
     '.md': 'markdown',

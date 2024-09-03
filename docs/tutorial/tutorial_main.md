@@ -1,15 +1,80 @@
 
 # Tutorial 
 
-The goal of this tutorial is to show an example of commands on how Binette can be used on real data. We will start ou journey from metagenomics reads that we  gonna download, then we will assemble these reads in contigs that we will bin with different binning tool. I finally we will use Binette to refine those bins.
+In this tutorial, we'll walk through a practical example of how to use Binette with real data. We'll start by downloading metagenomics reads and then assemble these reads into contigs. Next, we'll use different binning tools to group the contigs. Finally, we'll use Binette to refine these bins and improve our results.
 
+```{mermaid}
+---
+title: "Tutorial Overview:"
+align: center
+---
+
+%%{init: {'theme':'default'}}%%
+
+graph LR
+
+  A[Download Metagenomics Reads] --> B
+  B[Assemble Reads into Contigs] --> c
+          subgraph Pangenome creation
+            a:::workflow
+            c:::workflow
+            g:::workflow
+            p:::workflow
+            a("annotate") --> c
+            c(cluster) --> g(graph)
+            g(graph) --> p(partition)
+        end
+
+
+  C[Bin Contigs with Binning Tools] --> D[Refine Bins with Binette]
+
+
+        
+    classDef panrgp fill:#4066d4
+    classDef panmodule fill:#d44066
+    classDef workflow fill:#d4ae40
+
+
+```
+
+```{mermaid}
+
+---
+title: "Tutorial Overview:"
+align: center
+---
+
+
+graph TD
+
+    i[Get Metagenomics Reads] --> B[Assembly & Reads alignment]
+
+
+    B --> metabat2 --> r[Binette]
+    B --> maxbin2 --> r
+    B --> concoct --> r
+    B --> semibin2 --> r
+    
+        subgraph Binning
+            metabat2:::binning
+            maxbin2:::binning
+            concoct:::binning
+            semibin2:::binning
+        end
+
+        
+    classDef binning fill:#d4ae40
+
+
+```
 
 
 ```{toctree}
-:caption: 'Tutorial'
-:maxdepth: 2
+:caption: 'Tutorial steps'
+:maxdepth: 1
 
-set_env_and_get_data
+set_environment
+get_dataset
 assembly
 binning
 binette

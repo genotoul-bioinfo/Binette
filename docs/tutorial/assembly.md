@@ -1,43 +1,49 @@
+## Assemble the Reads
 
+We will use **MEGAHIT** to assemble the reads from our dataset. Run the following command:
 
-## Assemble the reads
-
-We will use megahit to assemble the reads
-
-```bash
-
-cd /home/jmainguy/Analysis/Binette/Binette_tutorial/ncezid-biome_datasets/exec_tutorial_jupyter
+```{code-block} bash
+megahit -1 coal-metagenomics/Kickstart_1.fastq.gz \
+        -2 coal-metagenomics/Kickstart_2.fastq.gz \
+        --out-dir Kickstart.megahit --out-prefix R1 --num-cpu-threads 12
 ```
 
-```bash
+:::{admonition} ⌛ Expected Time
+:class: note
 
-megahit -1 coal-metagenomics/Kickstart_1.fastq.gz -2 coal-metagenomics/Kickstart_2.fastq.gz --out-dir Kickstart.megahit --out-prefix R1 --num-cpu-threads 12
+This process takes approximately 28 minutes to complete.
+:::
 
+
+```{admonition} Note
+:class: note
+
+You can also use **SPAdes** for assembly. It generally performs better than MEGAHIT but takes longer and requires more memory. Refer to the CAMI benchmark for a detailed comparison.
 ```
 
+## Align the Reads Over the Assembly
 
-This take 27m49,879s 
+To get coverage information, we first need to map the reads back to the assembly.
 
-```{note}
-We can use spade as well. It performs generally better that megahit but is generally longer and consume more memory than megahit. See cami benchmark ???  
-```
-
-
-
-## Align the reads over the assembly 
-
-First we need to map the reads back against the assembly to get coverage information
-
-```bash
-
+```{code-block} bash
+# Create a directory for the alignments
 mkdir -p alignments_bwa/
 
+# Index the contigs file using BWA-MEM2
 bwa-mem2 index Kickstart.megahit/R1.contigs.fa -p Kickstart.megahit/R1.contigs.fa
 
-bwa-mem2 mem -t 12  Kickstart.megahit/R1.contigs.fa  coal-metagenomics/Kickstart_*.fastq.gz | samtools view -@ 12 -bS - | samtools sort -@ 12  - -o alignments_bwa/Kickstart.bam
+# Map reads back to the assembly, convert to BAM format, and sort
+bwa-mem2 mem -t 12 Kickstart.megahit/R1.contigs.fa coal-metagenomics/Kickstart_*.fastq.gz | \
+samtools view -@ 12 -bS - | \
+samtools sort -@ 12 - -o alignments_bwa/Kickstart.bam
 
-samtools index alignments_bwa/Kickstart.bam 
-
+# Index the BAM file
+samtools index alignments_bwa/Kickstart.bam
 ```
-<!-- #region -->
-This take around   12 minutes
+
+
+:::{admonition} ⌛ Expected Time
+:class: note
+
+This process takes approximately 12 minutes to complete.
+:::
