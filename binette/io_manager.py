@@ -66,7 +66,7 @@ def infer_bin_set_names_from_input_paths(input_bins: List[Path]) -> Dict[str, Pa
     bin_name_to_bin_dir = {}
 
     common_prefix, common_suffix, common_extensions = get_paths_common_prefix_suffix(input_bins)
-    print(common_prefix, common_suffix, common_extensions )
+
     for path in input_bins:
 
         specific_parts = path.parts[len(common_prefix):len(path.parts)-len(common_suffix)]
