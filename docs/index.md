@@ -31,14 +31,18 @@ Binette is inspired from the metaWRAP bin-refinement tool but it effectively sol
 - Enhanced Speed: Binette significantly improves the speed of the refinement process. It achieves this by launching the initial steps of CheckM2, such as Prodigal and Diamond runs, only once on all contigs. These intermediate results are then utilized to assess the quality of any given bin, eliminating redundant computations and accelerating the refinement process.
 - No Limit on Input Bin Sets: Unlike its predecessor, Binette is not constrained by the number of input bin sets. It can handle and process multiple bin sets simultaneously.
 
+
+
+
 ```{toctree}
 :caption: 'Documentation'
 :maxdepth: 2
 
 installation
 usage
+tutorial/tutorial_main
 contributing
-tests.md
+tests
 api/api_ref
 ```
 
