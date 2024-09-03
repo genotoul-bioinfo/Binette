@@ -28,8 +28,8 @@ extensions = [
     "myst_parser",
     'nbsphinx',
     'nbsphinx_link', 
-    'sphinx.ext.napoleon',
-    'sphinx.ext.viewcode',
+    # 'sphinx.ext.napoleon',
+    # 'sphinx.ext.viewcode',
     "myst_parser",
 
 ]
