@@ -65,6 +65,7 @@ Binette results are stored in the `results` directory. You can specify a differe
 In this directory you will find:
 - `final_bins_quality_reports.tsv`: This is a TSV (tab-separated values) file containing quality information about the final selected bins.
 - `final_bins/`: This directory stores all the selected bins in fasta format.
+- `input_bins_quality_reports/`: A directory storing quality reports for the input bin sets, with files following the same structure as `final_bins_quality_reports.tsv`.
 - `temporary_files/`: This directory contains intermediate files. If you choose to use the `--resume` option, Binette will utilize files in this directory to prevent the recomputation of time-consuming steps.
 
 
