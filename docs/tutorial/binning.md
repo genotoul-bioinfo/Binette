@@ -75,8 +75,9 @@ SemiBin2 single_easy_bin -i Kickstart.megahit/R1.contigs.fa \
                             -o semibin2/ -p 12
 ```
 
-```{admonition} ⏳ Time Note
+```{admonition} ⌛ Expected Time
 :class: note
+:class: dropdown
 
-This process can take some time.
+This process take around 1 hour to complete.
 ```

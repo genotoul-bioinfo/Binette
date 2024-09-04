@@ -19,7 +19,6 @@ This process takes approximately 28 minutes to complete.
 
 ```{admonition} Assembly tips
 :class: tip
-:class: dropdown
 
 Here are some general tips that might help improve your assembly results, depending on your data:
 
