@@ -48,7 +48,8 @@ doc = [
     "nbsphinx==0.9.5",
     "nbsphinx_link==1.3.0",
     "sphinx-book-theme==1.0.1",
-    "sphinxcontrib.mermaid"
+    "sphinxcontrib.mermaid",
+    "sphinx_togglebutton=0.3.2"
      ]
 
 dev = [
