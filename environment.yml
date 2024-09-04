@@ -1,0 +1,8 @@
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - jupyter                # Jupyter notebook for interactive analysis
+  - pandas=1               # Data manipulation and analysis
+  - plotly=5               # Interactive graphing
+  - nbgitpuller
