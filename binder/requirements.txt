@@ -1,3 +1,0 @@
-jupyter                # Jupyter notebook for interactive analysis
-pandas               # Data manipulation and analysis
-plotly               # Interactive graphing
