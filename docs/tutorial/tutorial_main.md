@@ -7,7 +7,7 @@ In this tutorial, we'll walk through a practical example of how to use Binette w
 
 --- 
 title: "Tutorial Overview:"
-align: center
+align: right
 
 config:
   look: handDrawn
@@ -17,20 +17,20 @@ config:
 
 graph TD
 
-    i[metagenomics reads] --> B[assembly]
+    i[Metagenomics reads] --> B[Assembly]
 
 
-    B --> metabat2 --> r[binette]
-    B --> maxbin2 --> r
-    B --> concoct --> r
-    B --> semibin2 --> r
+    B --> MetaBAT2 --> r[Binette]
+    B --> MaxBin2 --> r
+    B --> CONCOCT --> r
+    B --> SemiBin2 --> r
     r --> f[final bins]
     
         subgraph Binning
-            metabat2:::binning
-            maxbin2:::binning
-            concoct:::binning
-            semibin2:::binning
+            MetaBAT2:::binning
+            MaxBin2:::binning
+            CONCOCT:::binning
+            SemiBin2:::binning
         end
 
             
@@ -50,7 +50,6 @@ assembly
 binning
 binette
 analyse_binette_result.ipynb
-analyse_binette_result.myst
 ```
 
 

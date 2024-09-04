@@ -1,43 +1,3 @@
-
-## Align the Reads to the Assembly
-
-Binning tools rely on coverage information, among other criteria, to evaluate each contig. 
-
-To obtain this coverage data, we first need to map the reads back to the assembly.
-
-```{code-block} bash
-# Create a directory for the alignments
-mkdir -p alignments_bwa/
-
-# Index the contigs file using BWA-MEM2
-bwa-mem2 index Kickstart.megahit/R1.contigs.fa -p Kickstart.megahit/R1.contigs.fa
-
-# Map reads back to the assembly, convert to BAM format, and sort
-bwa-mem2 mem -t 12 Kickstart.megahit/R1.contigs.fa coal-metagenomics/Kickstart_*.fastq.gz | \
-samtools view -@ 12 -bS - | \
-samtools sort -@ 12 - -o alignments_bwa/Kickstart.bam
-
-# Index the BAM file
-samtools index alignments_bwa/Kickstart.bam
-```
-
-
-:::{admonition} ⌛ Expected Time
-:class: note
-
-This process takes approximately 12 minutes to complete.
-:::
-
-```{admonition}
-:class: tip
-
-If you have multiple samples and assemble them separately, cross-aligning the samples can significantly improve binning. Align each sample to all assemblies and use the resulting BAM files in binning. This approach gives the binning tools more coverage variation, which can be beneficial. However, keep in mind that this process can be resource-intensive, especially with many samples. 
-
-If you did a cross-assembly with your samples, make sure to map the reads separately for each one, generating as many BAM files as you have samples, to help the binning tool. 🚀
-
-```
-
-
 ## Run Binning Tools
 
 Let's use different binning tools to group the contigs into bins, which we'll refine in the next section with Binette.
@@ -108,14 +68,15 @@ extract_fasta_bins.py Kickstart.megahit/R1.contigs.fa concoct/clustering_merge.c
 
 You can also run SemiBin2 with its `single_easy_bin` command:
 
-```{admonition} ⏳ Time Note
-:class: note
-
-This process can take some time, so it may be skipped.
-```
 
 ```bash
 SemiBin2 single_easy_bin -i Kickstart.megahit/R1.contigs.fa \
                             -b alignments_bwa/Kickstart.bam \
                             -o semibin2/ -p 12
+```
+
+```{admonition} ⏳ Time Note
+:class: note
+
+This process can take some time.
 ```

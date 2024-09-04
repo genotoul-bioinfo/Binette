@@ -11,7 +11,7 @@ For example, consider the following two `contig2bin_tables`:
 
 - `bin_set1.tsv`:
 
-    ```tsv
+    ```
     contig_1   binA
     contig_8   binA
     contig_15  binB
@@ -20,7 +20,7 @@ For example, consider the following two `contig2bin_tables`:
     
 - `bin_set2.tsv`:
 
-    ```tsv
+    ```
     contig_1   bin.0
     contig_8   bin.0
     contig_15  bin.1

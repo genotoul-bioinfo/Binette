@@ -8,7 +8,7 @@ Tests have been implemented to ensure the correctness of Binette.
 Unit tests have been implmented in the tests directory using pytest. 
 
 
-To run the test suit you would need to  have install Binette from the source code.  For that, you can follow installation instructions [here](./installation.md#installing-from-source-code-within-a-conda-environnement).
+To run the test suit you would need to  have install Binette from the source code.  For that, you can follow installation instructions [here](./installation.md#from-the-source-code-within-a-conda-environnement).
 
 
 To install pytest in you environement you can run :

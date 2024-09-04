@@ -12,6 +12,13 @@ mamba env create -f binette_tutorial_env.yaml -n binette_tuto
 
 This command will create a Conda environment named `binette_tuto` using the environment file `binette_tutorial_env.yaml`.
 
+Below is the content of the `binette_tutorial_env.yaml` file:
+
+```{include} binette_tutorial_env.yaml
+:code: yaml
+```
+
+
 ### Activate the Environment
 
 After the environment is created, activate it by running:
@@ -20,8 +27,3 @@ After the environment is created, activate it by running:
 conda activate binette_tuto
 ```
 
-Below is the content of the `binette_tutorial_env.yaml` file:
-
-```{include} binette_tutorial_env.yaml
-:code: yaml
-```

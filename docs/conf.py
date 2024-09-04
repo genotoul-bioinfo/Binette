@@ -24,13 +24,13 @@ extensions = [
     "sphinx.ext.autosectionlabel",
     "sphinx.ext.autodoc",
     'sphinx_search.extension',
+     'sphinx_togglebutton',
     # "myst_nb",
     "myst_parser",
     'nbsphinx',
     'nbsphinx_link', 
     # 'sphinx.ext.napoleon',
     # 'sphinx.ext.viewcode',
-    "myst_parser",
     'sphinxcontrib.mermaid'
 ]
 myst_enable_extensions = [
@@ -61,7 +61,7 @@ nbsphinx_execute = 'never'
 # `path/to/file:heading` instead of just `heading`
 autosectionlabel_prefix_document = True
 
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', 'build', "api", "jupyter_execute"]
+exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', 'build', "jupyter_execute"]
 
 
 

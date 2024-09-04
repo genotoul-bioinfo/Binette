@@ -13,7 +13,7 @@ binette --bin_dirs maxbin2/ metabat2/ semibin2/output_bins/ concoct/bins/ \
 
 Once Binette completes, the `binette_results` directory should have the following structure:
 
-```plaintext
+```
 binette_results/
 ├── final_bins
 │   ├── bin_13475.fa
