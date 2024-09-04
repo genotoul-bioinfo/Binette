@@ -1,7 +1,11 @@
 
 # Tutorial 
 
-In this tutorial, we'll walk through a practical example of how to use Binette with real data. We'll start by downloading metagenomics reads and then assemble these reads into contigs. Next, we'll use different binning tools to group the contigs into bins. Finally, we'll use Binette to refine these bins.
+In this tutorial, we'll walk through a practical example of how to use Binette with real data.
+
+  1. We'll start by downloading metagenomics reads and then assemble these reads into contigs.
+  2. Next, we'll use different binning tools to group the contigs into bins.
+  3. Finally, we'll use Binette to refine these bins.
 
 ```{mermaid}
 

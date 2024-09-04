@@ -37,11 +37,11 @@ Once the tool is installed, you can download the "Kickstart" dataset with the fo
    ```
 
 
-:::{admonition} ⌛ Expected Time
-:class: note
+   :::{admonition} ⌛ Expected Time
+   :class: note
 
-This process takes approximately 16 minutes to complete.
-:::
+   This process takes approximately 16 minutes to complete.
+   :::
 
 #### Directory Structure
 
