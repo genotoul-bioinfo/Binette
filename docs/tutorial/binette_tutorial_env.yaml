@@ -14,7 +14,7 @@ dependencies:
   - metabat2=2             # Binning tool for metagenomic datasets
   - semibin=2              # Binning tool for metagenomic datasets
   - concoct=1              # Binning tool for metagenomic datasets
-  - binette=1.0.1          # Binette for binning and genome analysis
+  - binette=1.0.2          # Binette for binning and genome analysis
   - das_tool=1             # Bin refiner to compare with Binette
   - jupyter                # Jupyter notebook for interactive analysis
   - pandas=1               # Data manipulation and analysis
