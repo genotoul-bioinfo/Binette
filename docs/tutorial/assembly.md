@@ -18,8 +18,27 @@ This process takes approximately 28 minutes to complete.
 ```{admonition} Note
 :class: note
 
-You can also use **SPAdes** for assembly. It generally performs better than MEGAHIT but takes longer and requires more memory. Refer to the CAMI benchmark for a detailed comparison.
+You can also use **SPAdes** for assembly. It generally performs better than MEGAHIT but takes longer and requires more memory.
 ```
+
+
+```{admonition} Best Practices
+:class: tip
+
+Here are some general tips that might help improve your assembly results, depending on your data:
+
+- **Read Cleaning:** If your reads have low-quality bases or adapters, consider cleaning them with a tool like `sickle`. It can boost the overall quality of your assembly.
+
+- **Quality Check:** Tools like `metaQUAST` are handy for checking your assembly’s quality. It’s a good way to ensure your results are solid before moving on.
+
+- **Assembly Filtering:** After assembling, it’s often a good idea to filter out small or low-coverage contigs. 
+
+
+These steps aren’t mandatory, and since this tutorial focuses on binning and using Binette, we’ll skip them for now.
+
+```
+
+
 
 ## Align the Reads Over the Assembly
 

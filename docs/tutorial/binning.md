@@ -1,10 +1,50 @@
+
+## Align the Reads to the Assembly
+
+Binning tools rely on coverage information, among other criteria, to evaluate each contig. 
+
+To obtain this coverage data, we first need to map the reads back to the assembly.
+
+```{code-block} bash
+# Create a directory for the alignments
+mkdir -p alignments_bwa/
+
+# Index the contigs file using BWA-MEM2
+bwa-mem2 index Kickstart.megahit/R1.contigs.fa -p Kickstart.megahit/R1.contigs.fa
+
+# Map reads back to the assembly, convert to BAM format, and sort
+bwa-mem2 mem -t 12 Kickstart.megahit/R1.contigs.fa coal-metagenomics/Kickstart_*.fastq.gz | \
+samtools view -@ 12 -bS - | \
+samtools sort -@ 12 - -o alignments_bwa/Kickstart.bam
+
+# Index the BAM file
+samtools index alignments_bwa/Kickstart.bam
+```
+
+
+:::{admonition} ⌛ Expected Time
+:class: note
+
+This process takes approximately 12 minutes to complete.
+:::
+
+```{admonition}
+:class: tip
+
+If you have multiple samples and assemble them separately, cross-aligning the samples can significantly improve binning. Align each sample to all assemblies and use the resulting BAM files in binning. This approach gives the binning tools more coverage variation, which can be beneficial. However, keep in mind that this process can be resource-intensive, especially with many samples. 
+
+If you did a cross-assembly with your samples, make sure to map the reads separately for each one, generating as many BAM files as you have samples, to help the binning tool. 🚀
+
+```
+
+
 ## Run Binning Tools
 
-In this section, we'll use different binning tools to group contigs of assembly.
+Let's use different binning tools to group the contigs into bins, which we'll refine in the next section with Binette.
 
 ### MetaBAT2
 
-First, generate a depth file from the BAM file using the `jgi_summarize_bam_contig_depths` script from MetaBAT2. This depth file will also be used for MaxBin2. 
+First, generate a depth file from the BAM file using the `jgi_summarize_bam_contig_depths` script from MetaBAT2. This depth file will also be used by MaxBin2. 
 
 ```bash
 jgi_summarize_bam_contig_depths --outputDepth depth_Kickstart.txt alignments_bwa/Kickstart.bam
