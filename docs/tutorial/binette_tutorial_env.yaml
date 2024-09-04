@@ -1,0 +1,21 @@
+name: binette_tutorial
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - uscdc-datasets-sars-cov-2 # Dataset downloader to get the tutorial initial data
+  - fastqc                 # Quality control for high-throughput sequencing data
+  - samtools=1             # Tools for manipulating sequencing data in SAM format
+  - bedtools=2             # Suite of tools for genome arithmetic
+  - bwa-mem2=2             # Align reads to a reference genome (using BWA-MEM2)
+  - megahit=1              # De novo assembler for large genomes
+  - maxbin2=2              # Binning tool for metagenomic datasets
+  - metabat2=2             # Binning tool for metagenomic datasets
+  - semibin=2              # Binning tool for metagenomic datasets
+  - concoct=1              # Binning tool for metagenomic datasets
+  - binette=1.0.2          # Binette for binning and genome analysis
+  - das_tool=1             # Bin refiner to compare with Binette
+  - jupyter                # Jupyter notebook for interactive analysis
+  - pandas=1               # Data manipulation and analysis
+  - plotly=5               # Interactive graphing

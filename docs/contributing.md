@@ -26,7 +26,7 @@ For minor changes like fixing typos or making small edits, create a new Pull Req
    - Clone your forked repository to your local machine.
 
 2. **Get an Environment:**
-   Create an environment with all Binette prerequisites installed by following the installation instructions [here](./installation.md#installing-from-source-code-within-a-conda-environnement).
+   Create an environment with all Binette prerequisites installed by following the installation instructions [here](./installation.md#from-the-source-code-within-a-conda-environnement).
 
 3. **Install in Editable Mode:**
    To enable code editing and testing of new functionality, you can install Binette in editable mode using the following command:

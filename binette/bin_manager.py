@@ -1,5 +1,4 @@
 import logging
-import os
 from collections import defaultdict
 from pathlib import Path
 
@@ -7,12 +6,12 @@ import pyfastx
 
 import itertools
 import networkx as nx
-from typing import List, Dict, Iterable, Tuple, Set
+from typing import List, Dict, Iterable, Tuple, Set, Mapping
 
 class Bin:
     counter = 0
 
-    def __init__(self, contigs: Iterable[str], origin: str, name: str) -> None:
+    def __init__(self, contigs: Iterable[str], origin: str, name: str, is_original:bool=False) -> None:
         """
         Initialize a Bin object.
 
@@ -22,7 +21,7 @@ class Bin:
         """
         Bin.counter += 1
 
-        self.origin = origin
+        self.origin = {origin}
         self.name = name
         self.id = Bin.counter
         self.contigs = set(contigs)
@@ -35,7 +34,9 @@ class Bin:
         self.contamination = None
         self.score = None
 
-    def __eq__(self, other: 'Bin') -> bool:
+        self.is_original = is_original
+
+    def __eq__(self, other) -> bool:
         """
         Compare the Bin object with another object for equality.
 
@@ -58,7 +59,7 @@ class Bin:
 
         :return: The string representation of the Bin object.
         """
-        return f"{self.origin}_{self.id}  ({len(self.contigs)} contigs)"
+        return f"Bin {self.id} from {';'.join(self.origin)}  ({len(self.contigs)} contigs)"
 
     def overlaps_with(self, other: 'Bin') -> Set[str]:
         """
@@ -69,18 +70,18 @@ class Bin:
         """
         return self.contigs & other.contigs
 
-    def __and__(self, other: 'Bin') -> 'Bin':
-        """
-        Perform a logical AND operation between this bin and another bin.
+    # def __and__(self, other: 'Bin') -> 'Bin':
+    #     """
+    #     Perform a logical AND operation between this bin and another bin.
 
-        :param other: The other Bin object.
-        :return: A new Bin object representing the intersection of the bins.
-        """
-        contigs = self.contigs & other.contigs
-        name = f"{self.name} & {other.name}"
-        origin = f"{self.origin} & {other.origin}"
+    #     :param other: The other Bin object.
+    #     :return: A new Bin object representing the intersection of the bins.
+    #     """
+    #     contigs = self.contigs & other.contigs
+    #     name = f"{self.name} & {other.name}"
+    #     origin = "intersection"
 
-        return Bin(contigs, origin, name)
+    #     return Bin(contigs, origin, name)
 
 
     def add_length(self, length: int) -> None:
@@ -129,7 +130,7 @@ class Bin:
         """
         other_contigs = (o.contigs for o in others)
         contigs = self.contigs.intersection(*other_contigs)
-        name = f"{self.name} & {' & '.join([other.name for other in others])}"
+        name = f"{self.id} & {' & '.join([str(other.id) for other in others])}"
         origin = "intersec"
 
         return Bin(contigs, origin, name)
@@ -143,7 +144,7 @@ class Bin:
         """
         other_contigs = (o.contigs for o in others)
         contigs = self.contigs.difference(*other_contigs)
-        name = f"{self.name} - {' - '.join([other.name for other in others])}"
+        name = f"{self.id} - {' - '.join([str(other.id) for other in others])}"
         origin = "diff"
 
         return Bin(contigs, origin, name)
@@ -157,13 +158,54 @@ class Bin:
         """
         other_contigs = (o.contigs for o in others)
         contigs = self.contigs.union(*other_contigs)
-        name = f"{self.name} | {' | '.join([other.name for other in others])}"
+        name = f"{self.id} | {' | '.join([str(other.id) for other in others])}"
         origin = "union"
 
         return Bin(contigs, origin, name)
     
 
-def get_bins_from_directory(bin_dir: str, set_name: str, fasta_extensions: Set[str]) -> List[Bin]:
+    def is_complete_enough(self, min_completeness: float) -> bool:
+        """
+        Determine if a bin is complete enough based on completeness threshold.
+
+        :param min_completeness: The minimum completeness required for a bin.
+        
+        :raises ValueError: If completeness has not been set (is None).
+
+        :return: True if the bin meets the min_completeness threshold; False otherwise.
+        """
+
+        if self.completeness is None:
+            raise ValueError(
+                f"The bin '{self.name}' with ID '{self.id}' has not been evaluated for completeness or contamination, "
+                "and therefore cannot be assessed."
+            )
+
+        return self.completeness >= min_completeness
+    
+
+    def is_high_quality(self, min_completeness: float, max_contamination: float) -> bool:
+        """
+        Determine if a bin is considered high quality based on completeness and contamination thresholds.
+
+        :param min_completeness: The minimum completeness required for a bin to be considered high quality.
+        :param max_contamination: The maximum allowed contamination for a bin to be considered high quality.
+        
+        :raises ValueError: If either completeness or contamination has not been set (is None).
+
+        :return: True if the bin meets the high quality criteria; False otherwise.
+        """
+        if self.completeness is None or self.contamination is None:
+            raise ValueError(
+                f"The bin '{self.name}' with ID '{self.id}' has not been evaluated for completeness or contamination, "
+                "and therefore cannot be assessed for high quality."
+            )
+
+        return self.completeness >= min_completeness and self.contamination <= max_contamination
+
+
+
+def get_bins_from_directory(bin_dir: Path, set_name: str, fasta_extensions: Set[str]) -> List[Bin]:
     """
     Retrieves a list of Bin objects from a directory containing bin FASTA files.
 
@@ -175,7 +217,7 @@ def get_bins_from_directory(bin_dir: str, set_name: str, fasta_extensions: Set[s
     """
     bins = []
     fasta_extensions |= {f".{ext}" for ext in fasta_extensions if not ext.startswith(".")} # adding a dot in case given extension are lacking one
-    bin_fasta_files = (fasta_file for fasta_file in Path(bin_dir).glob("*") if set(fasta_file.suffixes) & fasta_extensions)
+    bin_fasta_files = (fasta_file for fasta_file in bin_dir.glob("*") if set(fasta_file.suffixes) & fasta_extensions)
 
     for bin_fasta_path in bin_fasta_files:
 
@@ -191,7 +233,7 @@ def get_bins_from_directory(bin_dir: str, set_name: str, fasta_extensions: Set[s
 
 
 
-def parse_bin_directories(bin_name_to_bin_dir: Dict[str, str], fasta_extensions:Set[str]) -> Dict[str, list]:
+def parse_bin_directories(bin_name_to_bin_dir: Dict[str, Path], fasta_extensions:Set[str]) -> Dict[str, Set[Bin]]:
     """
     Parses multiple bin directories and returns a dictionary mapping bin names to a list of Bin objects.
 
@@ -200,31 +242,61 @@ def parse_bin_directories(bin_name_to_bin_dir: Dict[str, str], fasta_extensions:
 
     :return: A dictionary mapping bin names to a list of Bin objects created from the bin directories.
     """
-    bin_name_to_bins = {}
+    bin_set_name_to_bins = {}
 
     for name, bin_dir in bin_name_to_bin_dir.items():
-        bin_name_to_bins[name] = get_bins_from_directory(bin_dir, name, fasta_extensions)
+        bins = get_bins_from_directory(bin_dir, name, fasta_extensions)
+        set_of_bins = set(bins)
+        
+        # Calculate the number of duplicates
+        num_duplicates = len(bins) - len(set_of_bins)
+        
+        if num_duplicates > 0:
+            logging.warning(
+                f'{num_duplicates} bins with identical contig compositions detected in bin set "{name}". '
+                'These bins were merged to ensure uniqueness.'
+            )
 
-    return bin_name_to_bins
+        # Store the unique set of bins
+        bin_set_name_to_bins[name] = set_of_bins
 
 
-def parse_contig2bin_tables(bin_name_to_bin_tables: Dict[str, str]) -> Dict[str, list]:
+    return bin_set_name_to_bins
+
+def parse_contig2bin_tables(bin_name_to_bin_tables: Dict[str, Path]) -> Dict[str, Set['Bin']]:
     """
-    Parses multiple contig-to-bin tables and returns a dictionary mapping bin names to a list of Bin objects.
+    Parses multiple contig-to-bin tables and returns a dictionary mapping bin names to a set of unique Bin objects.
 
-    :param bin_name_to_bin_tables: A dictionary mapping bin names to their respective contig-to-bin tables.
+    Logs a warning if duplicate bins are detected within a bin set.
 
-    :return: A dictionary mapping bin names to a list of Bin objects created from the contig-to-bin tables.
+    :param bin_name_to_bin_tables: A dictionary where keys are bin set names and values are file paths or identifiers 
+                                   for contig-to-bin tables. Each table is parsed to extract Bin objects.
+
+    :return: A dictionary where keys are bin set names and values are sets of Bin objects. Duplicates are removed based 
+             on contig composition.
     """
-    bin_name_to_bins = {}
+    bin_set_name_to_bins = {}
 
     for name, contig2bin_table in bin_name_to_bin_tables.items():
-        bin_name_to_bins[name] = get_bins_from_contig2bin_table(contig2bin_table, name)
+        bins = get_bins_from_contig2bin_table(contig2bin_table, name)
+        set_of_bins = set(bins)
+        
+        # Calculate the number of duplicates
+        num_duplicates = len(bins) - len(set_of_bins)
+        
+        if num_duplicates > 0:
+            logging.warning(
+                f'{num_duplicates*2} bins with identical contig compositions detected in bin set "{name}". '
+                'These bins were merged to ensure uniqueness.'
+            )
 
-    return bin_name_to_bins
+        # Store the unique set of bins
+        bin_set_name_to_bins[name] = set_of_bins
+        
+    return bin_set_name_to_bins
 
 
-def get_bins_from_contig2bin_table(contig2bin_table: str, set_name: str) -> List[Bin]:
+def get_bins_from_contig2bin_table(contig2bin_table: Path, set_name: str) -> List[Bin]:
     """
     Retrieves a list of Bin objects from a contig-to-bin table.
 
@@ -239,7 +311,7 @@ def get_bins_from_contig2bin_table(contig2bin_table: str, set_name: str) -> List
             if line.startswith("#") or line.startswith("@"):
                 logging.debug(f"Ignoring a line from {contig2bin_table}: {line}")
                 continue
-            contig_name = line.strip().split("\t")[0]
+            contig_name = line.strip().split()[0]
             bin_name = line.strip().split("\t")[1]
             bin_name2contigs[bin_name].add(contig_name)
 
@@ -250,7 +322,7 @@ def get_bins_from_contig2bin_table(contig2bin_table: str, set_name: str) -> List
     return bins
 
 
-def from_bin_sets_to_bin_graph(bin_name_to_bin_set: Dict[str, set]) -> nx.Graph:
+def from_bin_sets_to_bin_graph(bin_name_to_bin_set: Mapping[str, Iterable[Bin]]) -> nx.Graph:
     """
     Creates a bin graph from a dictionary of bin sets.
 
@@ -272,7 +344,7 @@ def from_bin_sets_to_bin_graph(bin_name_to_bin_set: Dict[str, set]) -> nx.Graph:
 
 
 
-def get_all_possible_combinations(clique: Iterable) -> Iterable[Tuple]:
+def get_all_possible_combinations(clique: List) -> Iterable[Tuple]:
     """
     Generates all possible combinations of elements from a given clique.
 
@@ -366,7 +438,7 @@ def get_union_bins(G: nx.Graph, max_conta: int = 50) -> Set[Bin]:
     return union_bins
 
 
-def select_best_bins(bins: List[Bin]) -> List[Bin]:
+def select_best_bins(bins: Set[Bin]) -> List[Bin]:
     """
     Selects the best bins from a list of bins based on their scores, N50 values, and IDs.
 
@@ -391,30 +463,104 @@ def select_best_bins(bins: List[Bin]) -> List[Bin]:
     logging.info(f"Selected {len(selected_bins)} bins")
     return selected_bins
 
-
-def dereplicate_bin_sets(bin_sets):
+def group_identical_bins(bins:Iterable[Bin]) -> List[List[Bin]]:
     """
-    Dereplicates bins from different bin sets to obtain a non-redundant bin set.
+    Group identical bins together
 
-    :param bin_sets: A list of bin sets.
+    :param bins: list of bins
 
-    :return: A set of non-redundant bins.
+    return List of list of identical bins
     """
-    return set().union(*bin_sets)
+    binhash_to_bins = defaultdict(list)
+
+    # Collect bins by their hash values
+    for bin_obj in bins:
+        binhash_to_bins[bin_obj.hash].append(bin_obj)
+
+    return list(binhash_to_bins.values())
 
 
-def get_contigs_in_bins(bins: List[Bin]) -> Set[str]:
+def dereplicate_bin_sets(bin_sets: Iterable[Set['Bin']]) -> Set['Bin']:
+    """
+    Consolidate bins from multiple bin sets into a single set of non-redundant bins.
+
+    Bins with the same hash are considered duplicates. For each group of duplicates,
+    the origins are merged, and only one representative bin is kept.
+
+    :param bin_sets: An iterable of sets, where each set contains `Bin` objects. These sets are merged
+                     into a single set of unique bins by consolidating bins with the same hash.
+
+    :return: A set of `Bin` objects with duplicates removed. Each `Bin` in the resulting set has
+             merged origins from the bins it was consolidated with.
+    """
+    all_bins = (bin_obj for bins in bin_sets for bin_obj in bins)
+    list_of_identical_bins = group_identical_bins(all_bins)
+
+    dereplicated_bins = set()
+
+    # Merge bins with the same hash
+    for identical_bins in list_of_identical_bins:
+        # Select the first bin as the representative
+        selected_bin = identical_bins[0]
+        for bin_obj in identical_bins[1:]:
+            # Merge origins of all bins with the same hash
+            selected_bin.origin |= bin_obj.origin
+
+        # Add the representative bin to the result set
+        dereplicated_bins.add(selected_bin)
+
+    return dereplicated_bins
+
+def get_contigs_in_bin_sets(bin_set_name_to_bins: Dict[str, Set[Bin]]) -> Set[str]:
+    """
+    Processes bin sets to check for duplicated contigs and logs detailed information about each bin set.
+
+    :param bin_set_name_to_bins: A dictionary where keys are bin set names and values are sets of Bin objects.
+
+    :return:  A set of contig names found in bin sets
+    """
+    # To track all unique contigs across bin sets
+    all_contigs_in_bins = set()
+
+    for bin_set_name, bins in bin_set_name_to_bins.items():
+        list_contigs_in_bin_sets = get_contigs_in_bins(bins)
+
+        # Count duplicates
+        contig_counts = {contig: list_contigs_in_bin_sets.count(contig) for contig in list_contigs_in_bin_sets}
+        duplicated_contigs = {contig: count for contig, count in contig_counts.items() if count > 1}
+
+        if duplicated_contigs:
+            logging.warning(
+                f"Bin set '{bin_set_name}' contains {len(duplicated_contigs)} duplicated contigs. "
+                "Details: " + ", ".join(f"{contig} (found {count} times)" for contig, count in duplicated_contigs.items())
+            )
+
+        # Unique contigs in current bin set
+        unique_contigs_in_bin_set = set(list_contigs_in_bin_sets)
+
+        # Update global contig tracker
+        all_contigs_in_bins |= unique_contigs_in_bin_set
+
+        # Log summary for the current bin set
+        logging.debug(
+            f"Bin set '{bin_set_name}': {len(bins)} bins, {len(unique_contigs_in_bin_set)} unique contigs."
+        )
+
+    return all_contigs_in_bins
+
+
+def get_contigs_in_bins(bins: Iterable[Bin]) -> List[str]:
     """
     Retrieves all contigs present in the given list of bins.
 
     :param bins: A list of Bin objects.
 
-    :return: A set of contigs present in the bins.
+    :return: A list of contigs present in the bins.
     """
-    return set().union(*(b.contigs for b in bins))
+    return [contig for b in bins for contig in b.contigs]
 
 
-def rename_bin_contigs(bins: List[Bin], contig_to_index: dict):
+def rename_bin_contigs(bins: Iterable[Bin], contig_to_index: dict):
     """
     Renames the contigs in the bins based on the provided mapping.
 
@@ -425,7 +571,7 @@ def rename_bin_contigs(bins: List[Bin], contig_to_index: dict):
         b.contigs = {contig_to_index[contig] for contig in b.contigs}
         b.hash = hash(str(sorted(b.contigs)))
 
-def create_intermediate_bins(bin_set_name_to_bins: Dict[str, Set[Bin]]) -> Set[Bin]:
+def create_intermediate_bins(bin_set_name_to_bins: Mapping[str, Iterable[Bin]]) -> Set[Bin]:
     """
     Creates intermediate bins from a dictionary of bin sets.
 

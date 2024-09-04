@@ -20,15 +20,6 @@
    :show-inheritance:
 ```
 
-## binette.binette module
-
-```{eval-rst}
-.. automodule:: binette.binette
-   :members:
-   :undoc-members:
-   :show-inheritance:
-```
-
 ## binette.cds module
 
 ```{eval-rst}
@@ -65,10 +56,10 @@
    :show-inheritance:
 ```
 
-## Module contents
+## binette.main module
 
 ```{eval-rst}
-.. automodule:: binette
+.. automodule:: binette.main
    :members:
    :undoc-members:
    :show-inheritance:

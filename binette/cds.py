@@ -3,7 +3,7 @@ import concurrent.futures as cf
 import multiprocessing.pool
 import logging
 from collections import Counter, defaultdict
-from typing import Dict, List, Iterator, Tuple
+from typing import Dict, List, Iterator, Tuple, Any, Union
 
 import pyfastx
 import pyrodigal
@@ -33,9 +33,9 @@ def predict(contigs_iterator: Iterator, outfaa: str, threads: int =1) -> Dict[st
     """
     try:
         # for version >=3 of pyrodigal
-        orf_finder = pyrodigal.GeneFinder(meta="meta")
+        orf_finder = pyrodigal.GeneFinder(meta="meta") # type: ignore
     except AttributeError:
-        orf_finder = pyrodigal.OrfFinder(meta="meta")
+        orf_finder = pyrodigal.OrfFinder(meta="meta") # type: ignore
 
     logging.info(f"Predicting cds sequences with Pyrodigal using {threads} threads.")
     
@@ -52,13 +52,13 @@ def predict(contigs_iterator: Iterator, outfaa: str, threads: int =1) -> Dict[st
 
     return contig_to_genes
 
-def predict_genes(find_genes, seq):
+def predict_genes(find_genes, seq) -> Tuple[str, pyrodigal.Genes]:
 
 
     return (seq.name, find_genes(seq.seq) )
 
 
-def write_faa(outfaa: str, contig_to_genes: Dict[str, List[str]]) -> None:
+def write_faa(outfaa: str, contig_to_genes: List[Tuple[str, pyrodigal.Genes]]) -> None:
     """
     Write predicted protein sequences to a FASTA file.
 
@@ -71,7 +71,7 @@ def write_faa(outfaa: str, contig_to_genes: Dict[str, List[str]]) -> None:
         for contig_id, genes in contig_to_genes:
             genes.write_translations(fl, contig_id)
 
-def parse_faa_file(faa_file: str) -> Dict[str, List]:
+def parse_faa_file(faa_file: str) -> Dict[str, List[str]]:
     """
     Parse a FASTA file containing protein sequences and organize them by contig.
 
@@ -115,7 +115,7 @@ def get_contig_cds_metadata_flat(contig_to_genes: Dict[str, List[str]]) -> Tuple
 
     return contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length
 
-def get_contig_cds_metadata(contig_to_genes: Dict[str, List[str]], threads: int) -> Tuple[Dict[str, int], Dict[str, Counter], Dict[str, int]]:
+def get_contig_cds_metadata(contig_to_genes:  Dict[int, Union[Any, List[Any]]], threads: int) -> Dict[str, Dict]:
     """
     Calculate metadata for contigs in parallel, including CDS count, amino acid composition, and total amino acid length.
 
