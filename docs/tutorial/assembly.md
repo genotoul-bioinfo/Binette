@@ -24,7 +24,7 @@ Here are some general tips that might help improve your assembly results, depend
 
 - **Read Cleaning:** If your reads have low-quality bases or adapters, consider cleaning them with a tool like `sickle`. It can boost the overall quality of your assembly.
 
-- **Use SPAdes rather than MEGAHIT** **SPAdes** generally performs better than MEGAHIT but takes longer and requires more memory.
+- **Use SPAdes rather than MEGAHIT:** SPAdes generally performs better than MEGAHIT but takes longer and requires more memory.
 
 - **Quality Check:** Tools like `metaQUAST` are handy for checking your assembly’s quality. It’s a good way to ensure your results are solid before moving on.
 
