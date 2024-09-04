@@ -1,8 +1,0 @@
-name: binder_tutorial_env
-channels:
-  - conda-forge
-dependencies:
-  - jupyter                # Jupyter notebook for interactive analysis
-  - pandas               # Data manipulation and analysis
-  - plotly=5               # Interactive graphing
-  # - nbgitpuller
