@@ -5,4 +5,5 @@ dependencies:
   - jupyter                # Jupyter notebook for interactive analysis
   - pandas=1               # Data manipulation and analysis
   - plotly=5               # Interactive graphing
+  - sphinx                 # This is needed to be able to see the plot as sphinx_gallery render is used in the nb
   - nbgitpuller
