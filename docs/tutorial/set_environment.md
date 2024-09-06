@@ -18,6 +18,8 @@ Below is the content of the `binette_tutorial_env.yaml` file:
 :code: yaml
 ```
 
+Please ensure that the Checkm2 database is installed as described in the installation documentation. You can find the instructions [here](../installation.md#downloading-the-checkm2-database).
+
 
 ### Activate the Environment
 
