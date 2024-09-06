@@ -24,7 +24,7 @@ Once the tool is installed, you can download the "Kickstart" dataset with the fo
 
    ```{code-block} bash
    # Select the header of the table
-   head -n7 coal-metagenomics.tsv > coal-metagenomics_Kickstart_only.tsv
+   head -n8 coal-metagenomics.tsv > coal-metagenomics_Kickstart_only.tsv
    
    # Append the relevant line for the Kickstart dataset
    grep SRR5058924 coal-metagenomics.tsv >> coal-metagenomics_Kickstart_only.tsv
