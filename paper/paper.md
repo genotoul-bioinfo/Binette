@@ -10,7 +10,7 @@ tags:
 authors:
   - name: Jean Mainguy
     orcid: 0009-0006-9160-9744
-    affiliation: "1, 2"
+    affiliation: "1, 2, 3"
   - name: Claire Hoede
     orcid: 0000-0001-5054-7731
     affiliation: "1, 2"
@@ -20,6 +20,8 @@ affiliations:
    index: 1
  - name: Université de Toulouse, INRAE, UR 875 MIAT, 31326, Castanet-Tolosan, France
    index: 2
+ - name: LABGeM, Génomique Métabolique, Genoscope, Institut François Jacob, CEA, CNRS, Univ Evry, Université Paris-Saclay, Evry, France
+   index: 3
 date: 30 november 2023
 bibliography: paper.bib
 ---
