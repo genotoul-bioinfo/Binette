@@ -10,7 +10,7 @@ tags:
 authors:
   - name: Jean Mainguy
     orcid: 0009-0006-9160-9744
-    affiliation: "1, 2"
+    affiliation: "1, 2, 3"
   - name: Claire Hoede
     orcid: 0000-0001-5054-7731
     affiliation: "1, 2"
@@ -20,6 +20,8 @@ affiliations:
    index: 1
  - name: Université de Toulouse, INRAE, UR 875 MIAT, 31326, Castanet-Tolosan, France
    index: 2
+ - name: LABGeM, Génomique Métabolique, Genoscope, Institut François Jacob, CEA, CNRS, Univ Evry, Université Paris-Saclay, Evry, France
+   index: 3
 date: 30 november 2023
 bibliography: paper.bib
 ---
@@ -41,9 +43,9 @@ Binette is a Python reimplementation and enhanced version of the bin refinement 
 ![**Overview of Binette Steps**. **(A) Intermediate Bin Creation Example**: Bins are represented as square shapes, each containing colored lines representing the contigs they contain. Creation of intermediate bins involves the initial bins sharing at least one contig. Set operations are applied to the contigs within the bins to generate these intermediate bins. **(B) Binette Workflow Overview**: Input bins serve as the basis for generating intermediate bins. Each bin undergoes a scoring process utilizing quality metrics provided by CheckM2. Subsequently, the bins are sorted based on their scores, and a selection process is executed to retain non-redundant bins.\label{fig:overview}](./binette_overview.pdf)
 
 
-Bin completeness and contamination are assessed using CheckM2 [@chklovski2023checkm2]. Bins are scored using the following scoring function: $completeness - weight * contamination$, with the default weight set to 2. These scored bins are then sorted, facilitating the selection of a final new set of non-redundant bins (\autoref{fig:overview}.B). The ability to score bins is based on CheckM2 rather than CheckM1, which is what the metaWRAP pipeline uses. CheckM2 uses a novel approach to evaluate bin quality based on machine learning techniques. This approach improves speed and also provides better results than CheckM1. Binette initiates CheckM2 processing by running its initial steps once for all contigs within the input bins. These initial steps involve gene prediction using Prodigal and alignment against the CheckM2 database using Diamond [@buchfink2015diamond]. Binette uses Pyrodigal [@larralde2022pyrodigal], a Python module that uses Cython to provide bindings to Prodigal [@hyatt2010prodigal]. The intermediate Checkm2 results are then used to assess the quality of individual bins, eliminating redundant calculations and speeding up the refinement process.
+Bin completeness and contamination are assessed using CheckM2 [@chklovski2023checkm2]. Bins are scored using the following scoring function: $completeness - weight * contamination$, with the default weight set to 2. These scored bins are then sorted, facilitating the selection of a final new set of non-redundant bins (\autoref{fig:overview}.B). The ability to score bins is based on CheckM2 rather than CheckM1, which is what the metaWRAP pipeline uses. CheckM2 uses a novel approach to evaluate bin quality based on machine learning techniques. This approach improves speed and also provides better results than CheckM1. Binette initiates CheckM2 processing by running its initial steps once for all contigs within the input bins. These initial steps involve gene prediction using Prodigal and alignment against the CheckM2 database using Diamond [@buchfink2015diamond]. Binette uses Pyrodigal [@larralde2022pyrodigal], a Python module that uses Cython to provide bindings to Prodigal [@hyatt2010prodigal]. The intermediate CheckM2 results are then used to assess the quality of individual bins, eliminating redundant calculations and speeding up the refinement process.
 
-Binette serves as the bin refinement tool within the [metagWGS](https://forgemia.inra.fr/genotoul-bioinfo/metagwgs) metagenomic analysis pipeline [@metagWGS_inprep], providing a robust and faster alternative to the bin refinement module of the metaWRAP pipeline as well as other similar bin refinement tools.
+Binette serves as the bin refinement tool within the [metagWGS](https://forgemia.inra.fr/genotoul-bioinfo/metagwgs) metagenomic analysis pipeline [@metagWGS], providing a robust and faster alternative to the bin refinement module of the metaWRAP pipeline as well as other similar bin refinement tools.
 
 # Availability
 
