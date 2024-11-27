@@ -68,6 +68,21 @@ class UniqueStore(Action):
         setattr(namespace, self.dest, values)
 
 
+def is_valid_file(parser: ArgumentParser, arg: str) -> Path:
+    """
+    Validates that the provided input file exists.
+
+    :param parser: The ArgumentParser instance handling command-line arguments.
+    :param arg: The path to the file provided as an argument.
+    :return: A Path object representing the valid file.
+    """
+    path_arg = Path(arg)
+
+    # Check if the file exists at the provided path
+    if not path_arg.exists():
+        parser.error(f"Error: The specified file '{arg}' does not exist.")
+        
+    return path_arg
 
 def parse_arguments(args):
     """Parse script arguments."""
@@ -85,7 +100,7 @@ def parse_arguments(args):
         "-d",
         "--bin_dirs",
         nargs="+",
-        type=Path,
+        type=lambda x: is_valid_file(parser, x),
         action=UniqueStore,
         help="List of bin folders containing each bin in a fasta file.",
     )
@@ -95,12 +110,22 @@ def parse_arguments(args):
         "--contig2bin_tables",
         nargs="+",
         action=UniqueStore,
-        type=Path,
+        type=lambda x: is_valid_file(parser, x),
         help="List of contig2bin table with two columns separated\
             with a tabulation: contig, bin",
     )
 
-    input_group.add_argument("-c", "--contigs", required=True, type=Path, help="Contigs in fasta format.")
+    input_group.add_argument("-c", "--contigs", required=True, 
+                             type=lambda x: is_valid_file(parser, x),
+                               help="Contigs in fasta format.")
+
+    input_group.add_argument(
+        "-p", "--proteins",
+        type=lambda x: is_valid_file(parser, x),
+        help="FASTA file of predicted proteins in Prodigal format (>contigID_geneID). "
+            "Skips the gene prediction step if provided."
+    )
+      
 
     # Other parameters category
     other_group = parser.add_argument_group('Other Arguments')
@@ -211,7 +236,9 @@ def parse_input_files(bin_dirs: List[Path],
 
 def manage_protein_alignement(faa_file: Path, contigs_fasta: Path, contig_to_length: Dict[str, int],
                                 contigs_in_bins: Set[str], diamond_result_file: Path,
-                                checkm2_db: Optional[Path], threads: int, resume: bool, low_mem: bool) -> Tuple[Dict[str, int], Dict[str, List[str]]]:
+                                checkm2_db: Optional[Path], threads: int, use_existing_protein_file: bool, 
+                                resume_diamond:bool,
+                                low_mem: bool) -> Tuple[Dict[str, int], Dict[str, List[str]]]:
     """
     Predicts or reuses proteins prediction and runs diamond on them.
     
@@ -222,14 +249,15 @@ def manage_protein_alignement(faa_file: Path, contigs_fasta: Path, contig_to_len
     :param diamond_result_file: The path to the diamond result file.
     :param checkm2_db: The path to the CheckM2 database.
     :param threads: Number of threads for parallel processing.
-    :param resume: Boolean indicating whether to resume the process.
+    :param use_existing_protein_file: Boolean indicating whether to use an existing protein file.
+    :param resume_diamond: Boolean indicating whether to resume diamond alignement.
     :param low_mem: Boolean indicating whether to use low memory mode.
 
     :return: A tuple containing dictionaries - contig_to_kegg_counter and contig_to_genes.
     """
 
     # Predict or reuse proteins prediction and run diamond on them
-    if resume:
+    if use_existing_protein_file:
         logging.info(f"Parsing faa file: {faa_file}.")
         contig_to_genes = cds.parse_faa_file(faa_file.as_posix())
         io.check_contig_consistency(contig_to_length, contig_to_genes, contigs_fasta.as_posix(), faa_file.as_posix())
@@ -238,6 +266,7 @@ def manage_protein_alignement(faa_file: Path, contigs_fasta: Path, contig_to_len
         contigs_iterator = (s for s in contig_manager.parse_fasta_file(contigs_fasta.as_posix()) if s.name in contigs_in_bins)
         contig_to_genes = cds.predict(contigs_iterator, faa_file.as_posix(), threads)
 
+    if not resume_diamond:
         if checkm2_db is None:
             # get checkm2 db stored in checkm2 install
             diamond_db_path = diamond.get_checkm2_db()
@@ -360,8 +389,17 @@ def main():
     # Temporary files #
     out_tmp_dir:Path = args.outdir / "temporary_files"
     os.makedirs(out_tmp_dir, exist_ok=True)
+    
+    use_existing_protein_file = False
 
-    faa_file = out_tmp_dir / "assembly_proteins.faa"
+    if args.proteins:
+        logging.info(f"Using the provided protein sequences file: {args.proteins}")
+        faa_file = args.proteins
+        use_existing_protein_file = True
+    else:
+        faa_file = out_tmp_dir / "assembly_proteins.faa"
+
+
     diamond_result_file = out_tmp_dir / "diamond_result.tsv"
 
     # Output files #
@@ -370,13 +408,15 @@ def main():
 
     if args.resume:
         io.check_resume_file(faa_file, diamond_result_file)
+        use_existing_protein_file = True
 
     bin_set_name_to_bins, original_bins, contigs_in_bins, contig_to_length = parse_input_files(args.bin_dirs, args.contig2bin_tables, args.contigs, fasta_extensions=set(args.fasta_extensions))
 
     contig_to_kegg_counter, contig_to_genes = manage_protein_alignement(faa_file=faa_file, contigs_fasta=args.contigs, contig_to_length=contig_to_length,
                                                                         contigs_in_bins=contigs_in_bins,
                                                                         diamond_result_file=diamond_result_file, checkm2_db=args.checkm2_db,
-                                                                        threads=args.threads, resume=args.resume, low_mem=args.low_mem)
+                                                                        threads=args.threads, use_existing_protein_file=use_existing_protein_file, 
+                                                                        resume_diamond=args.resume, low_mem=args.low_mem)
     
     # Use contig index instead of contig name to save memory
     contig_to_index, index_to_contig = contig_manager.make_contig_index(contigs_in_bins)

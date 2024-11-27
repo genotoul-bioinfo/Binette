@@ -103,9 +103,6 @@ def test_extract_contig_name_from_cds_name():
     assert result == "contig1"
 
 
-# Import the functions write_faa and parse_faa_file here
-
-
 def test_write_faa(contig1, orf_finder):
     
     predicted_genes = orf_finder.find_genes(contig1.seq)
@@ -122,10 +119,11 @@ def test_write_faa(contig1, orf_finder):
 
 
 def test_parse_faa_file(tmp_path):
-    # Mock a FASTA file
+    # Mock a FASTA file of protein sequences
+    # at least one protein sequence to not triger the error
     fasta_content = (
         ">contig1_gene1\n"
-        "AAAAAAAAAAA\n"
+        "MPPPAOSKNSKSS\n" 
         ">contig1_gene2\n"
         "CCCCCCCCCCC\n"
         ">contig2_gene1\n"
@@ -139,10 +137,31 @@ def test_parse_faa_file(tmp_path):
 
     # Check if the output matches the expected dictionary
     expected_result = {
-        'contig1': ['AAAAAAAAAAA', 'CCCCCCCCCCC'],
+        'contig1': ['MPPPAOSKNSKSS', 'CCCCCCCCCCC'],
         'contig2': ['TTTTTTTTTTTT']
     }
     assert result == expected_result
+
+
+def test_parse_faa_file_raises_error_for_dna(tmp_path):
+    # Mock a DNA FASTA file
+    fasta_content = (
+        ">contig1_gene1\n"
+        "AAAAAAAAAAA\n"
+        ">contig1_gene2\n"
+        "CCCCCCCCCCC\n"
+        ">contig2_gene1\n"
+        "TTTTTTTTTTTT\n"
+    )
+    fna_file = tmp_path / "mock_file.fna"
+    fna_file.write_text(fasta_content)
+
+    
+    # Check that ValueError is raised when DNA sequences are encountered
+    with pytest.raises(ValueError):
+        cds.parse_faa_file(fna_file)
+
+
 
 def test_get_aa_composition():
 
@@ -176,3 +195,23 @@ def test_get_contig_cds_metadata():
     assert contig_metadata['contig_to_cds_count'] == {"c1":3, "c2":2}
     assert contig_metadata['contig_to_aa_counter'] == {"c1": {'A': 4, 'G': 4, "C":4} , "c2":{'C': 4, 'T': 4}}
     assert contig_metadata['contig_to_aa_length'] == {"c1":12, "c2":8}
+
+
+
+# Test function
+def test_is_nucleic_acid():
+    # Valid DNA sequence
+    assert cds.is_nucleic_acid("ATCG") is True
+    assert cds.is_nucleic_acid("ATCNNNNNG") is True # N can be found in DNA seq
+    # Valid RNA sequence
+    assert cds.is_nucleic_acid("AUGCAUGC") is True
+    
+    # Mixed case
+    assert cds.is_nucleic_acid("AtCg") is True
+    
+    # Invalid sequence (contains characters not part of DNA or RNA)
+    assert cds.is_nucleic_acid("ATCX") is False  # 'X' is not a valid base
+    assert cds.is_nucleic_acid("AUG#C") is False  # '#' is not a valid base
+    
+    # Amino acid sequence
+    assert cds.is_nucleic_acid("MSIRGVGGNGNSR") is False  # Numbers are invalid
