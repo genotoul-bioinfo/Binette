@@ -28,20 +28,37 @@ For minor changes like fixing typos or making small edits, create a new Pull Req
 2. **Get an Environment:**
    Create an environment with all Binette prerequisites installed by following the installation instructions [here](./installation.md#from-the-source-code-within-a-conda-environnement).
 
-3. **Install in Editable Mode:**
-   To enable code editing and testing of new functionality, you can install Binette in editable mode using the following command:
 
+3. **Branch from 'dev':**  
+   Start your changes from the `dev` branch, where updates for the upcoming release are integrated.  
    ```bash
-   pip install -e .
+   git checkout dev
    ```
 
-   This allows you to modify the code and experiment with new features directly.
+4. **Install in Editable Mode:**  
+   To enable code editing and testing of new functionality, you can install Binette in editable mode:  
+   ```bash
+   pip install -e .[dev]
+   ```  
+   - The `[dev]` part installs additional packages required for development. While not mandatory, it is recommended for an optimal development environment. Refer to the `pyproject.toml` file for details on the additional dependencies that will be installed.  
 
+   Installing in editable mode allows you to modify the codebase and experiment with new features directly.  
 
-```{note}
-Currently, we are not utilizing any auto formatters (like autopep8 or black). Kindly refrain from using them, as it could introduce extensive changes across the project, making code review challenging for us.
-```
+5. **Apply Code Formatting with Black:**  
+   To maintain consistent code styling, we use [Black](https://github.com/psf/black) as our code formatter.  
+   - Code changes are automatically checked for formatting as part of our CI pipeline via a GitHub Action.  
+   - **Ensure your code is formatted with Black before committing.**  
 
+   To format your code:  
+   1. Install Black (e.g., `pip install black`).  
+   2. Run Black from the root of the Binette repository:  
+      ```bash
+      black .
+      ```  
+
+   ```{tip}
+   Configure your IDE to integrate Black for automatic code formatting as you work.
+   ```  
 
 ### Making Your Changes
 
