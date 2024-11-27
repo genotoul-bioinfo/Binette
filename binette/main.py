@@ -10,7 +10,6 @@ Portability : POSIX
 
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, Action, Namespace
 
-from email.parser import Parser
 import sys
 import logging
 import os
