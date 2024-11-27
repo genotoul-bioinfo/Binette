@@ -100,7 +100,7 @@ def test_manage_protein_alignement_resume(tmp_path):
 
     faa_file = tmp_path / "proteins.faa"
     faa_file_content = (
-    ">contig1_1\nACGT\n>contig2_1\nTGCA\n>contig2_2\nAAAA\n>contig3_1\nCCCC\n"
+    ">contig1_1\nMCGT\n>contig2_1\nTGCA\n>contig2_2\nAAAA\n>contig3_1\nCCCC\n"
     )
 
     contig_to_length={"contig1":40, "contig2":80, "contig3":20}
@@ -127,6 +127,7 @@ def test_manage_protein_alignement_resume(tmp_path):
             checkm2_db=None,
             threads=1,
             use_existing_protein_file=True,
+            resume_diamond=True,
             low_mem=False
         )
 
@@ -141,7 +142,7 @@ def test_manage_protein_alignement_not_resume(tmpdir, tmp_path):
 
     faa_file = tmp_path / "proteins.faa"
     faa_file_content = (
-    ">contig1_1\nACGT\n>contig2_1\nTGCA\n>contig2_2\nAAAA\n>contig3_1\nCCCC\n"
+    ">contig1_1\nMLKPACGT\n>contig2_1\nMMMKPTGCA\n>contig2_2\nMMMAAAA\n>contig3_1\nMLPALP\n"
     )
 
     contig_to_length={"contig1":40, "contig2":80, "contig3":20}
@@ -172,6 +173,7 @@ def test_manage_protein_alignement_not_resume(tmpdir, tmp_path):
             checkm2_db=None,
             threads=1,
             use_existing_protein_file=True,
+            resume_diamond=True,
             low_mem=False
         )
 
@@ -352,7 +354,7 @@ def test_manage_protein_alignment_no_resume(tmp_path):
         # Call the function
         contig_to_kegg_counter, contig_to_genes = manage_protein_alignement(
             faa_file, contigs_fasta, contig_to_length, contigs_in_bins,
-            diamond_result_file, checkm2_db, threads, resume, low_mem
+            diamond_result_file, checkm2_db, threads, resume, resume, low_mem
         )
         
         # Assertions to check if functions were called
