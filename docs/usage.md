@@ -58,6 +58,20 @@ For example, consider the following two `contig2bin_tables`:
 
 In both formats, the `--contigs` argument should specify a FASTA file containing all the contigs found in the bins. Typically, this file would be the assembly FASTA file used to generate the bins. In these exemple the `assembly.fasta` file should contain at least the five contigs mentioned in the `contig2bin_tables` files or in the bin fasta files: `contig_1`, `contig_8`, `contig_15`, `contig_9`, and `contig_10`.
 
+
+## Providing Protein Sequences
+
+You can provide protein sequences in FASTA format to Binette using the `--proteins` argument. The sequence identifiers must follow the Prodigal convention: `<contigID>_<GeneID>`. This naming format ensures proper mapping of each gene to its corresponding contig.  
+
+By using this option, the gene prediction step is skipped.  
+
+### Example  
+If your contig is named `contig_A`, the gene identifiers should follow this pattern:  
+- `contig_A_1`  
+- `contig_A_2`  
+- `contig_A_3`  
+
+
 ## Outputs
 
 Binette results are stored in the `results` directory. You can specify a different directory using the `--outdir` option.
