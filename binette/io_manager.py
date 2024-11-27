@@ -167,8 +167,8 @@ def check_contig_consistency(contigs_from_assembly: Iterable[str],
 
     issue_countigs = len(set(contigs_from_elsewhere) - set(contigs_from_assembly))
     
-    message = f"{issue_countigs} contigs found in file {elsewhere_file} \
-                were not found in assembly_file ({assembly_file})."
+    message = (f"{issue_countigs} contigs found in file '{elsewhere_file}' "
+    f"were not found in assembly_file '{assembly_file}'")
     assert are_contigs_consistent, message
 
 
