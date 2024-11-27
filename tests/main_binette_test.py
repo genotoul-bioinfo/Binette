@@ -1,7 +1,7 @@
 
 import pytest
 import logging
-from binette.main import log_selected_bin_info, select_bins_and_write_them, manage_protein_alignement, parse_input_files, parse_arguments, init_logging, main, UniqueStore
+from binette.main import log_selected_bin_info, select_bins_and_write_them, manage_protein_alignement, parse_input_files, parse_arguments, init_logging, main, UniqueStore, is_valid_file
 from binette.bin_manager import Bin
 from binette import diamond, contig_manager, cds
 import os
@@ -12,6 +12,21 @@ from collections import Counter
 from tests.bin_manager_test import create_temp_bin_directories, create_temp_bin_files
 from argparse import ArgumentParser
 from pathlib import Path
+
+@pytest.fixture
+def test_environment(tmp_path: Path):
+    """
+    Fixture to set up a test environment with required directories and files.
+    """
+    folder1 = tmp_path / "folder1"
+    folder2 = tmp_path / "folder2"
+    contigs_file = tmp_path / "contigs.fasta"
+
+    folder1.mkdir()
+    folder2.mkdir()
+    contigs_file.write_text(">contig1\nATCG")  # Sample content for the FASTA file
+
+    return folder1, folder2, contigs_file
 
 @pytest.fixture
 def bins():
@@ -111,7 +126,7 @@ def test_manage_protein_alignement_resume(tmp_path):
             diamond_result_file=Path("diamond_result_file"),
             checkm2_db=None,
             threads=1,
-            resume=True,
+            use_existing_protein_file=True,
             low_mem=False
         )
 
@@ -156,7 +171,7 @@ def test_manage_protein_alignement_not_resume(tmpdir, tmp_path):
             diamond_result_file=Path(diamond_result_file),
             checkm2_db=None,
             threads=1,
-            resume=True,
+            use_existing_protein_file=True,
             low_mem=False
         )
 
@@ -254,17 +269,32 @@ def test_argument_used_multiple_times():
         parser.parse_args(['--example', 'value', '--example', 'value2'])
 
 
-def test_parse_arguments_required_arguments():
-    # Test when only required arguments are provided
-    args = parse_arguments(["-d", "folder1", "folder2", "-c", "contigs.fasta"])
-    assert args.bin_dirs == [Path("folder1"), Path("folder2")]
-    assert args.contigs == Path("contigs.fasta")
+def test_parse_arguments_required_arguments(test_environment):
+    """
+    Test parsing when only required arguments are provided.
+    Ensure that input arguments exist before parsing.
+    """
+    # Create temporary directories and files
+    folder1, folder2, contigs_file = test_environment
 
-def test_parse_arguments_optional_arguments():
+    # Parse arguments with existing files and directories
+    args = parse_arguments(["-d", str(folder1), str(folder2), "-c", str(contigs_file)])
+
+    # Assert that the parsed arguments match the expected paths
+    assert args.bin_dirs == [folder1, folder2]
+    assert args.contigs == contigs_file
+
+
+def test_parse_arguments_optional_arguments(test_environment):
     # Test when required and optional arguments are provided
-    args = parse_arguments(["-d", "folder1", "folder2", "-c", "contigs.fasta", "--threads", "4", "--outdir", "output"])
-    assert args.bin_dirs == [Path("folder1"), Path("folder2")]
-    assert args.contigs == Path("contigs.fasta")
+    
+    # Create temporary directories and files
+    folder1, folder2, contigs_file = test_environment   
+
+    # Parse arguments with existing files and directories
+    args = parse_arguments(["-d", str(folder1), str(folder2), "-c", str(contigs_file), "--threads", "4", "--outdir", "output"])
+    assert args.bin_dirs == [folder1, folder2]
+    assert args.contigs == contigs_file
     assert args.threads == 4
     assert args.outdir == Path("output")
 
@@ -333,13 +363,12 @@ def test_manage_protein_alignment_no_resume(tmp_path):
             faa_file.as_posix(), diamond_result_file.as_posix(), checkm2_db.as_posix(), f"{os.path.splitext(diamond_result_file.as_posix())[0]}.log", threads, low_mem=low_mem
         )
 
-def test_main_resume_when_not_possible(monkeypatch):
+def test_main_resume_when_not_possible(monkeypatch, test_environment):
     # Define or mock the necessary inputs/arguments
+    folder1, folder2, contigs_file = test_environment
 
     # Mock sys.argv to use test_args
-    test_args = [
-        "-d", "bin_dir1", "bin_dir2",
-        "-c", "contigs.fasta",
+    test_args = ["-d", str(folder1), str(folder2), "-c", str(contigs_file), 
         # ... more arguments as required ...
         "--debug",
         "--resume"
@@ -350,13 +379,12 @@ def test_main_resume_when_not_possible(monkeypatch):
     with pytest.raises(FileNotFoundError):
         main()
 
-def test_main(monkeypatch):
+def test_main(monkeypatch, test_environment):
     # Define or mock the necessary inputs/arguments
-
+    folder1, folder2, contigs_file = test_environment
     # Mock sys.argv to use test_args
     test_args = [
-        "-d", "bin_dir1", "bin_dir2",
-        "-c", "contigs.fasta",
+        "-d", str(folder1), str(folder2), "-c", str(contigs_file), 
         # ... more arguments as required ...
         "--debug"
     ]
@@ -400,3 +428,25 @@ def test_main(monkeypatch):
 
         assert mock_apply_contig_index.call_count == 3
         assert mock_add_bin_metrics.call_count == 2
+
+
+def test_is_valid_file_existing_file(tmp_path: Path):
+    """Test is_valid_file with a file that exists."""
+    # Create a temporary file
+    test_file = tmp_path / "test_file.txt"
+    test_file.write_text("Sample content")
+
+    parser = ArgumentParser()
+
+    # Assert that the function correctly returns the file path
+    result = is_valid_file(parser, str(test_file))
+    assert result == test_file
+
+def test_is_valid_file_non_existing_file():
+    """Test is_valid_file with a file that does not exist."""
+    parser = ArgumentParser()
+    non_existing_file = "non_existing_file.txt"
+
+    # Expect the function to call parser.error, which will raise a SystemExit exception
+    with pytest.raises(SystemExit):
+        is_valid_file(parser, non_existing_file)
