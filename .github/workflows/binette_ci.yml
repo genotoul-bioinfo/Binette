@@ -96,3 +96,16 @@ jobs:
         python scripts/compare_results.py expected_results/final_bins_quality_reports.tsv test_results_from_dirs/final_bins_quality_reports.tsv
 
 
+    - name: Run simple test case from bin dirs and with proteins input
+      run: |
+        cd test_data
+        binette -d binning_results/A/ binning_results/B/ binning_results/C/ \
+                --contigs all_contigs.fna --checkm2_db checkm2_tiny_db/checkm2_tiny_db.dmnd  -v -o test_results_from_dirs_and_prot_input --proteins proteins.faa
+
+    - name: Compare results from bin dirs with expectation
+      run: |
+        cd test_data
+        head  expected_results/final_bins_quality_reports.tsv test_results_from_dirs/final_bins_quality_reports.tsv
+        python scripts/compare_results.py expected_results/final_bins_quality_reports.tsv test_results_from_dirs_and_prot_input/final_bins_quality_reports.tsv
+
+
