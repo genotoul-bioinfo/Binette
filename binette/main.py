@@ -389,10 +389,12 @@ def main():
     use_existing_protein_file = False
 
     if args.proteins:
-        faa_file = args.protein
+        logging.info(f"Using the provided protein sequences file: {args.proteins}")
+        faa_file = args.proteins
         use_existing_protein_file = True
     else:
         faa_file = out_tmp_dir / "assembly_proteins.faa"
+
 
     diamond_result_file = out_tmp_dir / "diamond_result.tsv"
 
