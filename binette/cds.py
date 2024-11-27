@@ -71,19 +71,59 @@ def write_faa(outfaa: str, contig_to_genes: List[Tuple[str, pyrodigal.Genes]]) -
         for contig_id, genes in contig_to_genes:
             genes.write_translations(fl, contig_id)
 
+
+def is_nucleic_acid(sequence: str) -> bool:
+    """
+    Determines whether the given sequence is a DNA or RNA sequence.
+
+    :param sequence: The sequence to check.
+    :return: True if the sequence is a DNA or RNA sequence, False otherwise.
+    """
+    # Define nucleotidic bases (DNA and RNA)
+    nucleotidic_bases = set('ATCGNUatcgnu')
+    
+    # Check if all characters in the sequence are valid nucleotidic bases (DNA or RNA)
+    if all(base in nucleotidic_bases for base in sequence):
+        return True
+    
+    # If any character is invalid, return False
+    return False
+
+ 
+
 def parse_faa_file(faa_file: str) -> Dict[str, List[str]]:
     """
     Parse a FASTA file containing protein sequences and organize them by contig.
 
     :param faa_file: Path to the input FASTA file.
     :return: A dictionary mapping contig names to lists of protein sequences.
+    :raises ValueError: If the file contains nucleotidic sequences instead of protein sequences.
     """
     contig_to_genes = defaultdict(list)
+    checked_sequences = []
+
+    # Iterate through the FASTA file and parse sequences
     for name, seq in pyfastx.Fastx(faa_file):
         contig = get_contig_from_cds_name(name)
         contig_to_genes[contig].append(seq)
+        
+        # Concatenate up to the first 20 sequences for validation
+        if len(checked_sequences) < 20:
+            checked_sequences.append(seq)
+
+    # Concatenate all checked sequences for a more reliable nucleic acid check
+    concatenated_seq = "".join(checked_sequences)
+
+    # Check if the concatenated sequence appears to be nucleic acid
+    if is_nucleic_acid(concatenated_seq):
+        raise ValueError(
+            f"The file '{faa_file}' appears to contain nucleotide sequences. "
+            "Ensure that the file contains valid protein sequences in FASTA format."
+        )
 
     return dict(contig_to_genes)
+   
+
 
 def get_aa_composition(genes: List[str]) -> Counter:
     """
