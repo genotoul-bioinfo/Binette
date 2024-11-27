@@ -236,7 +236,9 @@ def parse_input_files(bin_dirs: List[Path],
 
 def manage_protein_alignement(faa_file: Path, contigs_fasta: Path, contig_to_length: Dict[str, int],
                                 contigs_in_bins: Set[str], diamond_result_file: Path,
-                                checkm2_db: Optional[Path], threads: int, use_existing_protein_file: bool, low_mem: bool) -> Tuple[Dict[str, int], Dict[str, List[str]]]:
+                                checkm2_db: Optional[Path], threads: int, use_existing_protein_file: bool, 
+                                resume_diamond:bool,
+                                low_mem: bool) -> Tuple[Dict[str, int], Dict[str, List[str]]]:
     """
     Predicts or reuses proteins prediction and runs diamond on them.
     
@@ -248,6 +250,7 @@ def manage_protein_alignement(faa_file: Path, contigs_fasta: Path, contig_to_len
     :param checkm2_db: The path to the CheckM2 database.
     :param threads: Number of threads for parallel processing.
     :param use_existing_protein_file: Boolean indicating whether to use an existing protein file.
+    :param resume_diamond: Boolean indicating whether to resume diamond alignement.
     :param low_mem: Boolean indicating whether to use low memory mode.
 
     :return: A tuple containing dictionaries - contig_to_kegg_counter and contig_to_genes.
@@ -263,6 +266,7 @@ def manage_protein_alignement(faa_file: Path, contigs_fasta: Path, contig_to_len
         contigs_iterator = (s for s in contig_manager.parse_fasta_file(contigs_fasta.as_posix()) if s.name in contigs_in_bins)
         contig_to_genes = cds.predict(contigs_iterator, faa_file.as_posix(), threads)
 
+    if not resume_diamond:
         if checkm2_db is None:
             # get checkm2 db stored in checkm2 install
             diamond_db_path = diamond.get_checkm2_db()
@@ -411,7 +415,8 @@ def main():
     contig_to_kegg_counter, contig_to_genes = manage_protein_alignement(faa_file=faa_file, contigs_fasta=args.contigs, contig_to_length=contig_to_length,
                                                                         contigs_in_bins=contigs_in_bins,
                                                                         diamond_result_file=diamond_result_file, checkm2_db=args.checkm2_db,
-                                                                        threads=args.threads, use_existing_protein_file=use_existing_protein_file, low_mem=args.low_mem)
+                                                                        threads=args.threads, use_existing_protein_file=use_existing_protein_file, 
+                                                                        resume_diamond=args.resume, low_mem=args.low_mem)
     
     # Use contig index instead of contig name to save memory
     contig_to_index, index_to_contig = contig_manager.make_contig_index(contigs_in_bins)
