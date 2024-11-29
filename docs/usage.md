@@ -59,18 +59,6 @@ For example, consider the following two `contig2bin_tables`:
 In both formats, the `--contigs` argument should specify a FASTA file containing all the contigs found in the bins. Typically, this file would be the assembly FASTA file used to generate the bins. In these exemple the `assembly.fasta` file should contain at least the five contigs mentioned in the `contig2bin_tables` files or in the bin fasta files: `contig_1`, `contig_8`, `contig_15`, `contig_9`, and `contig_10`.
 
 
-## Providing Precomputed Protein Sequences
-
-You can provide protein sequences in FASTA format to Binette using the `--proteins` argument. The sequence identifiers must follow the Prodigal convention: `<contigID>_<GeneID>`. This naming format ensures proper mapping of each gene to its contig.  
-
-By using this option, the gene prediction step is skipped.  
-
-### Example  
-If your contig is named `contig_A`, the gene identifiers should follow this pattern:  
-- `contig_A_1`  
-- `contig_A_2`  
-- `contig_A_3`  
-
 
 ## Outputs
 
@@ -95,3 +83,18 @@ The `final_bins_quality_reports.tsv` file contains the following columns:
 | **size**            | Represents the size of the bin in nucleotides.                                                              |
 | **N50**             | Displays the N50 of the bin.                                                                                |
 | **contig_count**    | The number of contigs contained within the bin.          
+
+
+
+
+## Providing Precomputed Protein Sequences
+
+You can provide protein sequences in FASTA format to Binette using the `--proteins` argument. The sequence identifiers must follow the Prodigal convention: `<contigID>_<GeneID>`. This naming format ensures proper mapping of each gene to its contig.  
+
+By using this option, the gene prediction step is skipped.  
+
+### Example  
+If your contig is named `contig_A`, the gene identifiers should follow this pattern:  
+- `contig_A_1`  
+- `contig_A_2`  
+- `contig_A_3`  
