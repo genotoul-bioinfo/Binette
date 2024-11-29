@@ -11,6 +11,7 @@ import networkx as nx
 import logging
 from pathlib import Path
 
+
 def test_get_all_possible_combinations():
     input_list = ["2", "3", "4"]
     expected_list = [("2", "3"), ("2", "4"), ("3", "4"), ("2", "3", "4")]
@@ -25,11 +26,13 @@ def example_bin_set1():
     bin3 = bin_manager.Bin(contigs={"5"}, origin="test1", name="bin2")
     return {bin1, bin2, bin3}
 
+
 @pytest.fixture
 def example_bin_set2():
     bin1 = bin_manager.Bin(contigs={"1", "2", "3"}, origin="test2", name="binA")
     bin2 = bin_manager.Bin(contigs={"4", "5"}, origin="test2", name="binB")
     return {bin1, bin2}
+
 
 def test_bin_eq_true():
     bin1 = bin_manager.Bin(contigs={"1", "2", "e"}, origin="test1", name="bin1")
@@ -56,17 +59,20 @@ def test_in_for_bin_list():
     assert bin2 in bins
     assert bin3 not in bins
 
+
 def test_add_length_positive_integer():
     bin_obj = bin_manager.Bin(contigs={"1", "2", "e"}, origin="test1", name="bin1")
     length = 100
     bin_obj.add_length(length)
     assert bin_obj.length == length
 
+
 def test_add_length_negative_integer():
-    bin_obj = bin_manager.Bin(contigs={"1", "2", "e"}, origin="test1", name="bin1") 
+    bin_obj = bin_manager.Bin(contigs={"1", "2", "e"}, origin="test1", name="bin1")
     with pytest.raises(ValueError):
         length = -50
         bin_obj.add_length(length)
+
 
 def test_add_n50_positive_integer():
     bin_obj = bin_manager.Bin(contigs={"1", "2", "e"}, origin="test1", name="bin1")
@@ -74,11 +80,13 @@ def test_add_n50_positive_integer():
     bin_obj.add_N50(n50)
     assert bin_obj.N50 == n50
 
+
 def test_add_n50_negative_integer():
-    bin_obj = bin_manager.Bin(contigs={"1", "2", "e"}, origin="test1", name="bin1") 
+    bin_obj = bin_manager.Bin(contigs={"1", "2", "e"}, origin="test1", name="bin1")
     with pytest.raises(ValueError):
         n50 = -50
         bin_obj.add_N50(n50)
+
 
 def test_add_quality():
 
@@ -86,18 +94,14 @@ def test_add_quality():
     contamination = 6
     contamination_weight = 2
 
-    bin_obj = bin_manager.Bin(contigs={"1", "2", "e"}, origin="test1", name="bin1") 
+    bin_obj = bin_manager.Bin(contigs={"1", "2", "e"}, origin="test1", name="bin1")
 
     bin_obj.add_quality(completeness, contamination, contamination_weight)
-    
-    assert bin_obj.completeness == completeness 
-    assert bin_obj.contamination == contamination 
+
+    assert bin_obj.completeness == completeness
+    assert bin_obj.contamination == contamination
 
     assert bin_obj.score == completeness - contamination * contamination_weight
-
-
-
-    
 
 
 # def test_two_bin_intersection():
@@ -145,7 +149,9 @@ def test_bin_union():
     bin1 = bin_manager.Bin(contigs={"13", "21"}, origin="test1", name="bin1")
     bin2 = bin_manager.Bin(contigs={"1", "e", "2", "33"}, origin="test2", name="binA")
 
-    expected_union_bin = bin_manager.Bin(contigs={"13", "21", "1", "e", "2", "33"}, origin="", name="")
+    expected_union_bin = bin_manager.Bin(
+        contigs={"13", "21", "1", "e", "2", "33"}, origin="", name=""
+    )
     union_bin = bin1.union(bin2)
 
     assert union_bin == expected_union_bin
@@ -154,16 +160,16 @@ def test_bin_union():
 
 def test_bin_union2():
     # Create some example bins
-    bin1 = bin_manager.Bin({'contig1', 'contig2'}, 'origin1', 'bin1')
-    bin2 = bin_manager.Bin({'contig2', 'contig3'}, 'origin2', 'bin2')
-    bin3 = bin_manager.Bin({'contig4', 'contig5'}, 'origin3', 'bin3')
+    bin1 = bin_manager.Bin({"contig1", "contig2"}, "origin1", "bin1")
+    bin2 = bin_manager.Bin({"contig2", "contig3"}, "origin2", "bin2")
+    bin3 = bin_manager.Bin({"contig4", "contig5"}, "origin3", "bin3")
 
     # Perform union operation
     union_bin = bin1.union(bin2, bin3)
 
     # Check the result
-    expected_contigs = {'contig1', 'contig2', 'contig3', 'contig4', 'contig5'}
-    expected_origin = {'union'}
+    expected_contigs = {"contig1", "contig2", "contig3", "contig4", "contig5"}
+    expected_origin = {"union"}
 
     assert union_bin.contigs == expected_contigs
     assert union_bin.origin == expected_origin
@@ -267,31 +273,35 @@ def test_intersection_bins_created():
     set2 = [
         binA,
     ]
-    bin_set_name_to_bins = {'set1': set1,
-                            "set2":set2}
+    bin_set_name_to_bins = {"set1": set1, "set2": set2}
 
-    intermediate_bins_result = bin_manager.create_intermediate_bins(bin_set_name_to_bins)
+    intermediate_bins_result = bin_manager.create_intermediate_bins(
+        bin_set_name_to_bins
+    )
 
-    expected_intermediate_bins = {bin_manager.Bin(contigs={"1", "2", "3"}, origin="bin1 | binA ", name="NA"),
-                                  bin_manager.Bin(contigs={"2"}, origin="bin1 - binA ", name="NA"),
-                                  bin_manager.Bin(contigs={"1"}, origin="bin1 & binA ", name="NA"),
-                                  bin_manager.Bin(contigs={"1", "4", "3"}, origin="bin2 | binA ", name="NA"),
-                                  bin_manager.Bin(contigs={"4"}, origin="bin2 - binA ", name="NA"), # binA -bin1 is equal to bin1 & binA
-                                  bin_manager.Bin(contigs={"3"}, origin="bin1 & binA ", name="NA"),
-                                  }
+    expected_intermediate_bins = {
+        bin_manager.Bin(contigs={"1", "2", "3"}, origin="bin1 | binA ", name="NA"),
+        bin_manager.Bin(contigs={"2"}, origin="bin1 - binA ", name="NA"),
+        bin_manager.Bin(contigs={"1"}, origin="bin1 & binA ", name="NA"),
+        bin_manager.Bin(contigs={"1", "4", "3"}, origin="bin2 | binA ", name="NA"),
+        bin_manager.Bin(
+            contigs={"4"}, origin="bin2 - binA ", name="NA"
+        ),  # binA -bin1 is equal to bin1 & binA
+        bin_manager.Bin(contigs={"3"}, origin="bin1 & binA ", name="NA"),
+    }
 
     assert intermediate_bins_result == expected_intermediate_bins
 
 
 # Renames contigs in bins based on provided mapping.
 def test_renames_contigs(example_bin_set1):
-    
+
     bin_set = [
         bin_manager.Bin(contigs={"c1", "c2"}, origin="A", name="bin1"),
-        bin_manager.Bin(contigs={"c3", "c4"}, origin="A", name="bin2")
+        bin_manager.Bin(contigs={"c3", "c4"}, origin="A", name="bin2"),
     ]
-        
-    contig_to_index = {'c1': 1, 'c2': 2, 'c3': 3, 'c4': 4, "c5":5}
+
+    contig_to_index = {"c1": 1, "c2": 2, "c3": 3, "c4": 4, "c5": 5}
 
     # Act
     bin_manager.rename_bin_contigs(bin_set, contig_to_index)
@@ -302,11 +312,12 @@ def test_renames_contigs(example_bin_set1):
     assert bin_set[1].contigs == {3, 4}
     assert bin_set[1].hash == hash(str(sorted({3, 4})))
 
+
 def test_get_contigs_in_bins():
     bin_set = [
         bin_manager.Bin(contigs={"c1", "c2"}, origin="A", name="bin1"),
         bin_manager.Bin(contigs={"c3", "c4"}, origin="A", name="bin2"),
-        bin_manager.Bin(contigs={"c3", "c18"}, origin="A", name="bin2")
+        bin_manager.Bin(contigs={"c3", "c18"}, origin="A", name="bin2"),
     ]
 
     contigs = bin_manager.get_contigs_in_bins(bin_set)
@@ -319,35 +330,33 @@ def test_dereplicate_bin_sets():
     b2 = bin_manager.Bin(contigs={"c3", "c4"}, origin="A", name="bin2")
     b3 = bin_manager.Bin(contigs={"c3", "c18"}, origin="A", name="bin2")
 
-    bdup  = bin_manager.Bin(contigs={"c3", "c18"}, origin="D", name="C")
+    bdup = bin_manager.Bin(contigs={"c3", "c18"}, origin="D", name="C")
 
-    derep_bins_result =  bin_manager.dereplicate_bin_sets([[b2,b3 ],[b1, bdup]])
-
+    derep_bins_result = bin_manager.dereplicate_bin_sets([[b2, b3], [b1, bdup]])
 
     assert derep_bins_result == {b1, b2, b3}
 
 
-
 def test_from_bin_sets_to_bin_graph():
-
 
     bin1 = bin_manager.Bin(contigs={"1", "2"}, origin="A", name="bin1")
     bin2 = bin_manager.Bin(contigs={"3", "4"}, origin="A", name="bin2")
     bin3 = bin_manager.Bin(contigs={"5"}, origin="A", name="bin3")
 
-    set1 = [bin1,bin2,bin3]
+    set1 = [bin1, bin2, bin3]
 
     binA = bin_manager.Bin(contigs={"1", "3"}, origin="B", name="binA")
-            
+
     set2 = [binA]
 
-    result_graph = bin_manager.from_bin_sets_to_bin_graph({"B":set2, "A":set1}) 
+    result_graph = bin_manager.from_bin_sets_to_bin_graph({"B": set2, "A": set1})
 
     assert result_graph.number_of_edges() == 2
     # bin3 is not connected to any bin so it is not in the graph
     assert result_graph.number_of_nodes() == 3
 
     assert set(result_graph.nodes) == {binA, bin1, bin2}
+
 
 @pytest.fixture
 def simple_bin_graph():
@@ -358,7 +367,7 @@ def simple_bin_graph():
     for b in [bin1, bin2]:
         b.completeness = 100
         b.contamination = 0
-    
+
     G = nx.Graph()
     G.add_edge(bin1, bin2)
 
@@ -368,33 +377,32 @@ def simple_bin_graph():
 def test_get_intersection_bins(simple_bin_graph):
 
     intersec_bins = bin_manager.get_intersection_bins(simple_bin_graph)
-    
+
     assert len(intersec_bins) == 1
     intersec_bin = intersec_bins.pop()
 
     assert intersec_bin.contigs == {"1", "2"}
 
+
 def test_get_difference_bins(simple_bin_graph):
-    
+
     difference_bins = bin_manager.get_difference_bins(simple_bin_graph)
-    
+
     expected_bin1 = bin_manager.Bin(contigs={"3"}, origin="D", name="1")
     expected_bin2 = bin_manager.Bin(contigs={"4"}, origin="D", name="2")
 
     assert len(difference_bins) == 2
-    assert difference_bins == {expected_bin1,expected_bin2}
+    assert difference_bins == {expected_bin1, expected_bin2}
 
 
 def test_get_union_bins(simple_bin_graph):
-    
+
     u_bins = bin_manager.get_union_bins(simple_bin_graph)
-    
+
     expected_bin1 = bin_manager.Bin(contigs={"1", "2", "3", "4"}, origin="U", name="1")
 
     assert len(u_bins) == 1
     assert u_bins == {expected_bin1}
-
-
 
 
 def test_get_bins_from_contig2bin_table(tmp_path):
@@ -412,15 +420,17 @@ def test_get_bins_from_contig2bin_table(tmp_path):
     set_name = "TestSet"
 
     # Call the function to generate Bin objects
-    result_bins = bin_manager.get_bins_from_contig2bin_table(str(test_table_path), set_name)
+    result_bins = bin_manager.get_bins_from_contig2bin_table(
+        str(test_table_path), set_name
+    )
 
     # Validate the result
     assert len(result_bins) == 2  # Check if the correct number of bins are created
 
     # Define expected bins based on the test table content
     expected_bins = [
-            bin_manager.Bin(contigs={"contig1", "contig2"}, origin="A", name="bin1"),
-            bin_manager.Bin(contigs={"contig3"}, origin="A", name="bin2")
+        bin_manager.Bin(contigs={"contig1", "contig2"}, origin="A", name="bin1"),
+        bin_manager.Bin(contigs={"contig3"}, origin="A", name="bin2"),
     ]
 
     # Compare expected bins with the result
@@ -440,8 +450,8 @@ def test_parse_contig2bin_tables(tmp_path):
         "set2": [
             "# Sample contig-to-bin table for bin2",
             "contig3\tbinA",
-            "contig4\tbinA"
-        ]
+            "contig4\tbinA",
+        ],
     }
 
     # Create temporary files for contig-to-bin tables
@@ -450,10 +460,17 @@ def test_parse_contig2bin_tables(tmp_path):
         table_path.write_text("\n".join(content))
 
     # Call the function to parse contig-to-bin tables
-    result_bin_dict = bin_manager.parse_contig2bin_tables({name: str(tmp_path / f"test_{name}_contig2bin_table.txt") for name in test_tables})
+    result_bin_dict = bin_manager.parse_contig2bin_tables(
+        {
+            name: str(tmp_path / f"test_{name}_contig2bin_table.txt")
+            for name in test_tables
+        }
+    )
 
     # Validate the result
-    assert len(result_bin_dict) == len(test_tables)  # Check if the number of bins matches the number of tables
+    assert len(result_bin_dict) == len(
+        test_tables
+    )  # Check if the number of bins matches the number of tables
 
     # Define expected Bin objects based on the test tables
     expected_bins = {
@@ -463,7 +480,7 @@ def test_parse_contig2bin_tables(tmp_path):
         ],
         "set2": [
             bin_manager.Bin(contigs={"contig3", "contig4"}, origin="set2", name="binA"),
-        ]
+        ],
     }
 
     # Compare expected bins with the result
@@ -492,10 +509,17 @@ def test_parse_contig2bin_tables_with_duplicated_bins(tmp_path, caplog):
         table_path.write_text("\n".join(content))
 
     # Call the function to parse contig-to-bin tables
-    bin_manager.parse_contig2bin_tables({name: str(tmp_path / f"test_{name}_contig2bin_table.txt") for name in test_tables})
-    expected_log_message = ('2 bins with identical contig compositions detected in bin set "set1". '
-                           'These bins were merged to ensure uniqueness.')
-    assert expected_log_message in caplog.text 
+    bin_manager.parse_contig2bin_tables(
+        {
+            name: str(tmp_path / f"test_{name}_contig2bin_table.txt")
+            for name in test_tables
+        }
+    )
+    expected_log_message = (
+        '2 bins with identical contig compositions detected in bin set "set1". '
+        "These bins were merged to ensure uniqueness."
+    )
+    assert expected_log_message in caplog.text
 
 
 @pytest.fixture
@@ -510,6 +534,7 @@ def create_temp_bin_files(tmpdir):
 
     return bin_dir
 
+
 @pytest.fixture
 def create_temp_bin_directories(tmpdir, create_temp_bin_files):
     # Create temporary bin directories
@@ -519,7 +544,6 @@ def create_temp_bin_directories(tmpdir, create_temp_bin_files):
 
     bin2 = bin_dir1.join("bin2.fasta")
     bin2.write(">contig3\nTTAG\n>contig4\nCGAT")
-
 
     bin_dir2 = tmpdir.mkdir("set2")
     bin2 = bin_dir2.join("binA.fasta")
@@ -532,7 +556,9 @@ def test_get_bins_from_directory(create_temp_bin_files):
     bin_dir = create_temp_bin_files
     set_name = "TestSet"
 
-    bins = bin_manager.get_bins_from_directory(Path(bin_dir), set_name, fasta_extensions={'.fasta'})
+    bins = bin_manager.get_bins_from_directory(
+        Path(bin_dir), set_name, fasta_extensions={".fasta"}
+    )
 
     assert len(bins) == 2  # Ensure that the correct number of Bin objects is returned
 
@@ -546,30 +572,39 @@ def test_get_bins_from_directory(create_temp_bin_files):
     assert bins[1].name in ["bin2.fasta", "bin1.fasta"]
     assert bins[0].name in ["bin2.fasta", "bin1.fasta"]
 
+
 def test_get_bins_from_directory_no_files(tmpdir):
     bin_dir = Path(tmpdir.mkdir("empty_bins"))
     set_name = "EmptySet"
 
-    bins = bin_manager.get_bins_from_directory(bin_dir, set_name, fasta_extensions={'.fasta'})
+    bins = bin_manager.get_bins_from_directory(
+        bin_dir, set_name, fasta_extensions={".fasta"}
+    )
 
-    assert len(bins) == 0  # Ensure that no Bin objects are returned for an empty directory
+    assert (
+        len(bins) == 0
+    )  # Ensure that no Bin objects are returned for an empty directory
+
 
 def test_get_bins_from_directory_no_wrong_extensions(create_temp_bin_files):
     bin_dir = Path(create_temp_bin_files)
     set_name = "TestSet"
 
-    bins = bin_manager.get_bins_from_directory(bin_dir, set_name, fasta_extensions={'.fna'})
+    bins = bin_manager.get_bins_from_directory(
+        bin_dir, set_name, fasta_extensions={".fna"}
+    )
 
-    assert len(bins) == 0  # Ensure that no Bin objects are returned for an empty directory
-
-
-
+    assert (
+        len(bins) == 0
+    )  # Ensure that no Bin objects are returned for an empty directory
 
 
 def test_parse_bin_directories(create_temp_bin_directories):
     set_name_to_bin_dir = create_temp_bin_directories
 
-    bins = bin_manager.parse_bin_directories(set_name_to_bin_dir, fasta_extensions={'.fasta'})
+    bins = bin_manager.parse_bin_directories(
+        set_name_to_bin_dir, fasta_extensions={".fasta"}
+    )
 
     assert len(bins) == 2  # Ensure that the correct number of bin directories is parsed
 
@@ -584,44 +619,46 @@ def test_parse_bin_directories(create_temp_bin_directories):
 def test_get_contigs_in_bin_sets(example_bin_set1, example_bin_set2, caplog):
     """
     Test the get_contigs_in_bin_sets function for correct behavior.
-    
+
     :param mock_bins: The mock_bins fixture providing test bin data.
     :param caplog: The pytest caplog fixture to capture logging output.
     """
 
-    bin_set_name_to_bins = {"set1":example_bin_set1,
-                            "set2":example_bin_set2}
+    bin_set_name_to_bins = {"set1": example_bin_set1, "set2": example_bin_set2}
 
     # Test the function with valid data
     with caplog.at_level(logging.WARNING):
         result = bin_manager.get_contigs_in_bin_sets(bin_set_name_to_bins)
-    
+
     # Expected unique contigs
     expected_contigs = {"1", "2", "3", "4", "5"}
-    
+
     # Check if the result matches expected contigs
     assert result == expected_contigs, "The returned set of contigs is incorrect."
-    
+
+
 def test_get_contigs_in_bin_sets_with_duplicated_warning(example_bin_set1, caplog):
 
     bin1 = bin_manager.Bin(contigs={"contig1", "2"}, origin="test1", name="bin1")
     bin2 = bin_manager.Bin(contigs={"contig1"}, origin="test1", name="binA")
 
     bin_set_name_to_bins = {
-                            "set1":example_bin_set1,
-                            "set_dup":{bin1, bin2},
-                            }
+        "set1": example_bin_set1,
+        "set_dup": {bin1, bin2},
+    }
 
     # Test the function with valid data
     with caplog.at_level(logging.WARNING):
         result = bin_manager.get_contigs_in_bin_sets(bin_set_name_to_bins)
-    
+
     # Expected unique contigs
     expected_contigs = {"1", "2", "3", "4", "5", "contig1"}
-    
+
     # Check if the result matches expected contigs
     assert result == expected_contigs, "The returned set of contigs is incorrect."
 
     # Check for expected warnings about duplicate contigs
     duplicate_warning = "Bin set 'set_dup' contains 1 duplicated contigs. Details: contig1 (found 2 times)"
-    assert duplicate_warning in caplog.text, "The warning for duplicate contigs was not logged correctly."
+    assert (
+        duplicate_warning in caplog.text
+    ), "The warning for duplicate contigs was not logged correctly."

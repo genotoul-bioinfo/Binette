@@ -63,3 +63,10 @@ cython_debug/
 # Custome folder
 # testing
 test_data/
+
+
+.vscode/
+
+.pytest_cache/
+
+Binette_TestData/

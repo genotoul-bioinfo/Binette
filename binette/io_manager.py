@@ -7,7 +7,10 @@ from binette.bin_manager import Bin
 
 from pathlib import Path
 
-def get_paths_common_prefix_suffix(paths: List[Path]) -> Tuple[List[str], List[str], List[str]]:
+
+def get_paths_common_prefix_suffix(
+    paths: List[Path],
+) -> Tuple[List[str], List[str], List[str]]:
     """
     Determine the common prefix parts, suffix parts, and common extensions of the last part of a list of pathlib.Path objects.
 
@@ -19,25 +22,33 @@ def get_paths_common_prefix_suffix(paths: List[Path]) -> Tuple[List[str], List[s
     """
     # Extract parts for all paths
     parts = [list(path.parts) for path in paths]
-    
+
     # Find the common prefix
     if not parts:
         return [], [], []
-    
+
     # Initialize common prefix and suffix lists
     common_prefix = list(parts[0])
     common_suffix = list(parts[0])
     # Determine common prefix
     for part_tuple in parts[1:]:
         common_prefix_length = min(len(common_prefix), len(part_tuple))
-        common_prefix = [common_prefix[i] for i in range(common_prefix_length) if common_prefix[:i+1] == part_tuple[:i+1]]
+        common_prefix = [
+            common_prefix[i]
+            for i in range(common_prefix_length)
+            if common_prefix[: i + 1] == part_tuple[: i + 1]
+        ]
         if not common_prefix:
             break
 
     # Determine common suffix
     for part_tuple in parts[1:]:
         common_suffix_length = min(len(common_suffix), len(part_tuple))
-        common_suffix = [common_suffix[-i] for i in range(1, common_suffix_length + 1) if common_suffix[-i:] == part_tuple[-i:]]
+        common_suffix = [
+            common_suffix[-i]
+            for i in range(1, common_suffix_length + 1)
+            if common_suffix[-i:] == part_tuple[-i:]
+        ]
         if not common_suffix:
             break
     if len(parts) > 1:
@@ -50,12 +61,17 @@ def get_paths_common_prefix_suffix(paths: List[Path]) -> Tuple[List[str], List[s
         common_extensions = list(paths[0].suffixes)
         for path in paths[1:]:
             common_extension_length = min(len(common_extensions), len(path.suffixes))
-            common_extensions = [common_extensions[i] for i in range(common_extension_length) if common_extensions[i] == path.suffixes[i]]
+            common_extensions = [
+                common_extensions[i]
+                for i in range(common_extension_length)
+                if common_extensions[i] == path.suffixes[i]
+            ]
             if not common_extensions:
                 break
-    
+
     return common_prefix, common_suffix, common_extensions
-    
+
+
 def infer_bin_set_names_from_input_paths(input_bins: List[Path]) -> Dict[str, Path]:
     """
     Infer bin set names from a list of bin input directories or files.
@@ -65,18 +81,23 @@ def infer_bin_set_names_from_input_paths(input_bins: List[Path]) -> Dict[str, Pa
     """
     bin_name_to_bin_dir = {}
 
-    common_prefix, common_suffix, common_extensions = get_paths_common_prefix_suffix(input_bins)
+    common_prefix, common_suffix, common_extensions = get_paths_common_prefix_suffix(
+        input_bins
+    )
 
     for path in input_bins:
 
-        specific_parts = path.parts[len(common_prefix):len(path.parts)-len(common_suffix)]
+        specific_parts = path.parts[
+            len(common_prefix) : len(path.parts) - len(common_suffix)
+        ]
 
         if not common_suffix and common_extensions:
-            last_specific_part = specific_parts[-1].split('.')[:-len(common_extensions)] 
+            last_specific_part = specific_parts[-1].split(".")[
+                : -len(common_extensions)
+            ]
             specific_parts = list(specific_parts[:-1]) + last_specific_part
 
-
-        bin_set_name = '/'.join(specific_parts)
+        bin_set_name = "/".join(specific_parts)
         if bin_set_name == "":
             bin_set_name = path.as_posix()
 
@@ -100,15 +121,25 @@ def write_bin_info(bins: Iterable[Bin], output: Path, add_contigs: bool = False)
     :param add_contigs: Flag indicating whether to include contig information.
     """
 
-    header = ["bin_id", "origin", "name", "completeness", "contamination", "score", "size", "N50", "contig_count"]
+    header = [
+        "bin_id",
+        "origin",
+        "name",
+        "completeness",
+        "contamination",
+        "score",
+        "size",
+        "N50",
+        "contig_count",
+    ]
     if add_contigs:
-        header.append('contigs')
+        header.append("contigs")
 
     bin_infos = []
     for bin_obj in sorted(bins, key=lambda x: (x.score, x.N50, -x.id), reverse=True):
         bin_info = [
             bin_obj.id,
-            ';'.join(bin_obj.origin),
+            ";".join(bin_obj.origin),
             bin_obj.name,
             bin_obj.completeness,
             bin_obj.contamination,
@@ -118,7 +149,9 @@ def write_bin_info(bins: Iterable[Bin], output: Path, add_contigs: bool = False)
             len(bin_obj.contigs),
         ]
         if add_contigs:
-            bin_info.append(";".join(str(c) for c in bin_obj.contigs) if add_contigs else "")
+            bin_info.append(
+                ";".join(str(c) for c in bin_obj.contigs) if add_contigs else ""
+            )
 
         bin_infos.append(bin_info)
 
@@ -147,10 +180,12 @@ def write_bins_fasta(selected_bins: List[Bin], contigs_fasta: Path, outdir: Path
             outfl.write("\n".join(sequences) + "\n")
 
 
-def check_contig_consistency(contigs_from_assembly: Iterable[str],
-                             contigs_from_elsewhere: Iterable[str],
-                             assembly_file: str,
-                             elsewhere_file: str ):
+def check_contig_consistency(
+    contigs_from_assembly: Iterable[str],
+    contigs_from_elsewhere: Iterable[str],
+    assembly_file: str,
+    elsewhere_file: str,
+):
     """
     Check the consistency of contig names between different sources.
 
@@ -161,14 +196,16 @@ def check_contig_consistency(contigs_from_assembly: Iterable[str],
     :raises AssertionError: If inconsistencies in contig names are found.
     """
     logging.debug("check_contig_consistency.")
-    are_contigs_consistent = len(set(contigs_from_elsewhere) | set(contigs_from_assembly)) <= len(
-        set(contigs_from_assembly)
-    )
+    are_contigs_consistent = len(
+        set(contigs_from_elsewhere) | set(contigs_from_assembly)
+    ) <= len(set(contigs_from_assembly))
 
     issue_countigs = len(set(contigs_from_elsewhere) - set(contigs_from_assembly))
-    
-    message = f"{issue_countigs} contigs found in file {elsewhere_file} \
-                were not found in assembly_file ({assembly_file})."
+
+    message = (
+        f"{issue_countigs} contigs found in file '{elsewhere_file}' "
+        f"were not found in assembly_file '{assembly_file}'"
+    )
     assert are_contigs_consistent, message
 
 
@@ -185,7 +222,9 @@ def check_resume_file(faa_file: Path, diamond_result_file: Path) -> None:
         return
 
     if not faa_file.exists():
-        error_msg = f"Protein file '{faa_file}' does not exist. Resuming is not possible."
+        error_msg = (
+            f"Protein file '{faa_file}' does not exist. Resuming is not possible."
+        )
         logging.error(error_msg)
         raise FileNotFoundError(error_msg)
 
@@ -195,7 +234,9 @@ def check_resume_file(faa_file: Path, diamond_result_file: Path) -> None:
         raise FileNotFoundError(error_msg)
 
 
-def write_original_bin_metrics(bin_set_name_to_bins: Dict[str, Set[Bin]], original_bin_report_dir: Path):
+def write_original_bin_metrics(
+    bin_set_name_to_bins: Dict[str, Set[Bin]], original_bin_report_dir: Path
+):
     """
     Write metrics of original input bins to a specified directory.
 
@@ -203,7 +244,7 @@ def write_original_bin_metrics(bin_set_name_to_bins: Dict[str, Set[Bin]], origin
     the metrics for each bin set to a TSV file in the specified directory. Each bin set
     will have its own TSV file named according to its set name.
 
-    :param bin_set_name_to_bins: A dictionary where the keys are bin set names (str) and 
+    :param bin_set_name_to_bins: A dictionary where the keys are bin set names (str) and
                                  the values are sets of Bin objects representing bins.
     :param original_bin_report_dir: The directory path (Path) where the bin metrics will be saved.
     """
@@ -211,9 +252,14 @@ def write_original_bin_metrics(bin_set_name_to_bins: Dict[str, Set[Bin]], origin
     original_bin_report_dir.mkdir(parents=True, exist_ok=True)
 
     for i, (set_name, bins) in enumerate(sorted(bin_set_name_to_bins.items())):
-        bins_metric_file = original_bin_report_dir / f"input_bins_{i + 1}.{set_name.replace('/', '_')}.tsv"
-        
-        logging.debug(f"Writing metrics for bin set '{set_name}' to file: {bins_metric_file}")
+        bins_metric_file = (
+            original_bin_report_dir
+            / f"input_bins_{i + 1}.{set_name.replace('/', '_')}.tsv"
+        )
+
+        logging.debug(
+            f"Writing metrics for bin set '{set_name}' to file: {bins_metric_file}"
+        )
         write_bin_info(bins, bins_metric_file)
 
     logging.debug("Completed writing all original input bin metrics.")

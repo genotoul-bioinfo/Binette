@@ -18,7 +18,12 @@ logging.getLogger("tensorflow").setLevel(logging.FATAL)
 from checkm2 import keggData, modelPostprocessing, modelProcessing  # noqa: E402
 
 
-def get_bins_metadata_df(bins: Iterable[Bin], contig_to_cds_count: Dict[str, int], contig_to_aa_counter: Dict[str, Counter], contig_to_aa_length: Dict[str, int]) -> pd.DataFrame:
+def get_bins_metadata_df(
+    bins: Iterable[Bin],
+    contig_to_cds_count: Dict[str, int],
+    contig_to_aa_counter: Dict[str, Counter],
+    contig_to_aa_length: Dict[str, int],
+) -> pd.DataFrame:
     """
     Generate a DataFrame containing metadata for a list of bins.
 
@@ -36,8 +41,20 @@ def get_bins_metadata_df(bins: Iterable[Bin], contig_to_cds_count: Dict[str, int
     for bin_obj in bins:
         bin_metadata = {
             "Name": bin_obj.id,
-            "CDS": sum((contig_to_cds_count[c] for c in bin_obj.contigs if c in contig_to_cds_count)),
-            "AALength": sum((contig_to_aa_length[c] for c in bin_obj.contigs if c in contig_to_aa_length)),
+            "CDS": sum(
+                (
+                    contig_to_cds_count[c]
+                    for c in bin_obj.contigs
+                    if c in contig_to_cds_count
+                )
+            ),
+            "AALength": sum(
+                (
+                    contig_to_aa_length[c]
+                    for c in bin_obj.contigs
+                    if c in contig_to_aa_length
+                )
+            ),
         }
 
         bin_aa_counter = Counter()
@@ -57,7 +74,10 @@ def get_bins_metadata_df(bins: Iterable[Bin], contig_to_cds_count: Dict[str, int
     metadata_df = metadata_df.set_index("Name", drop=False)
     return metadata_df
 
-def get_diamond_feature_per_bin_df(bins: Iterable[Bin], contig_to_kegg_counter: Dict[str, Counter]) -> Tuple[pd.DataFrame, int]:
+
+def get_diamond_feature_per_bin_df(
+    bins: Iterable[Bin], contig_to_kegg_counter: Dict[str, Counter]
+) -> Tuple[pd.DataFrame, int]:
     """
     Generate a DataFrame containing Diamond feature counts per bin and completeness information for pathways, categories, and modules.
 
@@ -83,7 +103,9 @@ def get_diamond_feature_per_bin_df(bins: Iterable[Bin], contig_to_kegg_counter: 
 
         bin_to_ko_counter[bin_obj.id] = bin_ko_counter
 
-    ko_count_per_bin_df = pd.DataFrame(bin_to_ko_counter, index=defaultKOs).transpose().fillna(0)
+    ko_count_per_bin_df = (
+        pd.DataFrame(bin_to_ko_counter, index=defaultKOs).transpose().fillna(0)
+    )
     ko_count_per_bin_df = ko_count_per_bin_df.astype(int)
     ko_count_per_bin_df["Name"] = ko_count_per_bin_df.index
 
@@ -92,12 +114,16 @@ def get_diamond_feature_per_bin_df(bins: Iterable[Bin], contig_to_kegg_counter: 
     KO_pathways = KeggCalc.calculate_KO_group("KO_Pathways", ko_count_per_bin_df.copy())
 
     logging.debug("Calculating category completeness information")
-    KO_categories = KeggCalc.calculate_KO_group("KO_Categories", ko_count_per_bin_df.copy())
+    KO_categories = KeggCalc.calculate_KO_group(
+        "KO_Categories", ko_count_per_bin_df.copy()
+    )
 
     logging.debug("Calculating module completeness information")
     KO_modules = KeggCalc.calculate_module_completeness(ko_count_per_bin_df.copy())
 
-    diamond_complete_results = pd.concat([ko_count_per_bin_df, KO_pathways, KO_modules, KO_categories], axis=1)
+    diamond_complete_results = pd.concat(
+        [ko_count_per_bin_df, KO_pathways, KO_modules, KO_categories], axis=1
+    )
 
     return diamond_complete_results, len(defaultKOs)
 
@@ -121,7 +147,8 @@ def compute_N50(list_of_lengths) -> int:
         cum_length += length
     return length
 
-def add_bin_size_and_N50(bins: Iterable[Bin], contig_to_size: Dict[str,int]):
+
+def add_bin_size_and_N50(bins: Iterable[Bin], contig_to_size: Dict[str, int]):
     """
     Add bin size and N50 to a list of bin objects.
 
@@ -136,7 +163,9 @@ def add_bin_size_and_N50(bins: Iterable[Bin], contig_to_size: Dict[str,int]):
         bin_obj.add_N50(n50)
 
 
-def add_bin_metrics(bins: Set[Bin], contig_info: Dict, contamination_weight: float, threads: int = 1):
+def add_bin_metrics(
+    bins: Set[Bin], contig_info: Dict, contamination_weight: float, threads: int = 1
+):
     """
     Add metrics to a Set of bins.
 
@@ -184,15 +213,17 @@ def chunks(iterable: Iterable, size: int) -> Iterator[Tuple]:
     return iter(lambda: tuple(islice(it, size)), ())
 
 
-def assess_bins_quality_by_chunk(bins: Iterable[Bin],
+def assess_bins_quality_by_chunk(
+    bins: Iterable[Bin],
     contig_to_kegg_counter: Dict,
     contig_to_cds_count: Dict,
     contig_to_aa_counter: Dict,
     contig_to_aa_length: Dict,
     contamination_weight: float,
-    postProcessor:Optional[modelPostprocessing.modelProcessor] = None,
+    postProcessor: Optional[modelPostprocessing.modelProcessor] = None,
     threads: int = 1,
-    chunk_size: int = 2500):
+    chunk_size: int = 2500,
+):
     """
     Assess the quality of bins in chunks.
 
@@ -206,7 +237,7 @@ def assess_bins_quality_by_chunk(bins: Iterable[Bin],
     :param contamination_weight: Weight for contamination assessment.
     :param postProcessor: post-processor from checkm2
     :param threads: Number of threads for parallel processing (default is 1).
-    :param chunk_size: The size of each chunk. 
+    :param chunk_size: The size of each chunk.
     """
 
     for i, chunk_bins_iter in enumerate(chunks(bins, chunk_size)):
@@ -214,14 +245,15 @@ def assess_bins_quality_by_chunk(bins: Iterable[Bin],
         logging.debug(f"chunk {i}: assessing quality of {len(chunk_bins)}")
         assess_bins_quality(
             bins=chunk_bins,
-            contig_to_kegg_counter= contig_to_kegg_counter,
+            contig_to_kegg_counter=contig_to_kegg_counter,
             contig_to_cds_count=contig_to_cds_count,
             contig_to_aa_counter=contig_to_aa_counter,
             contig_to_aa_length=contig_to_aa_length,
             contamination_weight=contamination_weight,
             postProcessor=postProcessor,
-            threads=threads
+            threads=threads,
         )
+
 
 def assess_bins_quality(
     bins: Iterable[Bin],
@@ -231,11 +263,12 @@ def assess_bins_quality(
     contig_to_aa_length: Dict,
     contamination_weight: float,
     postProcessor: Optional[modelPostprocessing.modelProcessor] = None,
-    threads: int = 1,):
+    threads: int = 1,
+):
     """
     Assess the quality of bins.
 
-    This function assesses the quality of bins based on various criteria and assigns completeness and contamination scores. 
+    This function assesses the quality of bins based on various criteria and assigns completeness and contamination scores.
     This code is taken from checkm2 and adjusted
 
     :param bins: List of bin objects.
@@ -250,9 +283,13 @@ def assess_bins_quality(
     if postProcessor is None:
         postProcessor = modelPostprocessing.modelProcessor(threads)
 
-    metadata_df = get_bins_metadata_df(bins, contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length)
+    metadata_df = get_bins_metadata_df(
+        bins, contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length
+    )
 
-    diamond_complete_results, ko_list_length = get_diamond_feature_per_bin_df(bins, contig_to_kegg_counter)
+    diamond_complete_results, ko_list_length = get_diamond_feature_per_bin_df(
+        bins, contig_to_kegg_counter
+    )
     diamond_complete_results = diamond_complete_results.drop(columns=["Name"])
 
     feature_vectors = pd.concat([metadata_df, diamond_complete_results], axis=1)
@@ -264,20 +301,30 @@ def assess_bins_quality(
     vector_array = feature_vectors.iloc[:, 1:].values.astype(np.float)
 
     logging.info("Predicting completeness and contamination using the general model.")
-    general_results_comp, general_results_cont = modelProc.run_prediction_general(vector_array)
+    general_results_comp, general_results_cont = modelProc.run_prediction_general(
+        vector_array
+    )
 
     logging.info("Predicting completeness using the specific model.")
-    specific_model_vector_len = (
-        ko_list_length + len(metadata_df.columns)
-    ) - 1
+    specific_model_vector_len = (ko_list_length + len(metadata_df.columns)) - 1
 
     # also retrieve scaled data for CSM calculations
-    specific_results_comp, scaled_features = modelProc.run_prediction_specific(vector_array, specific_model_vector_len)
+    specific_results_comp, scaled_features = modelProc.run_prediction_specific(
+        vector_array, specific_model_vector_len
+    )
 
-    logging.info("Using cosine similarity to reference data to select an appropriate predictor model.")
+    logging.info(
+        "Using cosine similarity to reference data to select an appropriate predictor model."
+    )
 
-    final_comp, final_cont, models_chosen, csm_array = postProcessor.calculate_general_specific_ratio(
-        vector_array[:, 20], scaled_features, general_results_comp, general_results_cont, specific_results_comp
+    final_comp, final_cont, models_chosen, csm_array = (
+        postProcessor.calculate_general_specific_ratio(
+            vector_array[:, 20],
+            scaled_features,
+            general_results_comp,
+            general_results_cont,
+            specific_results_comp,
+        )
     )
 
     final_results = feature_vectors[["Name"]].copy()

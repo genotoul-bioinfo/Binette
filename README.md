@@ -177,7 +177,7 @@ To report bugs, request new features, or seek help and support, please open an [
 This program is released as an open source software under the terms of [MIT License](LICENSE).
 
 
-## Citations
+## Citation
 
 Binette is scientific software, with a [published paper](https://joss.theoj.org/papers/10.21105/joss.06782) in the [Journal of Open-Source Software](https://joss.theoj.org/). 
 If you use Binette in academic research, please cite the following paper:

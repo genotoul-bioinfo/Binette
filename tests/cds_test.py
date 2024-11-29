@@ -5,22 +5,30 @@ import pyrodigal
 from pathlib import Path
 from unittest.mock import mock_open, patch
 
+
 class MockContig:
     def __init__(self, name, seq):
         self.seq = seq
         self.name = name
 
+
 @pytest.fixture
 def contig1():
-    contig =  MockContig(name="contig1", 
-                          seq="ATGAGCATCAGGGGAGTAGGAGGATGCAACGGGAATAGTCGAATCCCTTCTCATAATGGGGATGGATCGAATCGCAGAAGTCAAAATACGAAGGGTAATAATAAAGTTGAAGATCGAGTTTGT")
+    contig = MockContig(
+        name="contig1",
+        seq="ATGAGCATCAGGGGAGTAGGAGGATGCAACGGGAATAGTCGAATCCCTTCTCATAATGGGGATGGATCGAATCGCAGAAGTCAAAATACGAAGGGTAATAATAAAGTTGAAGATCGAGTTTGT",
+    )
     return contig
+
 
 @pytest.fixture
 def contig2():
-    contig =  MockContig(name="contig2", 
-                          seq="TTGGTCGTATGACTGATAATTTCTCAGACATTGAAAACTTTAATGAAATTTTCAACAGAAAACCTGCTTTACAATTTCGTTTTTA")
+    contig = MockContig(
+        name="contig2",
+        seq="TTGGTCGTATGACTGATAATTTCTCAGACATTGAAAACTTTAATGAAATTTTCAACAGAAAACCTGCTTTACAATTTCGTTTTTA",
+    )
     return contig
+
 
 @pytest.fixture
 def orf_finder():
@@ -31,6 +39,7 @@ def orf_finder():
         orf_finder = pyrodigal.OrfFinder(meta="meta")
 
     return orf_finder
+
 
 # Predict open reading frames with Pyrodigal using 1 thread.
 def test_predict_orf_with_1_thread(contig1, contig2):
@@ -60,7 +69,7 @@ def test_predict_orf_with_multiple_threads(contig1, contig2):
     threads = 4
 
     result = cds.predict(contigs_iterator, outfaa, threads)
-    
+
     assert isinstance(result, dict)
     assert len(result) == 2
     assert "contig1" in result
@@ -74,7 +83,6 @@ def test_predict_orf_with_multiple_threads(contig1, contig2):
 
 
 def test_predict_genes(contig1, orf_finder):
-
 
     result = cds.predict_genes(orf_finder.find_genes, contig1)
 
@@ -94,6 +102,7 @@ def test_extract_contig_name_from_cds_name():
     assert isinstance(result, str)
     assert result == "contig1"
 
+
 def test_extract_contig_name_from_cds_name():
     cds_name = "contig1_gene1"
 
@@ -103,13 +112,10 @@ def test_extract_contig_name_from_cds_name():
     assert result == "contig1"
 
 
-# Import the functions write_faa and parse_faa_file here
-
-
 def test_write_faa(contig1, orf_finder):
-    
+
     predicted_genes = orf_finder.find_genes(contig1.seq)
-    contig_name = 'contig'
+    contig_name = "contig"
     output_file = "tests/tmp_file.faa"
 
     cds.write_faa(output_file, [(contig_name, predicted_genes)])
@@ -122,10 +128,11 @@ def test_write_faa(contig1, orf_finder):
 
 
 def test_parse_faa_file(tmp_path):
-    # Mock a FASTA file
+    # Mock a FASTA file of protein sequences
+    # at least one protein sequence to not triger the error
     fasta_content = (
         ">contig1_gene1\n"
-        "AAAAAAAAAAA\n"
+        "MPPPAOSKNSKSS\n"
         ">contig1_gene2\n"
         "CCCCCCCCCCC\n"
         ">contig2_gene1\n"
@@ -139,40 +146,83 @@ def test_parse_faa_file(tmp_path):
 
     # Check if the output matches the expected dictionary
     expected_result = {
-        'contig1': ['AAAAAAAAAAA', 'CCCCCCCCCCC'],
-        'contig2': ['TTTTTTTTTTTT']
+        "contig1": ["MPPPAOSKNSKSS", "CCCCCCCCCCC"],
+        "contig2": ["TTTTTTTTTTTT"],
     }
     assert result == expected_result
 
+
+def test_parse_faa_file_raises_error_for_dna(tmp_path):
+    # Mock a DNA FASTA file
+    fasta_content = (
+        ">contig1_gene1\n"
+        "AAAAAAAAAAA\n"
+        ">contig1_gene2\n"
+        "CCCCCCCCCCC\n"
+        ">contig2_gene1\n"
+        "TTTTTTTTTTTT\n"
+    )
+    fna_file = tmp_path / "mock_file.fna"
+    fna_file.write_text(fasta_content)
+
+    # Check that ValueError is raised when DNA sequences are encountered
+    with pytest.raises(ValueError):
+        cds.parse_faa_file(fna_file)
+
+
 def test_get_aa_composition():
 
-    genes = ['AAAA',
-            "CCCC",
-            "TTTT",
-            "GGGG"]
+    genes = ["AAAA", "CCCC", "TTTT", "GGGG"]
 
     result = cds.get_aa_composition(genes)
 
-    assert dict(result) == {'A': 4, 'C': 4, 'T': 4, 'G': 4}
+    assert dict(result) == {"A": 4, "C": 4, "T": 4, "G": 4}
+
 
 def test_get_contig_cds_metadata_flat():
 
-    contig_to_genes = {"c1":["AAAA", "GGGG", "CCCC"],
-                       "c2":["TTTT", "CCCC"]}
+    contig_to_genes = {"c1": ["AAAA", "GGGG", "CCCC"], "c2": ["TTTT", "CCCC"]}
 
-    contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length = cds.get_contig_cds_metadata_flat(contig_to_genes)
-    
-    assert contig_to_cds_count == {"c1":3, "c2":2}
-    assert contig_to_aa_counter == {"c1": {'A': 4, 'G': 4, "C":4} , "c2":{'C': 4, 'T': 4}}
-    assert contig_to_aa_length == {"c1":12, "c2":8}
+    contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length = (
+        cds.get_contig_cds_metadata_flat(contig_to_genes)
+    )
+
+    assert contig_to_cds_count == {"c1": 3, "c2": 2}
+    assert contig_to_aa_counter == {
+        "c1": {"A": 4, "G": 4, "C": 4},
+        "c2": {"C": 4, "T": 4},
+    }
+    assert contig_to_aa_length == {"c1": 12, "c2": 8}
+
 
 def test_get_contig_cds_metadata():
 
-    contig_to_genes = {"c1":["AAAA", "GGGG", "CCCC"],
-                       "c2":["TTTT", "CCCC"]}
+    contig_to_genes = {"c1": ["AAAA", "GGGG", "CCCC"], "c2": ["TTTT", "CCCC"]}
 
     contig_metadata = cds.get_contig_cds_metadata(contig_to_genes, 1)
-    
-    assert contig_metadata['contig_to_cds_count'] == {"c1":3, "c2":2}
-    assert contig_metadata['contig_to_aa_counter'] == {"c1": {'A': 4, 'G': 4, "C":4} , "c2":{'C': 4, 'T': 4}}
-    assert contig_metadata['contig_to_aa_length'] == {"c1":12, "c2":8}
+
+    assert contig_metadata["contig_to_cds_count"] == {"c1": 3, "c2": 2}
+    assert contig_metadata["contig_to_aa_counter"] == {
+        "c1": {"A": 4, "G": 4, "C": 4},
+        "c2": {"C": 4, "T": 4},
+    }
+    assert contig_metadata["contig_to_aa_length"] == {"c1": 12, "c2": 8}
+
+
+# Test function
+def test_is_nucleic_acid():
+    # Valid DNA sequence
+    assert cds.is_nucleic_acid("ATCG") is True
+    assert cds.is_nucleic_acid("ATCNNNNNG") is True  # N can be found in DNA seq
+    # Valid RNA sequence
+    assert cds.is_nucleic_acid("AUGCAUGC") is True
+
+    # Mixed case
+    assert cds.is_nucleic_acid("AtCg") is True
+
+    # Invalid sequence (contains characters not part of DNA or RNA)
+    assert cds.is_nucleic_acid("ATCX") is False  # 'X' is not a valid base
+    assert cds.is_nucleic_acid("AUG#C") is False  # '#' is not a valid base
+
+    # Amino acid sequence
+    assert cds.is_nucleic_acid("MSIRGVGGNGNSR") is False  # Numbers are invalid
