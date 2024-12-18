@@ -2,11 +2,13 @@ import concurrent.futures as cf
 import multiprocessing.pool
 import logging
 from collections import Counter, defaultdict
-from typing import Dict, List, Iterator, Tuple, Any, Union
+from typing import Dict, List, Iterator, Tuple, Any, Union, Set
 
 import pyfastx
 import pyrodigal
 from tqdm import tqdm
+from pathlib import Path
+import gzip
 
 
 def get_contig_from_cds_name(cds_name: str) -> str:
@@ -207,3 +209,74 @@ def get_contig_cds_metadata(
     }
 
     return contig_info
+
+
+from typing import Set
+from pathlib import Path
+import gzip
+import pyfastx
+import logging
+
+from typing import Set
+from pathlib import Path
+import gzip
+import pyfastx
+import logging
+
+
+def filter_faa_file(
+    contigs_to_keep: Set[str],
+    input_faa_file: Path,
+    filtered_faa_file: Path,
+):
+    """
+    Filters a FASTA file containing protein sequences to only include sequences
+    from contigs present in the provided set of contigs (`contigs_to_keep`).
+
+    This function processes the input FASTA file, identifies protein sequences
+    originating from contigs listed in `contigs_to_keep`, and writes the filtered
+    sequences to a new FASTA file. The output file supports optional `.gz` compression.
+
+    Metrics computed and logged:
+    - Total number of contigs in `contigs_to_keep`.
+    - Number and proportion of contigs with at least one protein-coding gene.
+    - Number and proportion of contigs without any protein-coding genes.
+    - Number of contigs from the input FASTA file that are not in `contigs_to_keep`.
+
+    :param contigs_to_keep: A set of contig names to retain in the output FASTA file.
+    :param input_faa_file: Path to the input FASTA file containing protein sequences.
+    :param filtered_faa_file: Path to the output FASTA file for filtered sequences.
+                              If the filename ends with `.gz`, the output will be compressed.
+    """
+    # Determine whether the output file should be compressed
+    proper_open = gzip.open if str(filtered_faa_file).endswith(".gz") else open
+
+    # Initialize tracking sets for metrics
+    contigs_with_genes = set()
+    contigs_parsed = set()
+
+    # Process the input FASTA file and filter sequences based on contigs_to_keep
+    with proper_open(filtered_faa_file, "wt") as fl:
+        for name, seq in pyfastx.Fastx(input_faa_file):
+            contig = get_contig_from_cds_name(name)
+            contigs_parsed.add(contig)
+            if contig in contigs_to_keep:
+                contigs_with_genes.add(contig)
+                fl.write(f">{name}\n{seq}\n")
+
+    # Calculate metrics
+    total_contigs = len(contigs_to_keep)
+    contigs_with_no_genes = total_contigs - len(contigs_with_genes)
+    contigs_not_in_keep_list = len(contigs_parsed - contigs_to_keep)
+
+    # Log the computed metrics
+    logging.info(f"Processing protein sequences from '{input_faa_file}'.")
+    logging.info(
+        f"Filtered {input_faa_file} to retain genes from {total_contigs} contigs that are included the input bins."
+    )
+    logging.info(
+        f"Found {contigs_with_no_genes} contigs ({contigs_with_no_genes / total_contigs:.2%}) with no genes."
+    )
+    logging.debug(
+        f"{contigs_not_in_keep_list} contigs from the input FASTA file are not in the keep list."
+    )

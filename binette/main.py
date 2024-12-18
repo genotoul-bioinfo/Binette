@@ -482,12 +482,7 @@ def main():
 
     use_existing_protein_file = False
 
-    if args.proteins:
-        logging.info(f"Using the provided protein sequences file: {args.proteins}")
-        faa_file = args.proteins
-        use_existing_protein_file = True
-    else:
-        faa_file = out_tmp_dir / "assembly_proteins.faa"
+    faa_file = out_tmp_dir / "assembly_proteins.faa"
 
     diamond_result_file = out_tmp_dir / "diamond_result.tsv"
 
@@ -505,6 +500,16 @@ def main():
         args.contigs,
         fasta_extensions=set(args.fasta_extensions),
     )
+
+    if args.proteins and not args.resume:
+        logging.info(f"Using the provided protein sequences file: {args.proteins}")
+        use_existing_protein_file = True
+
+        cds.filter_faa_file(
+            contigs_in_bins,
+            input_faa_file=args.proteins,
+            filtered_faa_file=faa_file,
+        )
 
     contig_to_kegg_counter, contig_to_genes = manage_protein_alignement(
         faa_file=faa_file,
