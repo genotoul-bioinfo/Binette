@@ -315,9 +315,9 @@ def manage_protein_alignement(
 
     else:
         contigs_iterator = (
-            s
-            for s in contig_manager.parse_fasta_file(contigs_fasta.as_posix())
-            if s.name in contigs_in_bins
+            seq
+            for seq in contig_manager.parse_fasta_file(contigs_fasta.as_posix())
+            if seq.name in contigs_in_bins
         )
         contig_to_genes = cds.predict(contigs_iterator, faa_file.as_posix(), threads)
 
@@ -330,7 +330,10 @@ def manage_protein_alignement(
         else:
             raise FileNotFoundError(checkm2_db)
 
-        diamond_log = diamond_result_file.parents[0] / f"{diamond_result_file.stem}.log"
+        diamond_log = (
+            diamond_result_file.parents[0]
+            / f"{diamond_result_file.stem.split('.')[0]}.log"
+        )
 
         diamond.run(
             faa_file.as_posix(),
@@ -482,9 +485,9 @@ def main():
 
     use_existing_protein_file = False
 
-    faa_file = out_tmp_dir / "assembly_proteins.faa"
+    faa_file = out_tmp_dir / "assembly_proteins.faa.gz"
 
-    diamond_result_file = out_tmp_dir / "diamond_result.tsv"
+    diamond_result_file = out_tmp_dir / "diamond_result.tsv.gz"
 
     # Output files #
     final_bin_report: Path = args.outdir / "final_bins_quality_reports.tsv"

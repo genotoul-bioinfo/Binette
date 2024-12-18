@@ -72,7 +72,7 @@ def write_faa(outfaa: str, contig_to_genes: List[Tuple[str, pyrodigal.Genes]]) -
 
     """
     logging.info("Writing predicted protein sequences.")
-    with open(outfaa, "w") as fl:
+    with gzip.open(outfaa, "wt") as fl:
         for contig_id, genes in contig_to_genes:
             genes.write_translations(fl, contig_id)
 
@@ -236,12 +236,6 @@ def filter_faa_file(
     This function processes the input FASTA file, identifies protein sequences
     originating from contigs listed in `contigs_to_keep`, and writes the filtered
     sequences to a new FASTA file. The output file supports optional `.gz` compression.
-
-    Metrics computed and logged:
-    - Total number of contigs in `contigs_to_keep`.
-    - Number and proportion of contigs with at least one protein-coding gene.
-    - Number and proportion of contigs without any protein-coding genes.
-    - Number of contigs from the input FASTA file that are not in `contigs_to_keep`.
 
     :param contigs_to_keep: A set of contig names to retain in the output FASTA file.
     :param input_faa_file: Path to the input FASTA file containing protein sequences.
