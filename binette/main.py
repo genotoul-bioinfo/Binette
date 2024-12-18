@@ -213,6 +213,7 @@ def parse_input_files(
     bin_dirs: List[Path],
     contig2bin_tables: List[Path],
     contigs_fasta: Path,
+    temporary_dir: Path,
     fasta_extensions: Set[str] = {".fasta", ".fna", ".fa"},
 ) -> Tuple[
     Dict[str, Set[bin_manager.Bin]], Set[bin_manager.Bin], Set[str], Dict[str, int]
@@ -254,7 +255,10 @@ def parse_input_files(
     original_bins = bin_manager.dereplicate_bin_sets(bin_set_name_to_bins.values())
 
     logging.info(f"Parsing contig fasta file: {contigs_fasta}")
-    contigs_object = contig_manager.parse_fasta_file(contigs_fasta.as_posix())
+    index_file = temporary_dir / f"{contigs_fasta.name}.fxi"
+    contigs_object = contig_manager.parse_fasta_file(
+        contigs_fasta.as_posix(), index_file=index_file.as_posix()
+    )
 
     unexpected_contigs = {
         contig for contig in contigs_in_bins if contig not in contigs_object
@@ -276,6 +280,7 @@ def parse_input_files(
 def manage_protein_alignement(
     faa_file: Path,
     contigs_fasta: Path,
+    temporary_dir: Path,
     contig_to_length: Dict[str, int],
     contigs_in_bins: Set[str],
     diamond_result_file: Path,
@@ -314,9 +319,12 @@ def manage_protein_alignement(
         )
 
     else:
+        index_file = temporary_dir / f"{contigs_fasta.name}.fxi"
         contigs_iterator = (
             seq
-            for seq in contig_manager.parse_fasta_file(contigs_fasta.as_posix())
+            for seq in contig_manager.parse_fasta_file(
+                contigs_fasta.as_posix(), index_file=index_file.as_posix()
+            )
             if seq.name in contigs_in_bins
         )
         contig_to_genes = cds.predict(contigs_iterator, faa_file.as_posix(), threads)
@@ -502,6 +510,7 @@ def main():
         args.contig2bin_tables,
         args.contigs,
         fasta_extensions=set(args.fasta_extensions),
+        temporary_dir=out_tmp_dir,
     )
 
     if args.proteins and not args.resume:
@@ -517,6 +526,7 @@ def main():
     contig_to_kegg_counter, contig_to_genes = manage_protein_alignement(
         faa_file=faa_file,
         contigs_fasta=args.contigs,
+        temporary_dir=out_tmp_dir,
         contig_to_length=contig_to_length,
         contigs_in_bins=contigs_in_bins,
         diamond_result_file=diamond_result_file,
