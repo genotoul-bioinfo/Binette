@@ -342,26 +342,19 @@ def get_bins_from_contig2bin_table(contig2bin_table: Path, set_name: str) -> Lis
     return bins
 
 
-def from_bin_sets_to_bin_graph(
-    bin_name_to_bin_set: Mapping[str, Iterable[Bin]]
-) -> nx.Graph:
+def from_bins_to_bin_graph(bins) -> nx.Graph:
     """
-    Creates a bin graph from a dictionary of bin sets.
+    Creates a bin graph made of overlapping gram a set of bins.
 
-    :param bin_name_to_bin_set: A dictionary mapping bin names to their respective bin sets.
+    :param bins: a set of bins
 
     :return: A networkx Graph representing the bin graph of overlapping bins.
     """
     G = nx.Graph()
 
-    for set1_name, set2_name in itertools.combinations(bin_name_to_bin_set, 2):
-        set1 = bin_name_to_bin_set[set1_name]
-        set2 = bin_name_to_bin_set[set2_name]
-
-        for bin1, bin2 in itertools.product(set1, set2):
-
-            if bin1.overlaps_with(bin2):
-                G.add_edge(bin1, bin2)
+    for bin1, bin2 in itertools.combinations(bins, 2):
+        if bin1.overlaps_with(bin2):
+            G.add_edge(bin1, bin2)
     return G
 
 
@@ -618,18 +611,16 @@ def rename_bin_contigs(bins: Iterable[Bin], contig_to_index: dict):
         b.hash = hash(str(sorted(b.contigs)))
 
 
-def create_intermediate_bins(
-    bin_set_name_to_bins: Mapping[str, Iterable[Bin]]
-) -> Set[Bin]:
+def create_intermediate_bins(original_bins: Set[Bin]) -> Set[Bin]:
     """
     Creates intermediate bins from a dictionary of bin sets.
 
-    :param bin_set_name_to_bins: A dictionary mapping bin set names to corresponding bins.
+    :param original_bins: Set of input bins.
 
     :return: A set of intermediate bins created from intersections, differences, and unions.
     """
     logging.info("Making bin graph...")
-    connected_bins_graph = from_bin_sets_to_bin_graph(bin_set_name_to_bins)
+    connected_bins_graph = from_bins_to_bin_graph(original_bins)
 
     logging.info("Creating intersection bins...")
     intersection_bins = get_intersection_bins(connected_bins_graph)
