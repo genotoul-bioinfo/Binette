@@ -207,17 +207,15 @@ def test_parse_input_files_with_contig2bin_tables(tmp_path):
     fasta_file.write_text(fasta_file_content)
 
     # Call the function and capture the return values
-    bin_set_name_to_bins, original_bins, contigs_in_bins, contig_to_length = (
-        parse_input_files(None, [bin_set1, bin_set2], fasta_file)
+    original_bins, contigs_in_bins, contig_to_length = parse_input_files(
+        None, [bin_set1, bin_set2], fasta_file
     )
 
     # # Perform assertions on the returned values
-    assert isinstance(bin_set_name_to_bins, dict)
     assert isinstance(original_bins, set)
     assert isinstance(contigs_in_bins, set)
     assert isinstance(contig_to_length, dict)
 
-    assert set(bin_set_name_to_bins) == {"bin_set1", "bin_set2"}
     assert len(original_bins) == 4
     assert contigs_in_bins == {"contig1", "contig2", "contig3", "contig4"}
     assert len(contig_to_length) == 4
@@ -248,17 +246,15 @@ def test_parse_input_files_bin_dirs(create_temp_bin_directories, tmp_path):
     fasta_file.write_text(fasta_file_content)
 
     # Call the function and capture the return values
-    bin_set_name_to_bins, original_bins, contigs_in_bins, contig_to_length = (
-        parse_input_files(bin_dirs, contig2bin_tables, fasta_file)
+    original_bins, contigs_in_bins, contig_to_length = parse_input_files(
+        bin_dirs, contig2bin_tables, fasta_file
     )
 
     # # Perform assertions on the returned values
-    assert isinstance(bin_set_name_to_bins, dict)
     assert isinstance(original_bins, set)
     assert isinstance(contigs_in_bins, set)
     assert isinstance(contig_to_length, dict)
 
-    assert set(bin_set_name_to_bins) == {"set1", "set2"}
     assert len(original_bins) == 3
     assert contigs_in_bins == {
         "contig1",
@@ -471,7 +467,7 @@ def test_main(monkeypatch, test_environment):
     ) as mock_select_bins_and_write_them:
 
         # Set return values for mocked functions if needed
-        mock_parse_input_files.return_value = (None, None, None, None)
+        mock_parse_input_files.return_value = (None, None, None)
         mock_manage_protein_alignement.return_value = (
             {"contig1": 1},
             {"contig1": ["gene1"]},

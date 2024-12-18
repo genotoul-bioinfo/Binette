@@ -242,7 +242,7 @@ def assess_bins_quality_by_chunk(
 
     for i, chunk_bins_iter in enumerate(chunks(bins, chunk_size)):
         chunk_bins = set(chunk_bins_iter)
-        logging.debug(f"chunk {i}: assessing quality of {len(chunk_bins)}")
+        logging.debug(f"chunk {i}: assessing quality of {len(chunk_bins)} bins")
         assess_bins_quality(
             bins=chunk_bins,
             contig_to_kegg_counter=contig_to_kegg_counter,
