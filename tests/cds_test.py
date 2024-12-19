@@ -118,14 +118,14 @@ def test_write_faa(contig1, orf_finder):
 
     predicted_genes = orf_finder.find_genes(contig1.seq)
     contig_name = "contig"
-    output_file = "tests/tmp_file.faa"
+    output_file = "tests/tmp_file.faa.gz"
 
     cds.write_faa(output_file, [(contig_name, predicted_genes)])
 
     # Check if the file was created and first seq starts
     # with the contig name as expected
     assert Path(output_file).exists()
-    with open(output_file, "r") as f:
+    with gzip.open(output_file, "rt") as f:
         assert f.read().startswith(f">{contig_name}")
 
 
