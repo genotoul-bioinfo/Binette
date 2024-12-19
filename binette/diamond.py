@@ -92,6 +92,7 @@ def run(
         f"-o {output} "
         f"--threads {threads} "
         f"--db {db} "
+        f"--compress 1 "
         f"--query-cover {query_cover} "
         f"--subject-cover {subject_cover} "
         f"--id {percent_id} "
