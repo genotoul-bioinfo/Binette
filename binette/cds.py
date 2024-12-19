@@ -266,10 +266,10 @@ def filter_faa_file(
     # Log the computed metrics
     logging.info(f"Processing protein sequences from '{input_faa_file}'.")
     logging.info(
-        f"Filtered {input_faa_file} to retain genes from {total_contigs} contigs that are included the input bins."
+        f"Filtered {input_faa_file} to retain genes from {total_contigs} contigs that are included in the input bins."
     )
-    logging.info(
-        f"Found {contigs_with_no_genes} contigs ({contigs_with_no_genes / total_contigs:.2%}) with no genes."
+    logging.debug(
+        f"Found {contigs_with_no_genes}/{total_contigs}  contigs ({contigs_with_no_genes / total_contigs:.2%}) with no genes."
     )
     logging.debug(
         f"{contigs_not_in_keep_list} contigs from the input FASTA file are not in the keep list."
