@@ -226,7 +226,6 @@ def parse_input_files(
     :fasta_extensions: Possible fasta extensions to look for in the bin directory.
 
     :return: A tuple containing:
-        - Dictionary mapping bin set names to lists of bins.
         - List of original bins.
         - Dictionary mapping bins to lists of contigs.
         - Dictionary mapping contig names to their lengths.
@@ -271,7 +270,7 @@ def parse_input_files(
         seq.name: len(seq) for seq in contigs_object if seq.name in contigs_in_bins
     }
 
-    return bin_set_name_to_bins, original_bins, contigs_in_bins, contig_to_length
+    return original_bins, contigs_in_bins, contig_to_length
 
 
 def manage_protein_alignement(
@@ -500,13 +499,11 @@ def main():
         io.check_resume_file(faa_file, diamond_result_file)
         use_existing_protein_file = True
 
-    bin_set_name_to_bins, original_bins, contigs_in_bins, contig_to_length = (
-        parse_input_files(
-            args.bin_dirs,
-            args.contig2bin_tables,
-            args.contigs,
-            fasta_extensions=set(args.fasta_extensions),
-        )
+    original_bins, contigs_in_bins, contig_to_length = parse_input_files(
+        args.bin_dirs,
+        args.contig2bin_tables,
+        args.contigs,
+        fasta_extensions=set(args.fasta_extensions),
     )
 
     contig_to_kegg_counter, contig_to_genes = manage_protein_alignement(
@@ -552,10 +549,10 @@ def main():
     logging.info(
         f"Writting original input bin metrics to directory: {original_bin_report_dir}"
     )
-    io.write_original_bin_metrics(bin_set_name_to_bins, original_bin_report_dir)
+    io.write_original_bin_metrics(original_bins, original_bin_report_dir)
 
     logging.info("Create intermediate bins:")
-    new_bins = bin_manager.create_intermediate_bins(bin_set_name_to_bins)
+    new_bins = bin_manager.create_intermediate_bins(original_bins)
 
     logging.info("Assess quality for supplementary intermediate bins.")
     new_bins = bin_quality.add_bin_metrics(

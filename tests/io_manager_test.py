@@ -350,17 +350,16 @@ def test_write_original_bin_metrics(mock_write_bin_info, bin1, bin2, tmp_path):
 
     temp_directory = tmp_path / "test_output"
 
-    mock_bins = {"set1": {bin1}, "set2": {bin2}}
     # Call the function with mock data
-    io_manager.write_original_bin_metrics(mock_bins, temp_directory)
+    io_manager.write_original_bin_metrics({bin1, bin2}, temp_directory)
 
     # Check if the output directory was created
     assert temp_directory.exists(), "Output directory should be created."
 
     # Check that the correct files are created
     expected_files = [
-        temp_directory / "input_bins_1.set1.tsv",
-        temp_directory / "input_bins_2.set2.tsv",
+        temp_directory / "input_bins_1.origin1.tsv",
+        temp_directory / "input_bins_2.origin2.tsv",
     ]
 
     assert (
@@ -373,5 +372,5 @@ def test_write_original_bin_metrics(mock_write_bin_info, bin1, bin2, tmp_path):
     ), "write_bin_info should be called once for each bin set."
 
     # Verify the specific calls to `write_bin_info`
-    mock_write_bin_info.assert_any_call(mock_bins["set1"], expected_files[0])
-    mock_write_bin_info.assert_any_call(mock_bins["set2"], expected_files[1])
+    mock_write_bin_info.assert_any_call({bin1}, expected_files[0])
+    mock_write_bin_info.assert_any_call({bin2}, expected_files[1])

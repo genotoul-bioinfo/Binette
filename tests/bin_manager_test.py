@@ -256,11 +256,11 @@ def test_select_best_bins_with_equality():
 
 # The function should create intersection bins when there are overlapping contigs between bins.
 def test_intersection_bins_created():
-    set1 = [
+    set1 = {
         bin_manager.Bin(contigs={"1", "2"}, origin="A", name="bin1"),
         bin_manager.Bin(contigs={"3", "4"}, origin="A", name="bin2"),
         bin_manager.Bin(contigs={"5"}, origin="A", name="bin2"),
-    ]
+    }
     # need to defined completeness and conta
     # because when too low the bin is not used in all operation
     for b in set1:
@@ -270,14 +270,12 @@ def test_intersection_bins_created():
     binA = bin_manager.Bin(contigs={"1", "3"}, origin="B", name="binA")
     binA.contamination = 0
     binA.completeness = 100
-    set2 = [
+    set2 = {
         binA,
-    ]
-    bin_set_name_to_bins = {"set1": set1, "set2": set2}
+    }
+    input_bins = set1 | set2
 
-    intermediate_bins_result = bin_manager.create_intermediate_bins(
-        bin_set_name_to_bins
-    )
+    intermediate_bins_result = bin_manager.create_intermediate_bins(input_bins)
 
     expected_intermediate_bins = {
         bin_manager.Bin(contigs={"1", "2", "3"}, origin="bin1 | binA ", name="NA"),
@@ -337,19 +335,19 @@ def test_dereplicate_bin_sets():
     assert derep_bins_result == {b1, b2, b3}
 
 
-def test_from_bin_sets_to_bin_graph():
+def test_from_bins_to_bin_graph():
 
     bin1 = bin_manager.Bin(contigs={"1", "2"}, origin="A", name="bin1")
     bin2 = bin_manager.Bin(contigs={"3", "4"}, origin="A", name="bin2")
     bin3 = bin_manager.Bin(contigs={"5"}, origin="A", name="bin3")
 
-    set1 = [bin1, bin2, bin3]
+    set1 = {bin1, bin2, bin3}
 
     binA = bin_manager.Bin(contigs={"1", "3"}, origin="B", name="binA")
 
-    set2 = [binA]
+    set2 = {binA}
 
-    result_graph = bin_manager.from_bin_sets_to_bin_graph({"B": set2, "A": set1})
+    result_graph = bin_manager.from_bins_to_bin_graph(set1 | set2)
 
     assert result_graph.number_of_edges() == 2
     # bin3 is not connected to any bin so it is not in the graph
