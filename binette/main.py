@@ -213,6 +213,7 @@ def parse_input_files(
     bin_dirs: List[Path],
     contig2bin_tables: List[Path],
     contigs_fasta: Path,
+    temporary_dir: Path,
     fasta_extensions: Set[str] = {".fasta", ".fna", ".fa"},
 ) -> Tuple[
     Dict[str, Set[bin_manager.Bin]], Set[bin_manager.Bin], Set[str], Dict[str, int]
@@ -254,7 +255,10 @@ def parse_input_files(
     original_bins = bin_manager.dereplicate_bin_sets(bin_set_name_to_bins.values())
 
     logging.info(f"Parsing contig fasta file: {contigs_fasta}")
-    contigs_object = contig_manager.parse_fasta_file(contigs_fasta.as_posix())
+    index_file = temporary_dir / f"{contigs_fasta.name}.fxi"
+    contigs_object = contig_manager.parse_fasta_file(
+        contigs_fasta.as_posix(), index_file=index_file.as_posix()
+    )
 
     unexpected_contigs = {
         contig for contig in contigs_in_bins if contig not in contigs_object
@@ -276,6 +280,7 @@ def parse_input_files(
 def manage_protein_alignement(
     faa_file: Path,
     contigs_fasta: Path,
+    temporary_dir: Path,
     contig_to_length: Dict[str, int],
     contigs_in_bins: Set[str],
     diamond_result_file: Path,
@@ -314,10 +319,13 @@ def manage_protein_alignement(
         )
 
     else:
+        index_file = temporary_dir / f"{contigs_fasta.name}.fxi"
         contigs_iterator = (
-            s
-            for s in contig_manager.parse_fasta_file(contigs_fasta.as_posix())
-            if s.name in contigs_in_bins
+            seq
+            for seq in contig_manager.parse_fasta_file(
+                contigs_fasta.as_posix(), index_file=index_file.as_posix()
+            )
+            if seq.name in contigs_in_bins
         )
         contig_to_genes = cds.predict(contigs_iterator, faa_file.as_posix(), threads)
 
@@ -330,7 +338,10 @@ def manage_protein_alignement(
         else:
             raise FileNotFoundError(checkm2_db)
 
-        diamond_log = diamond_result_file.parents[0] / f"{diamond_result_file.stem}.log"
+        diamond_log = (
+            diamond_result_file.parents[0]
+            / f"{diamond_result_file.stem.split('.')[0]}.log"
+        )
 
         diamond.run(
             faa_file.as_posix(),
@@ -382,28 +393,17 @@ def select_bins_and_write_them(
     outdir_final_bin_set = outdir / "final_bins"
     os.makedirs(outdir_final_bin_set, exist_ok=True)
 
-    if debug:
-        all_bins_for_debug = set(all_bins)
-        all_bin_compo_file = outdir / "all_bins_quality_reports.tsv"
-
-        logging.info(f"Writing all bins in {all_bin_compo_file}")
-
-        io.write_bin_info(all_bins_for_debug, all_bin_compo_file, add_contigs=True)
-
-        with open(os.path.join(outdir, "index_to_contig.tsv"), "w") as flout:
-            flout.write("\n".join((f"{i}\t{c}" for i, c in index_to_contig.items())))
-
-    logging.info("Selecting best bins")
-    selected_bins = bin_manager.select_best_bins(all_bins)
-
-    logging.info(f"Bin Selection: {len(selected_bins)} selected bins")
-
     logging.info(
         f"Filtering bins: only bins with completeness >= {min_completeness} are kept"
     )
-    selected_bins = [b for b in selected_bins if b.is_complete_enough(min_completeness)]
+    all_bins_complete_enough = {
+        b for b in all_bins if b.is_complete_enough(min_completeness)
+    }
 
-    logging.info(f"Filtering bins: {len(selected_bins)} selected bins")
+    logging.info("Selecting best bins")
+    selected_bins = bin_manager.select_best_bins(all_bins_complete_enough)
+
+    logging.info(f"Bin Selection: {len(selected_bins)} selected bins")
 
     logging.info(f"Writing selected bins in {final_bin_report}")
 
@@ -413,6 +413,16 @@ def select_bins_and_write_them(
     io.write_bin_info(selected_bins, final_bin_report)
 
     io.write_bins_fasta(selected_bins, contigs_fasta, outdir_final_bin_set)
+
+    if debug:
+        all_bin_compo_file = outdir / "all_bins_quality_reports.tsv"
+
+        logging.info(f"Writing all bins in {all_bin_compo_file}")
+
+        io.write_bin_info(all_bins, all_bin_compo_file, add_contigs=True)
+
+        with open(os.path.join(outdir, "index_to_contig.tsv"), "w") as flout:
+            flout.write("\n".join((f"{i}\t{c}" for i, c in index_to_contig.items())))
 
     return selected_bins
 
@@ -482,14 +492,9 @@ def main():
 
     use_existing_protein_file = False
 
-    if args.proteins:
-        logging.info(f"Using the provided protein sequences file: {args.proteins}")
-        faa_file = args.proteins
-        use_existing_protein_file = True
-    else:
-        faa_file = out_tmp_dir / "assembly_proteins.faa"
+    faa_file = out_tmp_dir / "assembly_proteins.faa.gz"
 
-    diamond_result_file = out_tmp_dir / "diamond_result.tsv"
+    diamond_result_file = out_tmp_dir / "diamond_result.tsv.gz"
 
     # Output files #
     final_bin_report: Path = args.outdir / "final_bins_quality_reports.tsv"
@@ -504,11 +509,23 @@ def main():
         args.contig2bin_tables,
         args.contigs,
         fasta_extensions=set(args.fasta_extensions),
+        temporary_dir=out_tmp_dir,
     )
+
+    if args.proteins and not args.resume:
+        logging.info(f"Using the provided protein sequences file: {args.proteins}")
+        use_existing_protein_file = True
+
+        cds.filter_faa_file(
+            contigs_in_bins,
+            input_faa_file=args.proteins,
+            filtered_faa_file=faa_file,
+        )
 
     contig_to_kegg_counter, contig_to_genes = manage_protein_alignement(
         faa_file=faa_file,
         contigs_fasta=args.contigs,
+        temporary_dir=out_tmp_dir,
         contig_to_length=contig_to_length,
         contigs_in_bins=contigs_in_bins,
         diamond_result_file=diamond_result_file,
@@ -554,9 +571,12 @@ def main():
     logging.info("Create intermediate bins:")
     new_bins = bin_manager.create_intermediate_bins(original_bins)
 
-    logging.info("Assess quality for supplementary intermediate bins.")
-    new_bins = bin_quality.add_bin_metrics(
-        new_bins, contig_metadat, args.contamination_weight, args.threads
+    logging.info(f"Assess quality for {len(new_bins)} intermediate bins.")
+    bin_quality.add_bin_metrics(
+        new_bins,
+        contig_metadat,
+        args.contamination_weight,
+        args.threads,
     )
 
     logging.info("Dereplicating input bins and new bins")
