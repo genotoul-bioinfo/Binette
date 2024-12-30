@@ -393,28 +393,17 @@ def select_bins_and_write_them(
     outdir_final_bin_set = outdir / "final_bins"
     os.makedirs(outdir_final_bin_set, exist_ok=True)
 
-    if debug:
-        all_bins_for_debug = set(all_bins)
-        all_bin_compo_file = outdir / "all_bins_quality_reports.tsv"
-
-        logging.info(f"Writing all bins in {all_bin_compo_file}")
-
-        io.write_bin_info(all_bins_for_debug, all_bin_compo_file, add_contigs=True)
-
-        with open(os.path.join(outdir, "index_to_contig.tsv"), "w") as flout:
-            flout.write("\n".join((f"{i}\t{c}" for i, c in index_to_contig.items())))
-
-    logging.info("Selecting best bins")
-    selected_bins = bin_manager.select_best_bins(all_bins)
-
-    logging.info(f"Bin Selection: {len(selected_bins)} selected bins")
-
     logging.info(
         f"Filtering bins: only bins with completeness >= {min_completeness} are kept"
     )
-    selected_bins = [b for b in selected_bins if b.is_complete_enough(min_completeness)]
+    all_bins_complete_enough = {
+        b for b in all_bins if b.is_complete_enough(min_completeness)
+    }
 
-    logging.info(f"Filtering bins: {len(selected_bins)} selected bins")
+    logging.info("Selecting best bins")
+    selected_bins = bin_manager.select_best_bins(all_bins_complete_enough)
+
+    logging.info(f"Bin Selection: {len(selected_bins)} selected bins")
 
     logging.info(f"Writing selected bins in {final_bin_report}")
 
@@ -424,6 +413,16 @@ def select_bins_and_write_them(
     io.write_bin_info(selected_bins, final_bin_report)
 
     io.write_bins_fasta(selected_bins, contigs_fasta, outdir_final_bin_set)
+
+    if debug:
+        all_bin_compo_file = outdir / "all_bins_quality_reports.tsv"
+
+        logging.info(f"Writing all bins in {all_bin_compo_file}")
+
+        io.write_bin_info(all_bins, all_bin_compo_file, add_contigs=True)
+
+        with open(os.path.join(outdir, "index_to_contig.tsv"), "w") as flout:
+            flout.write("\n".join((f"{i}\t{c}" for i, c in index_to_contig.items())))
 
     return selected_bins
 
@@ -572,9 +571,12 @@ def main():
     logging.info("Create intermediate bins:")
     new_bins = bin_manager.create_intermediate_bins(original_bins)
 
-    logging.info("Assess quality for supplementary intermediate bins.")
-    new_bins = bin_quality.add_bin_metrics(
-        new_bins, contig_metadat, args.contamination_weight, args.threads
+    logging.info(f"Assess quality for {len(new_bins)} intermediate bins.")
+    bin_quality.add_bin_metrics(
+        new_bins,
+        contig_metadat,
+        args.contamination_weight,
+        args.threads,
     )
 
     logging.info("Dereplicating input bins and new bins")
