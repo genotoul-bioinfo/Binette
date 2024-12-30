@@ -211,19 +211,6 @@ def get_contig_cds_metadata(
     return contig_info
 
 
-from typing import Set
-from pathlib import Path
-import gzip
-import pyfastx
-import logging
-
-from typing import Set
-from pathlib import Path
-import gzip
-import pyfastx
-import logging
-
-
 def filter_faa_file(
     contigs_to_keep: Set[str],
     input_faa_file: Path,
