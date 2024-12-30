@@ -385,21 +385,9 @@ def get_intersection_bins(G: nx.Graph) -> Set[Bin]:
         bins_combinations = get_all_possible_combinations(clique)
         for bins in bins_combinations:
             if max((b.completeness for b in bins)) < 40:
-                # logging.debug(
-                #     "completeness is not good enough to create a new bin on intersection"
-                # )
-                # logging.debug(
-                #     f"{[(str(b), b.completeness, b.contamination)  for b in bins]}"
-                # )
                 continue
 
             intersec_bin = bins[0].intersection(*bins[1:])
-
-            # if intersec_bin in clique:
-            #     print("=" * 10, "****intersec_bin in clique", intersec_bin)
-
-            # if intersec_bin in G:
-            #     print("=" * 10, "****intersec_bin in clique", intersec_bin)
 
             if intersec_bin.contigs:  # and intersec_bin not in clique:
 
@@ -425,19 +413,8 @@ def get_difference_bins(G: nx.Graph) -> Set[Bin]:
 
             for bin_a in bins:
                 if bin_a.completeness < 40:
-                    # logging.debug(
-                    #     f"completeness of {bin_a} is not good enough to do difference... "
-                    # )
-                    # logging.debug(
-                    #     f"{[(str(b), b.completeness, b.contamination)  for b in bins]}"
-                    # )
                     continue
                 bin_diff = bin_a.difference(*(b for b in bins if b != bin_a))
-                # if bin_diff in clique:
-                #     print("=" * 10, "****bin_diff in clique", bin_diff)
-
-                # if bin_diff in G:
-                #     print("=" * 10, "****bin_diff in clique", bin_diff)
 
                 if bin_diff.contigs:  # and bin_diff not in clique:
                     difference_bins.add(bin_diff)
@@ -459,23 +436,11 @@ def get_union_bins(G: nx.Graph, max_conta: int = 50) -> Set[Bin]:
         bins_combinations = get_all_possible_combinations(clique)
         for bins in bins_combinations:
             if max((b.contamination for b in bins)) > 20:
-                # logging.debug(
-                #     "Some bin are too contaminated to make a useful union bin"
-                # )
-                # logging.debug(
-                #     f"{[(str(b), b.completeness, b.contamination)  for b in bins]}"
-                # )
                 continue
 
             bins = set(bins)
             bin_a = bins.pop()
             bin_union = bin_a.union(*bins)
-            # if bin_union in clique:
-            #     print("=" * 10, "****bin_union in clique", bin_union)
-
-            # if bin_union in G:
-            #     print("=" * 10, "****bin_union in clique", bin_union)
-
             if bin_union.contigs:  # and bin_union not in clique:
                 union_bins.add(bin_union)
 
@@ -636,34 +601,22 @@ def create_intermediate_bins(original_bins: Set[Bin]) -> Set[Bin]:
     :return: A set of intermediate bins created from intersections, differences, and unions.
     """
 
-    # original_bin_hashes = [b.hash for b in original_bins]
-
     logging.info("Making bin graph...")
     connected_bins_graph = from_bins_to_bin_graph(original_bins)
 
     logging.info("Creating intersection bins...")
     intersection_bins = get_intersection_bins(connected_bins_graph)
-    # intersection_bins = {
-    #     bin_obj
-    #     for bin_obj in intersection_bins
-    #     if bin_obj.hash not in original_bin_hashes
-    # }
+
     logging.info(f"{len(intersection_bins)} bins created on intersections.")
 
     logging.info("Creating difference bins...")
     difference_bins = get_difference_bins(connected_bins_graph)
-    # difference_bins = {
-    #     bin_obj
-    #     for bin_obj in difference_bins
-    #     if bin_obj.hash not in original_bin_hashes
-    # }
+
     logging.info(f"{len(difference_bins)} bins created based on symmetric difference.")
 
     logging.info("Creating union bins...")
     union_bins = get_union_bins(connected_bins_graph)
-    # union_bins = {
-    #     bin_obj for bin_obj in union_bins if bin_obj.hash not in original_bin_hashes
-    # }
+
     logging.info(f"{len(union_bins)} bins created on unions.")
 
     new_bins = difference_bins | intersection_bins | union_bins
