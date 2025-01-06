@@ -155,7 +155,7 @@ def test_run_diamond_tool_found(monkeypatch):
         # Simulating successful run of diamond command
         if (
             args[0]
-            == "diamond blastp --outfmt 6 --max-target-seqs 1 --query test.faa -o output.txt --threads 1 --db db --query-cover 80 --subject-cover 80 --id 30 --evalue 1e-05 --block-size 2 2> log.txt"
+            == "diamond blastp --outfmt 6 --max-target-seqs 1 --query test.faa -o output.txt --threads 1 --db db --compress 1 --query-cover 80 --subject-cover 80 --id 30 --evalue 1e-05 --block-size 2 2> log.txt"
         ):
             return CompletedProcess(0)
 

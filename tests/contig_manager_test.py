@@ -4,12 +4,13 @@ import pytest
 
 
 # Parses a valid FASTA file and returns a pyfastx.Fasta object.
-def test_valid_fasta_file():
+def test_valid_fasta_file(tmp_path):
     # Arrange
     fasta_file = "tests/contigs.fasta"
 
-    # Act
-    result = contig_manager.parse_fasta_file(fasta_file)
+    index_file = "tests/contigs.fasta.fxi"
+
+    result = contig_manager.parse_fasta_file(fasta_file, str(index_file))
 
     # Assert
     assert isinstance(result, pyfastx.Fasta)
@@ -22,7 +23,7 @@ def test_invalid_fasta_file():
 
     # Act and Assert
     with pytest.raises(RuntimeError):
-        contig_manager.parse_fasta_file(fasta_file)
+        contig_manager.parse_fasta_file(fasta_file, "./index.fxi")
 
 
 # The function returns a tuple containing two dictionaries.

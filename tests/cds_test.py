@@ -5,6 +5,8 @@ import pyrodigal
 from pathlib import Path
 from unittest.mock import mock_open, patch
 
+import gzip
+
 
 class MockContig:
     def __init__(self, name, seq):
@@ -116,14 +118,14 @@ def test_write_faa(contig1, orf_finder):
 
     predicted_genes = orf_finder.find_genes(contig1.seq)
     contig_name = "contig"
-    output_file = "tests/tmp_file.faa"
+    output_file = "tests/tmp_file.faa.gz"
 
     cds.write_faa(output_file, [(contig_name, predicted_genes)])
 
     # Check if the file was created and first seq starts
     # with the contig name as expected
     assert Path(output_file).exists()
-    with open(output_file, "r") as f:
+    with gzip.open(output_file, "rt") as f:
         assert f.read().startswith(f">{contig_name}")
 
 
@@ -226,3 +228,65 @@ def test_is_nucleic_acid():
 
     # Amino acid sequence
     assert cds.is_nucleic_acid("MSIRGVGGNGNSR") is False  # Numbers are invalid
+
+
+def test_filter_faa_file_basic(tmp_path):
+    """Test basic functionality of filtering a FASTA file."""
+    # Create input data
+    input_faa = tmp_path / "input.faa"
+    filtered_faa = tmp_path / "filtered.faa"
+
+    input_faa.write_text(
+        ">contig1_gene1\nATGCGT\n" ">contig2_gene1\nATGCCG\n" ">contig3_gene1\nATGAAA\n"
+    )
+
+    # Contigs to keep
+    contigs_to_keep = {"contig1", "contig3"}
+
+    # Run the function
+    cds.filter_faa_file(contigs_to_keep, input_faa, filtered_faa)
+
+    # Check the filtered output
+    expected_output = ">contig1_gene1\nATGCGT\n>contig3_gene1\nATGAAA\n"
+    assert filtered_faa.read_text() == expected_output
+
+
+def test_filter_faa_file_gz_output(tmp_path):
+    """Test filtering with gzipped output."""
+    input_faa = tmp_path / "input.faa"
+    filtered_faa = tmp_path / "filtered.faa.gz"
+
+    input_faa.write_text(
+        ">contig1_gene1\nATGCGT\n" ">contig2_gene1\nATGCCG\n" ">contig3_gene1\nATGAAA\n"
+    )
+
+    # Contigs to keep
+    contigs_to_keep = {"contig2"}
+
+    # Run the function
+    cds.filter_faa_file(contigs_to_keep, input_faa, filtered_faa)
+
+    # Check the filtered output
+    with gzip.open(filtered_faa, "rt") as f:
+        filtered_content = f.read()
+    expected_output = ">contig2_gene1\nATGCCG\n"
+    assert filtered_content == expected_output
+
+
+def test_filter_faa_file_no_matching_contigs(tmp_path):
+    """Test filtering when no contigs match the input list."""
+    input_faa = tmp_path / "input.faa"
+    filtered_faa = tmp_path / "filtered_no_match.faa"
+
+    input_faa.write_text(
+        ">contig1_gene1\nATGCGT\n" ">contig2_gene1\nATGCCG\n" ">contig3_gene1\nATGAAA\n"
+    )
+
+    # Contigs to keep
+    contigs_to_keep = {"contig4", "contig5"}
+
+    # Run the function
+    cds.filter_faa_file(contigs_to_keep, input_faa, filtered_faa)
+
+    # Check the output file is empty
+    assert filtered_faa.read_text() == ""

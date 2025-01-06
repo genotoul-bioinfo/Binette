@@ -2,7 +2,7 @@ import pyfastx
 from typing import Dict, Iterable, Tuple, Set, Any, Union
 
 
-def parse_fasta_file(fasta_file: str) -> pyfastx.Fasta:
+def parse_fasta_file(fasta_file: str, index_file: str) -> pyfastx.Fasta:
     """
     Parse a FASTA file and return a pyfastx.Fasta object.
 
@@ -10,7 +10,7 @@ def parse_fasta_file(fasta_file: str) -> pyfastx.Fasta:
 
     :return: A pyfastx.Fasta object representing the parsed FASTA file.
     """
-    fa = pyfastx.Fasta(fasta_file, build_index=True)
+    fa = pyfastx.Fasta(fasta_file, build_index=True, index_file=index_file)
     return fa
 
 

@@ -8,7 +8,7 @@ from typing import Dict, Iterable, Optional, Tuple, Iterator, Set
 import numpy as np
 import pandas as pd
 from binette.bin_manager import Bin
-
+from tqdm import tqdm
 
 # Suppress unnecessary TensorFlow warnings
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
@@ -109,7 +109,7 @@ def get_diamond_feature_per_bin_df(
     ko_count_per_bin_df = ko_count_per_bin_df.astype(int)
     ko_count_per_bin_df["Name"] = ko_count_per_bin_df.index
 
-    logging.info("Calculating completeness of pathways and modules.")
+    logging.debug("Calculating completeness of pathways and modules.")
     logging.debug("Calculating pathway completeness information")
     KO_pathways = KeggCalc.calculate_KO_group("KO_Pathways", ko_count_per_bin_df.copy())
 
@@ -184,11 +184,11 @@ def add_bin_metrics(
     contig_to_aa_length = contig_info["contig_to_aa_length"]
     contig_to_length = contig_info["contig_to_length"]
 
-    logging.info("Assess bin length and N50")
+    logging.info("Getting bin length and N50")
 
     add_bin_size_and_N50(bins, contig_to_length)
 
-    logging.info("Assess bin quality")
+    logging.info(f"Assessing bin quality for {len(bins)}")
     assess_bins_quality_by_chunk(
         bins,
         contig_to_kegg_counter,
@@ -197,6 +197,7 @@ def add_bin_metrics(
         contig_to_aa_length,
         contamination_weight,
         postProcessor,
+        chunk_size=1000,
     )
     return bins
 
@@ -239,20 +240,21 @@ def assess_bins_quality_by_chunk(
     :param threads: Number of threads for parallel processing (default is 1).
     :param chunk_size: The size of each chunk.
     """
-
-    for i, chunk_bins_iter in enumerate(chunks(bins, chunk_size)):
-        chunk_bins = set(chunk_bins_iter)
-        logging.debug(f"chunk {i}: assessing quality of {len(chunk_bins)} bins")
-        assess_bins_quality(
-            bins=chunk_bins,
-            contig_to_kegg_counter=contig_to_kegg_counter,
-            contig_to_cds_count=contig_to_cds_count,
-            contig_to_aa_counter=contig_to_aa_counter,
-            contig_to_aa_length=contig_to_aa_length,
-            contamination_weight=contamination_weight,
-            postProcessor=postProcessor,
-            threads=threads,
-        )
+    with tqdm(total=len(bins), unit="bin") as pbar:
+        for i, chunk_bins_iter in enumerate(chunks(bins, chunk_size)):
+            chunk_bins = set(chunk_bins_iter)
+            logging.debug(f"chunk {i}: assessing quality of {len(chunk_bins)} bins")
+            bins_scored = assess_bins_quality(
+                bins=chunk_bins,
+                contig_to_kegg_counter=contig_to_kegg_counter,
+                contig_to_cds_count=contig_to_cds_count,
+                contig_to_aa_counter=contig_to_aa_counter,
+                contig_to_aa_length=contig_to_aa_length,
+                contamination_weight=contamination_weight,
+                postProcessor=postProcessor,
+                threads=threads,
+            )
+            pbar.update(len(bins_scored))
 
 
 def assess_bins_quality(
@@ -300,12 +302,12 @@ def assess_bins_quality(
 
     vector_array = feature_vectors.iloc[:, 1:].values.astype(np.float)
 
-    logging.info("Predicting completeness and contamination using the general model.")
+    logging.debug("Predicting completeness and contamination using the general model.")
     general_results_comp, general_results_cont = modelProc.run_prediction_general(
         vector_array
     )
 
-    logging.info("Predicting completeness using the specific model.")
+    logging.debug("Predicting completeness using the specific model.")
     specific_model_vector_len = (ko_list_length + len(metadata_df.columns)) - 1
 
     # also retrieve scaled data for CSM calculations
@@ -313,7 +315,7 @@ def assess_bins_quality(
         vector_array, specific_model_vector_len
     )
 
-    logging.info(
+    logging.debug(
         "Using cosine similarity to reference data to select an appropriate predictor model."
     )
 
@@ -336,3 +338,4 @@ def assess_bins_quality(
         contamination = final_results.at[bin_obj.id, "Contamination"]
 
         bin_obj.add_quality(completeness, contamination, contamination_weight)
+    return bins

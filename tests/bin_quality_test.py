@@ -234,6 +234,7 @@ def test_add_bin_metrics(monkeypatch):
             contig_info["contig_to_aa_length"],
             contamination_weight,
             "mock_modelProcessor",  # Mocked postProcessor object
+            chunk_size=1000,
         )
 
 
