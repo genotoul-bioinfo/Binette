@@ -9,6 +9,7 @@ import networkx as nx
 from typing import List, Dict, Iterable, Tuple, Set, Mapping
 from tqdm import tqdm
 
+
 class Bin:
     counter = 0
 

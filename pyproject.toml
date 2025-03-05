@@ -22,7 +22,7 @@ classifiers=[
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",
     "Topic :: Scientific/Engineering :: Bio-Informatics"]
-requires-python = "3.12"
+requires-python = ">=3.12"
 license = {file="LICENCE"}
 
 [project.optional-dependencies]

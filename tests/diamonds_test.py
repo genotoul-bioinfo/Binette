@@ -231,8 +231,9 @@ def test_get_contig_to_kegg_id():
     mocked_kegg_calculator = MockedKeggCalculator()
 
     # Mocking relevant functions and classes used within the function
-    with patch("pandas.read_csv", return_value=mocked_df), patch(
-        "checkm2.keggData.KeggCalculator", return_value=mocked_kegg_calculator
+    with (
+        patch("pandas.read_csv", return_value=mocked_df),
+        patch("checkm2.keggData.KeggCalculator", return_value=mocked_kegg_calculator),
     ):
 
         # Call the function
