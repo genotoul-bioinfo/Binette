@@ -92,6 +92,7 @@ def test_select_bins_and_write_them(tmp_path, tmpdir, bins):
         min_completeness=60,
         index_to_contig=index_to_contig,
         outdir=outdir,
+        temporary_dir=tmp_path,
         debug=True,
     )
 

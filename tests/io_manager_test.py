@@ -256,6 +256,8 @@ def test_write_bin_info_add_contig(tmp_path, bin1, bin2):
 def test_write_bins_fasta(tmp_path, bin1, bin2):
     # Mock input data
     contigs_fasta = tmp_path / "contigs.fasta"
+    index_file = tmp_path / "contigs.fasta.fxi"
+
     contigs_fasta_content = (
         ">contig1\nACGT\n>contig2\nTGCA\n>contig3\nAAAA\n>contig4\nCCCC\n"
     )
@@ -267,7 +269,9 @@ def test_write_bins_fasta(tmp_path, bin1, bin2):
     outdir.mkdir()
 
     # Call the function
-    io_manager.write_bins_fasta(selected_bins, contigs_fasta, outdir)
+    io_manager.write_bins_fasta(
+        selected_bins, contigs_fasta, outdir, index_file=index_file
+    )
 
     # Check if the files were created and their content matches the expected output
     assert (outdir / "bin_1.fa").exists()

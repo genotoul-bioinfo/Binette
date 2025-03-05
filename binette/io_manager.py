@@ -163,7 +163,7 @@ def write_bin_info(bins: Iterable[Bin], output: Path, add_contigs: bool = False)
 
 
 def write_bins_fasta(
-    selected_bins: List[Bin], contigs_fasta: Path, outdir: Path, index_file: str
+    selected_bins: List[Bin], contigs_fasta: Path, outdir: Path, index_file: Path
 ):
     """
     Write selected bins' contigs to separate FASTA files.
@@ -174,7 +174,7 @@ def write_bins_fasta(
     """
 
     fa = pyfastx.Fasta(
-        contigs_fasta.as_posix(), build_index=True, index_file=index_file
+        contigs_fasta.as_posix(), build_index=True, index_file=index_file.as_posix()
     )
 
     for sbin in selected_bins:
