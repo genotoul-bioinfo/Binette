@@ -214,11 +214,12 @@ def test_add_bin_metrics(monkeypatch):
     monkeypatch.setattr(modelPostprocessing, "modelProcessor", mock_modelProcessor)
 
     # Mock the functions called within add_bin_metrics
-    with patch(
-        "binette.bin_quality.add_bin_size_and_N50"
-    ) as mock_add_bin_size_and_N50, patch(
-        "binette.bin_quality.assess_bins_quality_by_chunk"
-    ) as mock_assess_bins_quality_by_chunk:
+    with (
+        patch("binette.bin_quality.add_bin_size_and_N50") as mock_add_bin_size_and_N50,
+        patch(
+            "binette.bin_quality.assess_bins_quality_by_chunk"
+        ) as mock_assess_bins_quality_by_chunk,
+    ):
 
         add_bin_metrics(bins, contig_info, contamination_weight, threads)
 
