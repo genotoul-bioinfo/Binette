@@ -29,7 +29,7 @@ jobs:
     # Install requirements 
     - uses: conda-incubator/setup-miniconda@v3
       with:
-        # mamba-version: "*"
+        mamba-version: "*"
         python-version: ${{ matrix.python-version }}
         channels: conda-forge,bioconda
         environment-file: binette.yaml
