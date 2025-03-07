@@ -11,7 +11,6 @@ on:
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "check_recipe"
   check_recipe:
     name: test bioconda recipes on ${{ matrix.os }} with python ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
@@ -19,27 +18,37 @@ jobs:
       matrix:
         os: ['ubuntu-latest','macos-13']
         python-version: ['3.8']
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v4
-      # Setting up miniconda
-      - uses: conda-incubator/setup-miniconda@v3
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v3
         with:
           mamba-version: "*"
           python-version: ${{ matrix.python-version }}
-          channels: conda-forge,bioconda,defaults
+          channels: conda-forge,bioconda
           activate-environment: test
-      - name: Set up test environment
+
+      - name: Install binette with mamba
         shell: bash -l {0}
         run: |
             mamba install -y binette
-      - name: check installation
+
+      - name: Get binette version
+        id: binette_version
         shell: bash -l {0}
         run: |
-            python --version
-            binette --version
-      - name: Test with pytest
+            BINETTE_VERSION=$(binette --version | awk '{print $NF}')  # Extract the version number
+            echo "Binette version: $BINETTE_VERSION"
+            echo "BINETTE_VERSION=$BINETTE_VERSION" >> $GITHUB_ENV  # Export for later steps
+
+      - name: Checkout the corresponding Binette version
+        uses: actions/checkout@v4
+        with:
+          ref: "v${{ env.BINETTE_VERSION }}"
+          # path: "binette_source"
+
+      - name: Run tests with pytest
+        shell: bash -l {0}
         run: |
+          cd binette_source
           pip install pytest
           pytest
