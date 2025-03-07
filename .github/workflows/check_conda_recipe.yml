@@ -44,11 +44,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: "v${{ env.BINETTE_VERSION }}"
-          # path: "binette_source"
 
       - name: Run tests with pytest
         shell: bash -l {0}
         run: |
-          cd binette_source
           pip install pytest
           pytest
