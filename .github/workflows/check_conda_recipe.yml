@@ -39,3 +39,7 @@ jobs:
         run: |
             python --version
             binette --version
+      - name: Test with pytest
+        run: |
+          pip install pytest
+          pytest
