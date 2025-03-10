@@ -192,8 +192,7 @@ To report bugs, request new features, or seek help and support, please open an [
 
 ## Licence
 
-This program is released as an open source software under the terms of [MIT License](LICENSE).
-
+This tool is released as open source software under the terms of the [GNU General Public Licence](LICENSE).
 
 ## Citation  
 
