@@ -7,6 +7,7 @@ import pyfastx
 import itertools
 import networkx as nx
 from typing import List, Dict, Iterable, Tuple, Set, Mapping
+from tqdm import tqdm
 
 
 class Bin:
@@ -381,17 +382,20 @@ def get_intersection_bins(G: nx.Graph) -> Set[Bin]:
     """
     intersect_bins = set()
 
-    for clique in nx.clique.find_cliques(G):
-        bins_combinations = get_all_possible_combinations(clique)
-        for bins in bins_combinations:
-            if max((b.completeness for b in bins)) < 40:
-                continue
+    with tqdm(unit="bin", total=len(G)) as pbar:
 
-            intersec_bin = bins[0].intersection(*bins[1:])
+        for clique in nx.clique.find_cliques(G):
+            pbar.update(len(clique))
+            bins_combinations = get_all_possible_combinations(clique)
+            for bins in bins_combinations:
+                if max((b.completeness for b in bins)) < 40:
+                    continue
 
-            if intersec_bin.contigs:  # and intersec_bin not in clique:
+                intersec_bin = bins[0].intersection(*bins[1:])
 
-                intersect_bins.add(intersec_bin)
+                if intersec_bin.contigs:  # and intersec_bin not in clique:
+
+                    intersect_bins.add(intersec_bin)
 
     return intersect_bins
 
@@ -405,19 +409,21 @@ def get_difference_bins(G: nx.Graph) -> Set[Bin]:
     :return: A set of Bin objects representing the difference bins.
     """
     difference_bins = set()
+    with tqdm(unit="bin", total=len(G)) as pbar:
 
-    for clique in nx.clique.find_cliques(G):
+        for clique in nx.clique.find_cliques(G):
+            pbar.update(len(clique))
 
-        bins_combinations = get_all_possible_combinations(clique)
-        for bins in bins_combinations:
+            bins_combinations = get_all_possible_combinations(clique)
+            for bins in bins_combinations:
 
-            for bin_a in bins:
-                if bin_a.completeness < 40:
-                    continue
-                bin_diff = bin_a.difference(*(b for b in bins if b != bin_a))
+                for bin_a in bins:
+                    if bin_a.completeness < 40:
+                        continue
+                    bin_diff = bin_a.difference(*(b for b in bins if b != bin_a))
 
-                if bin_diff.contigs:  # and bin_diff not in clique:
-                    difference_bins.add(bin_diff)
+                    if bin_diff.contigs:  # and bin_diff not in clique:
+                        difference_bins.add(bin_diff)
 
     return difference_bins
 
@@ -432,17 +438,20 @@ def get_union_bins(G: nx.Graph, max_conta: int = 50) -> Set[Bin]:
     :return: A set of Bin objects representing the union bins.
     """
     union_bins = set()
-    for clique in nx.clique.find_cliques(G):
-        bins_combinations = get_all_possible_combinations(clique)
-        for bins in bins_combinations:
-            if max((b.contamination for b in bins)) > 20:
-                continue
+    with tqdm(unit="bin", total=len(G)) as pbar:
 
-            bins = set(bins)
-            bin_a = bins.pop()
-            bin_union = bin_a.union(*bins)
-            if bin_union.contigs:  # and bin_union not in clique:
-                union_bins.add(bin_union)
+        for clique in nx.clique.find_cliques(G):
+            pbar.update(len(clique))
+            bins_combinations = get_all_possible_combinations(clique)
+            for bins in bins_combinations:
+                if max((b.contamination for b in bins)) > 20:
+                    continue
+
+                bins = set(bins)
+                bin_a = bins.pop()
+                bin_union = bin_a.union(*bins)
+                if bin_union.contigs:  # and bin_union not in clique:
+                    union_bins.add(bin_union)
 
     return union_bins
 
@@ -630,5 +639,9 @@ def create_intermediate_bins(original_bins: Set[Bin]) -> Set[Bin]:
     for b in new_bins:
         if b.hash not in original_hashes:
             new_bins_not_in_original.add(b)
+
+    logging.info(
+        f"{len(new_bins)} new bins created from {len(original_bins)} input bins."
+    )
 
     return new_bins_not_in_original

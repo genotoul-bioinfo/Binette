@@ -224,6 +224,7 @@ def parse_input_files(
     :param bin_dirs: List of paths to directories containing bin FASTA files.
     :param contig2bin_tables: List of paths to contig-to-bin tables.
     :param contigs_fasta: Path to the contigs FASTA file.
+    :param temporary_dir: Path to the temporary directory to store intermediate files.
     :fasta_extensions: Possible fasta extensions to look for in the bin directory.
 
     :return: A tuple containing:
@@ -295,6 +296,7 @@ def manage_protein_alignement(
 
     :param faa_file: The path to the .faa file.
     :param contigs_fasta: The path to the contigs FASTA file.
+    :param temporary_dir: Path to the temporary directory to store intermediate files.
     :param contig_to_length: Dictionary mapping contig names to their lengths.
     :param contigs_in_bins: Dictionary mapping bin names to lists of contigs.
     :param diamond_result_file: The path to the diamond result file.
@@ -375,6 +377,7 @@ def select_bins_and_write_them(
     min_completeness: float,
     index_to_contig: dict,
     outdir: Path,
+    temporary_dir: Path,
     debug: bool,
 ) -> List[bin_manager.Bin]:
     """
@@ -386,6 +389,7 @@ def select_bins_and_write_them(
     :param min_completeness: Minimum completeness threshold for bin selection.
     :param index_to_contig: Dictionary mapping indices to contig names.
     :param outdir: Output directory to save final bins and reports.
+    :param temporary_dir: Path to the temporary directory to store intermediate files.
     :param debug: Debug mode flag.
     :return: Selected bins that meet the completeness threshold.
     """
@@ -412,7 +416,8 @@ def select_bins_and_write_them(
 
     io.write_bin_info(selected_bins, final_bin_report)
 
-    io.write_bins_fasta(selected_bins, contigs_fasta, outdir_final_bin_set)
+    index_file = temporary_dir / f"{contigs_fasta.name}.fxi"
+    io.write_bins_fasta(selected_bins, contigs_fasta, outdir_final_bin_set, index_file)
 
     if debug:
         all_bin_compo_file = outdir / "all_bins_quality_reports.tsv"
@@ -583,13 +588,14 @@ def main():
     all_bins = original_bins | new_bins
 
     selected_bins = select_bins_and_write_them(
-        all_bins,
-        args.contigs,
-        final_bin_report,
-        args.min_completeness,
-        index_to_contig,
-        args.outdir,
-        args.debug,
+        all_bins=all_bins,
+        contigs_fasta=args.contigs,
+        final_bin_report=final_bin_report,
+        min_completeness=args.min_completeness,
+        index_to_contig=index_to_contig,
+        outdir=args.outdir,
+        temporary_dir=out_tmp_dir,
+        debug=args.debug,
     )
 
     log_selected_bin_info(selected_bins, hq_min_completeness, hq_max_conta)

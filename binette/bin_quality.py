@@ -300,7 +300,7 @@ def assess_bins_quality(
     # 4: Call general model & specific models and derive predictions"""
     modelProc = modelProcessing.modelProcessor(threads)
 
-    vector_array = feature_vectors.iloc[:, 1:].values.astype(np.float)
+    vector_array = feature_vectors.iloc[:, 1:].values.astype(float)
 
     logging.debug("Predicting completeness and contamination using the general model.")
     general_results_comp, general_results_cont = modelProc.run_prediction_general(

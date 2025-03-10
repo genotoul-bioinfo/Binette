@@ -92,6 +92,7 @@ def test_select_bins_and_write_them(tmp_path, tmpdir, bins):
         min_completeness=60,
         index_to_contig=index_to_contig,
         outdir=outdir,
+        temporary_dir=tmp_path,
         debug=True,
     )
 
@@ -171,9 +172,10 @@ def test_manage_protein_alignement_not_resume(tmpdir, tmp_path):
         "contig2": Counter({"K23456": 1}),
     }
 
-    with patch(
-        "binette.diamond.get_contig_to_kegg_id", return_value=contig_to_kegg_id
-    ), patch("binette.diamond.run", return_value=None):
+    with (
+        patch("binette.diamond.get_contig_to_kegg_id", return_value=contig_to_kegg_id),
+        patch("binette.diamond.run", return_value=None),
+    ):
 
         # Call the function
 
@@ -368,15 +370,15 @@ def test_manage_protein_alignment_no_resume(tmp_path):
     low_mem = False
 
     # Mock the necessary functions
-    with patch(
-        "binette.contig_manager.parse_fasta_file"
-    ) as mock_parse_fasta_file, patch("binette.cds.predict") as mock_predict, patch(
-        "binette.diamond.get_checkm2_db"
-    ) as mock_get_checkm2_db, patch(
-        "binette.diamond.run"
-    ) as mock_diamond_run, patch(
-        "binette.diamond.get_contig_to_kegg_id"
-    ) as mock_diamond_get_contig_to_kegg_id:
+    with (
+        patch("binette.contig_manager.parse_fasta_file") as mock_parse_fasta_file,
+        patch("binette.cds.predict") as mock_predict,
+        patch("binette.diamond.get_checkm2_db") as mock_get_checkm2_db,
+        patch("binette.diamond.run") as mock_diamond_run,
+        patch(
+            "binette.diamond.get_contig_to_kegg_id"
+        ) as mock_diamond_get_contig_to_kegg_id,
+    ):
 
         # Set the return value of the mocked functions
         mock_parse_fasta_file.return_value = [MagicMock(name="contig1")]
@@ -449,25 +451,26 @@ def test_main(monkeypatch, test_environment):
     monkeypatch.setattr(sys, "argv", ["your_script.py"] + test_args)
 
     # Mock the necessary functions
-    with patch("binette.main.parse_input_files") as mock_parse_input_files, patch(
-        "binette.main.manage_protein_alignement"
-    ) as mock_manage_protein_alignement, patch(
-        "binette.contig_manager.apply_contig_index"
-    ) as mock_apply_contig_index, patch(
-        "binette.bin_manager.rename_bin_contigs"
-    ) as mock_rename_bin_contigs, patch(
-        "binette.bin_manager.create_intermediate_bins"
-    ) as mock_create_intermediate_bins, patch(
-        "binette.bin_quality.add_bin_metrics"
-    ) as mock_add_bin_metrics, patch(
-        "binette.main.log_selected_bin_info"
-    ) as mock_log_selected_bin_info, patch(
-        "binette.contig_manager.make_contig_index"
-    ) as mock_make_contig_index, patch(
-        "binette.io_manager.write_original_bin_metrics"
-    ) as mock_write_original_bin_metrics, patch(
-        "binette.main.select_bins_and_write_them"
-    ) as mock_select_bins_and_write_them:
+    with (
+        patch("binette.main.parse_input_files") as mock_parse_input_files,
+        patch(
+            "binette.main.manage_protein_alignement"
+        ) as mock_manage_protein_alignement,
+        patch("binette.contig_manager.apply_contig_index") as mock_apply_contig_index,
+        patch("binette.bin_manager.rename_bin_contigs") as mock_rename_bin_contigs,
+        patch(
+            "binette.bin_manager.create_intermediate_bins"
+        ) as mock_create_intermediate_bins,
+        patch("binette.bin_quality.add_bin_metrics") as mock_add_bin_metrics,
+        patch("binette.main.log_selected_bin_info") as mock_log_selected_bin_info,
+        patch("binette.contig_manager.make_contig_index") as mock_make_contig_index,
+        patch(
+            "binette.io_manager.write_original_bin_metrics"
+        ) as mock_write_original_bin_metrics,
+        patch(
+            "binette.main.select_bins_and_write_them"
+        ) as mock_select_bins_and_write_them,
+    ):
 
         # Set return values for mocked functions if needed
         mock_parse_input_files.return_value = (None, None, None)

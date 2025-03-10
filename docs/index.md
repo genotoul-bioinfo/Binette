@@ -17,19 +17,27 @@
 
 # Binette
 
+**Binette** is a fast and accurate binning refinement tool designed to construct high-quality MAGs from the output of multiple binning tools.  
 
-Binette is a fast and accurate binning refinement tool to constructs high quality MAGs from the output of multiple binning tools.
+### How It Works  
 
-From the input bin sets, Binette constructs new hybrid bins. A bin can be seen as a set of contigs. When at least two bins overlap, meaning they share at least one contig, Binette utilizes basic set operations to create new bins.
-- Intersection bin: This bin consists of the contigs that are shared by the overlapping bins. 
-- Difference bin: This bin contains the contigs that are exclusively found in one bin and not present in the others.
-- Union bin: The union bin includes all the contigs contained within the overlapping bins
+From the input bin sets, Binette constructs new **hybrid bins**. A **bin** is a set of contigs. When at least two bins overlap (i.e., share at least one contig), Binette applies fundamental set operations to generate new bins:  
 
-It then uses CheckM2 to assess bins quality to finally select the best bins possible.
+- **Intersection Bin**: Contains contigs that are shared by overlapping bins.  
+- **Difference Bin**: Includes contigs that are unique to one bin and not found in others.  
+- **Union Bin**: Encompasses all contigs from the overlapping bins.  
 
-Binette is inspired from the metaWRAP bin-refinement tool but it effectively solves all the problems from that very tool. 
-- Enhanced Speed: Binette significantly improves the speed of the refinement process. It achieves this by launching the initial steps of CheckM2, such as Prodigal and Diamond runs, only once on all contigs. These intermediate results are then utilized to assess the quality of any given bin, eliminating redundant computations and accelerating the refinement process.
-- No Limit on Input Bin Sets: Unlike its predecessor, Binette is not constrained by the number of input bin sets. It can handle and process multiple bin sets simultaneously.
+Binette then evaluates bin quality using **CheckM2**, ensuring the selection of the best possible bins.  
+
+### Why Binette?  
+
+Binette is inspired by the **metaWRAP bin-refinement tool** but effectively addresses its limitations. Key improvements include:  
+
+- **Enhanced Speed**  
+  Binette significantly accelerates the refinement process by running **CheckM2's** initial steps (e.g., Prodigal and Diamond) only once for all contigs. These intermediate results are then reused for bin quality assessment, eliminating redundant computations.  
+
+- **No Limit on Input Bin Sets**  
+  Unlike metaWRAP, Binette supports **any number of input bin sets**, allowing seamless processing of multiple binning outputs.  
 
 
 

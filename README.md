@@ -9,24 +9,42 @@
 [![Documentation Status](https://readthedocs.org/projects/binette/badge/?version=latest)](https://binette.readthedocs.io/en/latest/?badge=latest)
 
 
-# Binette 
+# Binette
 
-Binette is a fast and accurate binning refinement tool to constructs high quality MAGs from the output of multiple binning tools.
+**Binette** is a fast and accurate binning refinement tool designed to construct high-quality MAGs from the output of multiple binning tools.  
 
-From the input bin sets, Binette constructs new hybrid bins. A bin can be seen as a set of contigs. When at least two bins overlap, meaning they share at least one contig, Binette utilizes basic set operations to create new bins.
-- Intersection bin: This bin consists of the contigs that are shared by the overlapping bins. 
-- Difference bin: This bin contains the contigs that are exclusively found in one bin and not present in the others.
-- Union bin: The union bin includes all the contigs contained within the overlapping bins
+### How It Works  
 
-It then uses CheckM2 to assess bins quality to finally select the best bins possible.
+From the input bin sets, Binette constructs new **hybrid bins**. A **bin** is a set of contigs. When at least two bins overlap (i.e., share at least one contig), Binette applies fundamental set operations to generate new bins:  
 
-Binette is inspired from the metaWRAP bin-refinement tool but it effectively solves all the problems from that very tool. 
-- Enhanced Speed: Binette significantly improves the speed of the refinement process. It achieves this by launching the initial steps of CheckM2, such as Prodigal and Diamond runs, only once on all contigs. These intermediate results are then utilized to assess the quality of any given bin, eliminating redundant computations and accelerating the refinement process.
-- No Limit on Input Bin Sets: Unlike its predecessor, Binette is not constrained by the number of input bin sets. It can handle and process multiple bin sets simultaneously.
-<!-- - Bin selection have been improved. It selects the best bins in a more accurate and elegant manner.
-- It is easier to use. -->
+- **Intersection Bin**: Contains contigs that are shared by overlapping bins.  
+- **Difference Bin**: Includes contigs that are unique to one bin and not found in others.  
+- **Union Bin**: Encompasses all contigs from the overlapping bins.  
 
-A comprehensive documentation of Binette is avalaible here: https://binette.readthedocs.io/
+Binette then evaluates bin quality using **CheckM2**, ensuring the selection of the best possible bins.  
+
+### Why Binette?  
+
+Binette is inspired by the **metaWRAP bin-refinement tool** but effectively addresses its limitations. Key improvements include:  
+
+- **Enhanced Speed**  
+  Binette significantly accelerates the refinement process by running **CheckM2's** initial steps (e.g., Prodigal and Diamond) only once for all contigs. These intermediate results are then reused for bin quality assessment, eliminating redundant computations.  
+
+- **No Limit on Input Bin Sets**  
+  Unlike metaWRAP, Binette supports **any number of input bin sets**, allowing seamless processing of multiple binning outputs.  
+
+<!--  
+- **Improved Bin Selection**  
+  Binette selects the best bins in a more accurate and elegant manner.  
+
+- **User-Friendly**  
+  Designed for ease of use with a streamlined workflow.  
+-->
+
+
+> [!NOTE]
+> For a detailed guide and tutorial, see the [Binette documentation](https://binette.readthedocs.io/). 
+
 
 ## Installation
 
@@ -174,12 +192,23 @@ To report bugs, request new features, or seek help and support, please open an [
 
 ## Licence
 
-This program is released as an open source software under the terms of [MIT License](LICENSE).
+This tool is released as open source software under the terms of the [GNU General Public Licence](LICENSE).
+
+## Citation  
+
+Binette is a scientific software tool with a [published paper](https://joss.theoj.org/papers/10.21105/joss.06782) in the [Journal of Open Source Software](https://joss.theoj.org/). If you use Binette in academic research, please cite:  
+
+> **Binette: a fast and accurate bin refinement tool to construct high-quality Metagenome Assembled Genomes.**  
+> Mainguy et al., (2024).    
+> *Journal of Open Source Software, 9(102), 6782.*    
+> doi: [10.21105/joss.06782](https://doi.org/10.21105/joss.06782)   
 
 
-## Citation
+Binette extensively uses **CheckM2**. If your work relies on Binette, consider citing:  
 
-Binette is scientific software, with a [published paper](https://joss.theoj.org/papers/10.21105/joss.06782) in the [Journal of Open-Source Software](https://joss.theoj.org/). 
-If you use Binette in academic research, please cite the following paper:
+> **CheckM2: a rapid, scalable, and accurate tool for assessing microbial genome quality using machine learning.**   
+> Chklovski, Alex, et al. (2023).  
+> *Nature Methods, 20(8), 1203-1212.*    
+> doi: [10.1038/s41592-023-01940-w](https://doi.org/10.1038/s41592-023-01940-w)
 
-> Mainguy et al., (2024). Binette: a fast and accurate bin refinement tool to construct high quality Metagenome Assembled Genomes.. Journal of Open Source Software, 9(102), 6782, https://doi.org/10.21105/joss.06782
+

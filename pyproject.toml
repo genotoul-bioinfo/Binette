@@ -22,20 +22,18 @@ classifiers=[
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",
     "Topic :: Scientific/Engineering :: Bio-Informatics"]
-requires-python = ">=3.8"
-license = {file="LICENCE"}
+requires-python = ">=3.12"
+license = {file="LICENSE"}
 
 [project.optional-dependencies]
 main_deps = [
-    "checkm2==1.*",
-    "networkx==3.*",
-    "numpy==1.19.2",
-    "packaging==23.*",
-    "pandas==1.4.0",
-    "pyfastx==2.*",
-    "pyrodigal==2.*",
-    "requests==2.*",
-    "tqdm==4.*",
+    # "checkm2==1.1", # not yet on Pypi
+    "networkx>=3.0,<4.0",
+    "numpy>1.24,<3.0",
+    "pandas>=2,<3",
+    "pyfastx>=2,<3",
+    "pyrodigal>=2,<3",
+    "tqdm>=4,<5",
 ]
 
 doc = [
@@ -55,7 +53,7 @@ doc = [
 dev = [
     "pytest>=7.0.0",
     "pytest-cov",
-    "black"
+    "black==24.*"
 ]
 #
 [project.urls]
