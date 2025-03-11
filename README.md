@@ -1,7 +1,7 @@
 [![install with bioconda](https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg?style=flat)](http://bioconda.github.io/recipes/binette/README.html)  [![Anaconda-Server Badge](https://anaconda.org/bioconda/binette/badges/downloads.svg)](https://anaconda.org/bioconda/binette)
-[![Anaconda-Server Badge](https://anaconda.org/bioconda/binette/badges/license.svg)](https://anaconda.org/bioconda/binette) 
-[![Anaconda-Server Badge](https://anaconda.org/bioconda/binette/badges/version.svg)](https://anaconda.org/bioconda/binette)
-[![PyPI version](https://badge.fury.io/py/Binette.svg)](https://badge.fury.io/py/Binette)
+[![Anaconda-Server Badge](https://anaconda.org/bioconda/binette/badges/license.svg?cache-control=no-cache)](https://anaconda.org/bioconda/binette) 
+[![Anaconda-Server Badge](https://anaconda.org/bioconda/binette/badges/version.svg?cache-control=no-cache)](https://anaconda.org/bioconda/binette)
+[![PyPI version](https://badge.fury.io/py/Binette.svg?cache-control=no-cache)](https://badge.fury.io/py/Binette)
 [![status](https://joss.theoj.org/papers/ad304709d59f1a51a31614393b09ba2b/status.svg)](https://joss.theoj.org/papers/ad304709d59f1a51a31614393b09ba2b)
 
 [![Test Coverage](https://genotoul-bioinfo.github.io/Binette/coverage-badge.svg)](https://genotoul-bioinfo.github.io/Binette/) 
