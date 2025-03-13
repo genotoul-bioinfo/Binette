@@ -60,6 +60,19 @@ In both formats, the `--contigs` argument should specify a FASTA file containing
 
 
 
+### Providing Precomputed Protein Sequences
+
+You can provide protein sequences in FASTA format to Binette using the `--proteins` argument. The sequence identifiers must follow the Prodigal convention: `<contigID>_<GeneID>`. This naming format ensures proper mapping of each gene to its contig.  
+
+By using this option, the gene prediction step is skipped.  
+
+#### Example  
+If your contig is named `contig_A`, the gene identifiers should follow this pattern:  
+- `contig_A_1`  
+- `contig_A_2`  
+- `contig_A_3`  
+
+
 ## Outputs
 
 Binette results are stored in the `results` directory. You can specify a different directory using the `--outdir` option.
@@ -85,16 +98,3 @@ The `final_bins_quality_reports.tsv` file contains the following columns:
 | **contig_count**    | The number of contigs contained within the bin.          
 
 
-
-
-## Providing Precomputed Protein Sequences
-
-You can provide protein sequences in FASTA format to Binette using the `--proteins` argument. The sequence identifiers must follow the Prodigal convention: `<contigID>_<GeneID>`. This naming format ensures proper mapping of each gene to its contig.  
-
-By using this option, the gene prediction step is skipped.  
-
-### Example  
-If your contig is named `contig_A`, the gene identifiers should follow this pattern:  
-- `contig_A_1`  
-- `contig_A_2`  
-- `contig_A_3`  
