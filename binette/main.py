@@ -27,6 +27,7 @@ from typing import List, Dict, Optional, Set, Tuple, Union, Sequence, Any
 from pathlib import Path
 import pyfastx
 
+
 def init_logging(verbose, debug):
     """Initialise logging."""
     if debug:
