@@ -20,7 +20,7 @@ def contig1():
         name="contig1",
         seq="ATGAGCATCAGGGGAGTAGGAGGATGCAACGGGAATAGTCGAATCCCTTCTCATAATGGGGATGGATCGAATCGCAGAAGTCAAAATACGAAGGGTAATAATAAAGTTGAAGATCGAGTTTGT",
     )
-    return contig
+    return contig.name, contig.seq
 
 
 @pytest.fixture
@@ -29,7 +29,7 @@ def contig2():
         name="contig2",
         seq="TTGGTCGTATGACTGATAATTTCTCAGACATTGAAAACTTTAATGAAATTTTCAACAGAAAACCTGCTTTACAATTTCGTTTTTA",
     )
-    return contig
+    return contig.name, contig.seq
 
 
 @pytest.fixture
@@ -85,13 +85,13 @@ def test_predict_orf_with_multiple_threads(contig1, contig2):
 
 
 def test_predict_genes(contig1, orf_finder):
-
-    result = cds.predict_genes(orf_finder.find_genes, contig1)
+    name, seq = contig1
+    result = cds.predict_genes(orf_finder.find_genes, name, seq)
 
     assert isinstance(result, tuple)
     assert len(result) == 2
     assert isinstance(result[0], str)
-    assert result[0] == contig1.name
+    assert result[0] == name
     assert result[0] == "contig1"
 
 
@@ -115,8 +115,8 @@ def test_extract_contig_name_from_cds_name():
 
 
 def test_write_faa(contig1, orf_finder):
-
-    predicted_genes = orf_finder.find_genes(contig1.seq)
+    name, seq = contig1
+    predicted_genes = orf_finder.find_genes(seq)
     contig_name = "contig"
     output_file = "tests/tmp_file.faa.gz"
 

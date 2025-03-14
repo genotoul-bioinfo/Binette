@@ -45,7 +45,8 @@ def predict(
 
     with multiprocessing.pool.ThreadPool(processes=threads) as pool:
         contig_and_genes = pool.starmap(
-            predict_genes, ((orf_finder.find_genes, seq) for seq in contigs_iterator)
+            predict_genes,
+            ((orf_finder.find_genes, name, seq) for name, seq in contigs_iterator),
         )
 
     write_faa(outfaa, contig_and_genes)
@@ -58,9 +59,9 @@ def predict(
     return contig_to_genes
 
 
-def predict_genes(find_genes, seq) -> Tuple[str, pyrodigal.Genes]:
+def predict_genes(find_genes, name, seq) -> Tuple[str, pyrodigal.Genes]:
 
-    return (seq.name, find_genes(seq.seq))
+    return (name, find_genes(seq))
 
 
 def write_faa(outfaa: str, contig_to_genes: List[Tuple[str, pyrodigal.Genes]]) -> None:

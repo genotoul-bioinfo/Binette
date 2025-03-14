@@ -137,7 +137,6 @@ def test_manage_protein_alignement_resume(tmp_path):
         contig_to_kegg_counter, contig_to_genes = manage_protein_alignement(
             faa_file=Path(faa_file),
             contigs_fasta=Path("contigs_fasta"),
-            temporary_dir=Path(tmp_path),
             contig_to_length=contig_to_length,
             contigs_in_bins=set(),
             diamond_result_file=Path("diamond_result_file"),
@@ -182,7 +181,6 @@ def test_manage_protein_alignement_not_resume(tmpdir, tmp_path):
         contig_to_kegg_counter, contig_to_genes = manage_protein_alignement(
             faa_file=Path(faa_file),
             contigs_fasta=Path(contigs_fasta),
-            temporary_dir=Path(tmp_path),
             contig_to_length=contig_to_length,
             contigs_in_bins=set(),
             diamond_result_file=Path(diamond_result_file),
@@ -251,7 +249,7 @@ def test_parse_input_files_bin_dirs(create_temp_bin_directories, tmp_path):
 
     # Call the function and capture the return values
     original_bins, contigs_in_bins, contig_to_length = parse_input_files(
-        bin_dirs, contig2bin_tables, fasta_file, temporary_dir=tmp_path
+        bin_dirs, contig2bin_tables, fasta_file
     )
 
     # # Perform assertions on the returned values
@@ -371,7 +369,7 @@ def test_manage_protein_alignment_no_resume(tmp_path):
 
     # Mock the necessary functions
     with (
-        patch("binette.contig_manager.parse_fasta_file") as mock_parse_fasta_file,
+        patch("pyfastx.Fastx") as mock_pyfastx_Fastx,
         patch("binette.cds.predict") as mock_predict,
         patch("binette.diamond.get_checkm2_db") as mock_get_checkm2_db,
         patch("binette.diamond.run") as mock_diamond_run,
@@ -381,14 +379,13 @@ def test_manage_protein_alignment_no_resume(tmp_path):
     ):
 
         # Set the return value of the mocked functions
-        mock_parse_fasta_file.return_value = [MagicMock(name="contig1")]
+        mock_pyfastx_Fastx.return_value = [("contig1", "ATCG")]
         mock_predict.return_value = {"contig1": ["gene1"]}
 
         # Call the function
         contig_to_kegg_counter, contig_to_genes = manage_protein_alignement(
             faa_file,
             contigs_fasta,
-            tmp_path,
             contig_to_length,
             contigs_in_bins,
             diamond_result_file,
@@ -400,7 +397,7 @@ def test_manage_protein_alignment_no_resume(tmp_path):
         )
 
         # Assertions to check if functions were called
-        mock_parse_fasta_file.assert_called_once()
+        mock_pyfastx_Fastx.assert_called_once()
         mock_predict.assert_called_once()
         mock_diamond_get_contig_to_kegg_id.assert_called_once()
         mock_diamond_run.assert_called_once_with(
