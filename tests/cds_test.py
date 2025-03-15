@@ -104,16 +104,6 @@ def test_extract_contig_name_from_cds_name():
     assert isinstance(result, str)
     assert result == "contig1"
 
-
-def test_extract_contig_name_from_cds_name():
-    cds_name = "contig1_gene1"
-
-    result = cds.get_contig_from_cds_name(cds_name)
-
-    assert isinstance(result, str)
-    assert result == "contig1"
-
-
 def test_write_faa(contig1, orf_finder):
     name, seq = contig1
     predicted_genes = orf_finder.find_genes(seq)

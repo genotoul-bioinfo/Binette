@@ -8,8 +8,7 @@ def test_valid_fasta_file(tmp_path):
     # Arrange
     fasta_file = "tests/contigs.fasta"
 
-    index_file = "tests/contigs.fasta.fxi"
-
+    index_file = tmp_path / "contigs.fasta.fxi"
     result = contig_manager.parse_fasta_file(fasta_file, str(index_file))
 
     # Assert

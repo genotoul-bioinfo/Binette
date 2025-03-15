@@ -175,7 +175,7 @@ def write_bins_fasta(
     :param temporary_dir: Temporary directory to store the index file.
     """
 
-    index_file = temporary_dir / f"write_final_bins.{contigs_fasta.name}.fxi"
+    index_file = temporary_dir / f"{contigs_fasta.name}.fxi"
 
     fa = contig_manager.parse_fasta_file(
         contigs_fasta.as_posix(), index_file=index_file.as_posix()
