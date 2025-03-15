@@ -239,9 +239,7 @@ def get_bins_from_directory(
 
         bin_name = bin_fasta_path.name
 
-        contigs = {
-            name for name, _ in pyfastx.Fasta(str(bin_fasta_path), build_index=False)
-        }
+        contigs = {name for name, _ in pyfastx.Fastx(str(bin_fasta_path))}
 
         bin_obj = Bin(contigs, set_name, bin_name)
 
