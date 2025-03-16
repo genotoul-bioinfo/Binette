@@ -1,6 +1,5 @@
 from collections import defaultdict
 import logging
-import pyfastx
 from typing import Iterable, List, Dict, Tuple, Set
 import csv
 
