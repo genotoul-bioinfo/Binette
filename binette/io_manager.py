@@ -1,9 +1,9 @@
 from collections import defaultdict
 import logging
-import pyfastx
 from typing import Iterable, List, Dict, Tuple, Set
 import csv
 
+from binette import contig_manager
 from binette.bin_manager import Bin
 
 from pathlib import Path
@@ -163,7 +163,7 @@ def write_bin_info(bins: Iterable[Bin], output: Path, add_contigs: bool = False)
 
 
 def write_bins_fasta(
-    selected_bins: List[Bin], contigs_fasta: Path, outdir: Path, index_file: Path
+    selected_bins: List[Bin], contigs_fasta: Path, outdir: Path, temporary_dir: Path
 ):
     """
     Write selected bins' contigs to separate FASTA files.
@@ -171,10 +171,13 @@ def write_bins_fasta(
     :param selected_bins: List of Bin objects representing the selected bins.
     :param contigs_fasta: Path to the input FASTA file containing contig sequences.
     :param outdir: Output directory to save the individual bin FASTA files.
+    :param temporary_dir: Temporary directory to store the index file.
     """
 
-    fa = pyfastx.Fasta(
-        contigs_fasta.as_posix(), build_index=True, index_file=index_file.as_posix()
+    index_file = temporary_dir / f"{contigs_fasta.name}.fxi"
+
+    fa = contig_manager.parse_fasta_file(
+        contigs_fasta.as_posix(), index_file=index_file.as_posix()
     )
 
     for sbin in selected_bins:
