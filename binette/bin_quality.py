@@ -188,7 +188,7 @@ def add_bin_metrics(
 
     add_bin_size_and_N50(bins, contig_to_length)
 
-    logging.info(f"Assessing bin quality for {len(bins)}")
+    logging.info(f"Assessing bin quality for {len(bins)} bins.")
     assess_bins_quality_by_chunk(
         bins,
         contig_to_kegg_counter,

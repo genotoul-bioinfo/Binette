@@ -67,6 +67,16 @@ class Bin:
             f"Bin {self.id} from {';'.join(self.origin)}  ({len(self.contigs)} contigs)"
         )
 
+    def __lt__(self, other: "Bin") -> bool:
+        """
+        Compare the Bin object with another object based on their id. This is useful to be able to sort the bins.
+
+        :param other: The object to compare with.
+        :return: True if self has an id lower than the other bin.
+        """
+
+        return self.id < other.id
+
     def overlaps_with(self, other: "Bin") -> Set[str]:
         """
         Find the contigs that overlap between this bin and another bin.
@@ -136,7 +146,7 @@ class Bin:
         """
         other_contigs = (o.contigs for o in others)
         contigs = self.contigs.intersection(*other_contigs)
-        name = f"{self.id} & {' & '.join([str(other.id) for other in others])}"
+        name = f"{self.id} & {' & '.join([str(other.id) for other in sorted(others)])}"
         origin = "intersec"
 
         return Bin(contigs, origin, name)
@@ -150,7 +160,7 @@ class Bin:
         """
         other_contigs = (o.contigs for o in others)
         contigs = self.contigs.difference(*other_contigs)
-        name = f"{self.id} - {' - '.join([str(other.id) for other in others])}"
+        name = f"{self.id} - {' - '.join([str(other.id) for other in sorted(others)])}"
         origin = "diff"
 
         return Bin(contigs, origin, name)
@@ -164,7 +174,8 @@ class Bin:
         """
         other_contigs = (o.contigs for o in others)
         contigs = self.contigs.union(*other_contigs)
-        name = f"{self.id} | {' | '.join([str(other.id) for other in others])}"
+        name = f"{self.id} | {' | '.join([str(other.id) for other in sorted(others)])}"
+
         origin = "union"
 
         return Bin(contigs, origin, name)
@@ -261,7 +272,7 @@ def parse_bin_directories(
     """
     bin_set_name_to_bins = {}
 
-    for name, bin_dir in bin_name_to_bin_dir.items():
+    for name, bin_dir in sorted(bin_name_to_bin_dir.items()):
         bins = get_bins_from_directory(bin_dir, name, fasta_extensions)
         set_of_bins = set(bins)
 
@@ -281,7 +292,7 @@ def parse_bin_directories(
 
 
 def parse_contig2bin_tables(
-    bin_name_to_bin_tables: Dict[str, Path]
+    bin_name_to_bin_tables: Dict[str, Path],
 ) -> Dict[str, Set["Bin"]]:
     """
     Parses multiple contig-to-bin tables and returns a dictionary mapping bin names to a set of unique Bin objects.
@@ -296,7 +307,7 @@ def parse_contig2bin_tables(
     """
     bin_set_name_to_bins = {}
 
-    for name, contig2bin_table in bin_name_to_bin_tables.items():
+    for name, contig2bin_table in sorted(bin_name_to_bin_tables.items()):
         bins = get_bins_from_contig2bin_table(contig2bin_table, name)
         set_of_bins = set(bins)
 
@@ -370,7 +381,7 @@ def get_all_possible_combinations(clique: List) -> Iterable[Tuple]:
     )
 
 
-def get_intersection_bins(G: nx.Graph) -> Set[Bin]:
+def get_intersection_bins(cliques: List[List[Bin]]) -> Set[Bin]:
     """
     Retrieves the intersection bins from a given graph.
 
@@ -380,10 +391,10 @@ def get_intersection_bins(G: nx.Graph) -> Set[Bin]:
     """
     intersect_bins = set()
 
-    with tqdm(unit="bin", total=len(G)) as pbar:
+    with tqdm(unit="clique of bins", total=len(cliques)) as pbar:
 
-        for clique in nx.clique.find_cliques(G):
-            pbar.update(len(clique))
+        for clique in cliques:
+            pbar.update()
             bins_combinations = get_all_possible_combinations(clique)
             for bins in bins_combinations:
                 if max((b.completeness for b in bins)) < 40:
@@ -398,7 +409,7 @@ def get_intersection_bins(G: nx.Graph) -> Set[Bin]:
     return intersect_bins
 
 
-def get_difference_bins(G: nx.Graph) -> Set[Bin]:
+def get_difference_bins(cliques: List[List[Bin]]) -> Set[Bin]:
     """
     Retrieves the difference bins from a given graph.
 
@@ -407,11 +418,10 @@ def get_difference_bins(G: nx.Graph) -> Set[Bin]:
     :return: A set of Bin objects representing the difference bins.
     """
     difference_bins = set()
-    with tqdm(unit="bin", total=len(G)) as pbar:
+    with tqdm(unit="clique of bins", total=len(cliques)) as pbar:
 
-        for clique in nx.clique.find_cliques(G):
-            pbar.update(len(clique))
-
+        for clique in cliques:
+            pbar.update()
             bins_combinations = get_all_possible_combinations(clique)
             for bins in bins_combinations:
 
@@ -426,7 +436,7 @@ def get_difference_bins(G: nx.Graph) -> Set[Bin]:
     return difference_bins
 
 
-def get_union_bins(G: nx.Graph, max_conta: int = 50) -> Set[Bin]:
+def get_union_bins(cliques: List[List[Bin]]) -> Set[Bin]:
     """
     Retrieves the union bins from a given graph.
 
@@ -436,16 +446,16 @@ def get_union_bins(G: nx.Graph, max_conta: int = 50) -> Set[Bin]:
     :return: A set of Bin objects representing the union bins.
     """
     union_bins = set()
-    with tqdm(unit="bin", total=len(G)) as pbar:
+    with tqdm(unit="clique of bins", total=len(cliques)) as pbar:
 
-        for clique in nx.clique.find_cliques(G):
-            pbar.update(len(clique))
+        for clique in cliques:
+            pbar.update()
             bins_combinations = get_all_possible_combinations(clique)
             for bins in bins_combinations:
                 if max((b.contamination for b in bins)) > 20:
                     continue
 
-                bins = set(bins)
+                bins = sorted(set(bins))
                 bin_a = bins.pop()
                 bin_union = bin_a.union(*bins)
                 if bin_union.contigs:  # and bin_union not in clique:
@@ -517,6 +527,7 @@ def dereplicate_bin_sets(bin_sets: Iterable[Set["Bin"]]) -> Set["Bin"]:
 
     # Merge bins with the same hash
     for identical_bins in list_of_identical_bins:
+        identical_bins.sort()
         # Select the first bin as the representative
         selected_bin = identical_bins[0]
         for bin_obj in identical_bins[1:]:
@@ -611,18 +622,22 @@ def create_intermediate_bins(original_bins: Set[Bin]) -> Set[Bin]:
     logging.info("Making bin graph...")
     connected_bins_graph = from_bins_to_bin_graph(original_bins)
 
+    cliques_of_bins = sorted(
+        [sorted(clique) for clique in nx.clique.find_cliques(connected_bins_graph)]
+    )
+
     logging.info("Creating intersection bins...")
-    intersection_bins = get_intersection_bins(connected_bins_graph)
+    intersection_bins = get_intersection_bins(cliques_of_bins)
 
     logging.info(f"{len(intersection_bins)} bins created on intersections.")
 
     logging.info("Creating difference bins...")
-    difference_bins = get_difference_bins(connected_bins_graph)
+    difference_bins = get_difference_bins(cliques_of_bins)
 
     logging.info(f"{len(difference_bins)} bins created based on symmetric difference.")
 
     logging.info("Creating union bins...")
-    union_bins = get_union_bins(connected_bins_graph)
+    union_bins = get_union_bins(cliques_of_bins)
 
     logging.info(f"{len(union_bins)} bins created on unions.")
 
