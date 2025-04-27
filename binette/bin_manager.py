@@ -383,9 +383,9 @@ def get_all_possible_combinations(clique: List) -> Iterable[Tuple]:
 
 def get_intersection_bins(cliques: List[List[Bin]]) -> Set[Bin]:
     """
-    Retrieves the intersection bins from a given graph.
+    Retrieves the intersection bins from a given list of cliques.
 
-    :param G: A networkx Graph representing the graph.
+    :param cliques: A list of cliques.
 
     :return: A set of Bin objects representing the intersection bins.
     """
@@ -413,7 +413,7 @@ def get_difference_bins(cliques: List[List[Bin]]) -> Set[Bin]:
     """
     Retrieves the difference bins from a given graph.
 
-    :param G: A networkx Graph representing the graph.
+    :param cliques: A list of cliques.
 
     :return: A set of Bin objects representing the difference bins.
     """
@@ -440,8 +440,7 @@ def get_union_bins(cliques: List[List[Bin]]) -> Set[Bin]:
     """
     Retrieves the union bins from a given graph.
 
-    :param G: A networkx Graph representing the graph of bins.
-    :param max_conta: Maximum allowed contamination value for a bin to be included in the union.
+    :param cliques: A list of cliques.
 
     :return: A set of Bin objects representing the union bins.
     """
