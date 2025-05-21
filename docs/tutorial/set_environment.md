@@ -7,7 +7,7 @@ To get started, we'll download the necessary tools and set them up in a dedicate
 First, let's create a new Conda environment specifically for this tutorial:
 
 ```{code-block} bash
-mamba env create -f binette_tutorial_env.yaml -n binette_tutorial
+conda env create -f binette_tutorial_env.yaml -n binette_tutorial
 ```
 
 This command will create a Conda environment named `binette_tuto` using the environment file `binette_tutorial_env.yaml`.
