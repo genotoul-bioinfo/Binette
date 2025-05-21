@@ -2,7 +2,6 @@ name: binette_tutorial
 channels:
   - conda-forge
   - bioconda
-  - defaults
 dependencies:
   - uscdc-datasets-sars-cov-2 # Dataset downloader to get the tutorial initial data
   - fastqc                 # Quality control for high-throughput sequencing data
@@ -14,8 +13,8 @@ dependencies:
   - metabat2=2             # Binning tool for metagenomic datasets
   - semibin=2              # Binning tool for metagenomic datasets
   - concoct=1              # Binning tool for metagenomic datasets
-  - binette=1.0.2          # Binette for binning and genome analysis
+  - binette=1.1.1          # Binette for binning and genome analysis
   - das_tool=1             # Bin refiner to compare with Binette
   - jupyter                # Jupyter notebook for interactive analysis
-  - pandas=1               # Data manipulation and analysis
+  - pandas                 # Data manipulation and analysis
   - plotly=5               # Interactive graphing
