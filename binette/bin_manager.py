@@ -11,6 +11,7 @@ from tqdm import tqdm
 
 from collections import Counter
 
+
 class Bin:
     counter = 0
 
