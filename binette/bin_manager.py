@@ -9,6 +9,8 @@ import networkx as nx
 from typing import List, Dict, Iterable, Tuple, Set, Mapping
 from tqdm import tqdm
 
+from collections import Counter
+
 
 class Bin:
     counter = 0
@@ -553,11 +555,7 @@ def get_contigs_in_bin_sets(bin_set_name_to_bins: Dict[str, Set[Bin]]) -> Set[st
     for bin_set_name, bins in bin_set_name_to_bins.items():
         list_contigs_in_bin_sets = get_contigs_in_bins(bins)
 
-        # Count duplicates
-        contig_counts = {
-            contig: list_contigs_in_bin_sets.count(contig)
-            for contig in list_contigs_in_bin_sets
-        }
+        contig_counts = Counter(list_contigs_in_bin_sets)
         duplicated_contigs = {
             contig: count for contig, count in contig_counts.items() if count > 1
         }
