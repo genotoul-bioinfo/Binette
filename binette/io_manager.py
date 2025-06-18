@@ -189,7 +189,7 @@ def write_bins_fasta(
     contig_to_bins = {}
     for sbin in selected_bins:
         for contig in sbin.contigs:
-            contig_to_bins[contig] = bin.id
+            contig_to_bins[contig] = sbin.id
 
     buffer = defaultdict(list)
     buffer_size = 0
