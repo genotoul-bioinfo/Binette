@@ -8,6 +8,7 @@ from binette.bin_manager import Bin
 from pathlib import Path
 import pyfastx
 
+
 def get_paths_common_prefix_suffix(
     paths: List[Path],
 ) -> Tuple[List[str], List[str], List[str]]:
