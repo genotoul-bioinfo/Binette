@@ -410,9 +410,7 @@ def select_bins_and_write_them(
 
     io.write_bin_info(selected_bins, final_bin_report)
 
-    io.write_bins_fasta(
-        selected_bins, contigs_fasta, outdir_final_bin_set, temporary_dir
-    )
+    io.write_bins_fasta(selected_bins, contigs_fasta, outdir_final_bin_set)
 
     if debug:
         all_bin_compo_file = outdir / "all_bins_quality_reports.tsv"
