@@ -224,6 +224,7 @@ def assess_bins_quality_by_chunk(
     postProcessor: Optional[modelPostprocessing.modelProcessor] = None,
     threads: int = 1,
     chunk_size: int = 2500,
+    disable_bar=False,
 ):
     """
     Assess the quality of bins in chunks.
@@ -240,7 +241,7 @@ def assess_bins_quality_by_chunk(
     :param threads: Number of threads for parallel processing (default is 1).
     :param chunk_size: The size of each chunk.
     """
-    with tqdm(total=len(bins), unit="bin") as pbar:
+    with tqdm(total=len(bins), unit="bin", disable=disable_bar) as pbar:
         for i, chunk_bins_iter in enumerate(chunks(bins, chunk_size)):
             chunk_bins = set(chunk_bins_iter)
             logging.debug(f"chunk {i}: assessing quality of {len(chunk_bins)} bins")
