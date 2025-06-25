@@ -268,7 +268,7 @@ def test_write_bins_fasta(tmp_path, bin1, bin2):
     outdir.mkdir()
 
     # Call the function
-    io_manager.write_bins_fasta(selected_bins, contigs_fasta, outdir, tmp_path)
+    io_manager.write_bins_fasta(selected_bins, contigs_fasta, Path(outdir))
 
     # Check if the files were created and their content matches the expected output
     assert (outdir / "bin_1.fa").exists()

@@ -3,10 +3,10 @@ import logging
 from typing import Iterable, List, Dict, Tuple, Set
 import csv
 
-from binette import contig_manager
 from binette.bin_manager import Bin
 
 from pathlib import Path
+import pyfastx
 
 
 def get_paths_common_prefix_suffix(
@@ -163,29 +163,61 @@ def write_bin_info(bins: Iterable[Bin], output: Path, add_contigs: bool = False)
 
 
 def write_bins_fasta(
-    selected_bins: List[Bin], contigs_fasta: Path, outdir: Path, temporary_dir: Path
+    selected_bins: List,
+    contigs_fasta: Path,
+    outdir: Path,
+    max_buffer_size: int = 50_000_000,
 ):
     """
-    Write selected bins' contigs to separate FASTA files.
+    Write selected bins' contigs to separate FASTA files using pyfastx.Fastx (no index).
+    Buffer entries by total character size, not just number of sequences.
 
-    :param selected_bins: List of Bin objects representing the selected bins.
-    :param contigs_fasta: Path to the input FASTA file containing contig sequences.
-    :param outdir: Output directory to save the individual bin FASTA files.
-    :param temporary_dir: Temporary directory to store the index file.
+    :param selected_bins: List of Bin objects with .id and .contigs.
+    :param contigs_fasta: Path to the input FASTA file.
+    :param outdir: Directory to save bin FASTA files.
+    :param max_buffer_size: Maximum total character size to buffer before flushing.
     """
+    outdir.mkdir(parents=True, exist_ok=True)
 
-    index_file = temporary_dir / f"{contigs_fasta.name}.fxi"
-
-    fa = contig_manager.parse_fasta_file(
-        contigs_fasta.as_posix(), index_file=index_file.as_posix()
-    )
-
+    # Clear existing files for selected bins
     for sbin in selected_bins:
-        outfile = outdir / f"bin_{sbin.id}.fa"
+        out_path = outdir / f"bin_{sbin.id}.fa"
+        if out_path.exists():
+            out_path.unlink()  # remove the file
 
-        with open(outfile, "w") as outfl:
-            sequences = (f">{c}\n{fa[c]}" for c in sbin.contigs)
-            outfl.write("\n".join(sequences) + "\n")
+    # Map contig name to bin IDs
+    contig_to_bins = {}
+    for sbin in selected_bins:
+        for contig in sbin.contigs:
+            contig_to_bins[contig] = sbin.id
+
+    buffer = defaultdict(list)
+    buffer_size = 0
+
+    def flush_buffer():
+        nonlocal buffer_size
+        for bin_id, seqs in buffer.items():
+            if seqs:
+                with open(outdir / f"bin_{bin_id}.fa", "a") as f:
+                    f.writelines(seqs)
+        buffer.clear()
+        buffer_size = 0
+
+    for name, seq in pyfastx.Fastx(contigs_fasta.as_posix()):
+        bin_id = contig_to_bins.get(name)
+        if not bin_id:
+            continue
+
+        fasta_entry = f">{name}\n{seq}\n"
+        entry_size = len(fasta_entry)
+
+        buffer[bin_id].append(fasta_entry)
+
+        buffer_size += entry_size
+        if buffer_size >= max_buffer_size:
+            flush_buffer()
+
+    flush_buffer()
 
 
 def check_contig_consistency(

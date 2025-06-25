@@ -374,7 +374,9 @@ def simple_bin_graph():
 
 def test_get_intersection_bins(simple_bin_graph):
 
-    intersec_bins = bin_manager.get_intersection_bins(simple_bin_graph)
+    intersec_bins = bin_manager.get_intersection_bins(
+        list(nx.clique.find_cliques(simple_bin_graph))
+    )
 
     assert len(intersec_bins) == 1
     intersec_bin = intersec_bins.pop()
@@ -384,7 +386,9 @@ def test_get_intersection_bins(simple_bin_graph):
 
 def test_get_difference_bins(simple_bin_graph):
 
-    difference_bins = bin_manager.get_difference_bins(simple_bin_graph)
+    difference_bins = bin_manager.get_difference_bins(
+        list(nx.clique.find_cliques(simple_bin_graph))
+    )
 
     expected_bin1 = bin_manager.Bin(contigs={"3"}, origin="D", name="1")
     expected_bin2 = bin_manager.Bin(contigs={"4"}, origin="D", name="2")
@@ -395,7 +399,7 @@ def test_get_difference_bins(simple_bin_graph):
 
 def test_get_union_bins(simple_bin_graph):
 
-    u_bins = bin_manager.get_union_bins(simple_bin_graph)
+    u_bins = bin_manager.get_union_bins(list(nx.clique.find_cliques(simple_bin_graph)))
 
     expected_bin1 = bin_manager.Bin(contigs={"1", "2", "3", "4"}, origin="U", name="1")
 
