@@ -6,7 +6,7 @@ import pyfastx
 
 import itertools
 import networkx as nx
-from typing import List, Dict, Iterable, Tuple, Set, Mapping
+from typing import List, Dict, Iterable, Tuple, Set
 from tqdm import tqdm
 
 from collections import Counter
