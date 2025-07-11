@@ -655,3 +655,127 @@ def create_intermediate_bins(original_bins: Set[Bin]) -> Set[Bin]:
     )
 
     return new_bins_not_in_original
+
+
+def get_intermediate_bins(
+    input_bins,
+    best_bins,
+    contig_to_length,
+    max_diff_jacard_index=0.2,
+    min_jaccard_index=0.8,
+):
+    intermediate_intersec_bins = set()
+    intermediate_union_bins = set()
+    intermediate_diff_bins = set()
+
+    original_contigs_tuple = {tuple(sorted(b.contigs)) for b in input_bins}
+
+    for input_bin, best_bin in itertools.product(input_bins, best_bins):
+        intersec_contigs = input_bin.contigs & best_bin.contigs
+        if not intersec_contigs:
+            continue
+        if (
+            intersec_contigs == input_bin.contigs
+            or intersec_contigs == best_bin.contigs
+        ):
+            continue
+
+        intersec_size = sum(contig_to_length[c] for c in intersec_contigs)
+        union_contigs = best_bin.contigs | input_bin.contigs
+        union_size = sum(contig_to_length[c] for c in union_contigs)
+        jaccard_index = intersec_size / union_size
+
+        if jaccard_index > min_jaccard_index:
+            intermediate_union_bins.add(tuple(sorted(union_contigs)))
+            intermediate_intersec_bins.add(tuple(sorted(intersec_contigs)))
+
+        if jaccard_index < max_diff_jacard_index:
+            diff_contigs_best_bin = best_bin.contigs - input_bin.contigs
+            if sum(contig_to_length[c] for c in diff_contigs_best_bin) > 200_000:
+                intermediate_diff_bins.add(tuple(sorted(diff_contigs_best_bin)))
+
+    logging.info(":: Intermediate bins summary:")
+    logging.info(
+        f"  - {len(intermediate_intersec_bins)} intersection bins (Jaccard > {min_jaccard_index})"
+    )
+    logging.info(
+        f"  - {len(intermediate_union_bins)} union bins (Jaccard > {min_jaccard_index})"
+    )
+    logging.info(
+        f"  - {len(intermediate_diff_bins)} diff bins (Jaccard < {max_diff_jacard_index}, >200kb)"
+    )
+
+    intermediate_bins = (
+        intermediate_intersec_bins | intermediate_union_bins | intermediate_diff_bins
+    )
+
+    new_bins_count = len(
+        {
+            contigs
+            for contigs in intermediate_bins
+            if contigs not in original_contigs_tuple
+        }
+    )
+
+    logging.info(f"  - {len(intermediate_bins)} total intermediate bins")
+    logging.info(f"  - {new_bins_count} new intermediate bins")
+
+    intermediate_bins = {
+        Bin(b_contigs, origin="intermediate", name=i)
+        for i, b_contigs in enumerate(intermediate_bins)
+    }
+
+    return intermediate_bins
+
+
+def remove_contigs_from_bins(contigs_to_remove, input_bins):
+    clean_bins = set()
+    for input_bin in input_bins:
+        if input_bin.contigs & contigs_to_remove:
+            clean_bin_contigs = input_bin.contigs - contigs_to_remove
+            if clean_bin_contigs:
+                clean_bins.add(
+                    Bin(clean_bin_contigs, name="clean_diff", origin="clean_diff")
+                )
+        else:
+            clean_bins.add(input_bin)
+    return clean_bins
+
+
+def select_n_non_overlaping_bins(bins, n):
+    """
+    Selects the best bins from a list of bins based on their scores, N50 values, and IDs.
+
+    :param bins: A list of Bin objects.
+
+    :return: A list of selected Bin objects.
+    """
+
+    logging.info("Sorting bins")
+    # Sort on score, N50, and ID. Smaller ID values are preferred to select original bins first.
+    sorted_bins = sorted(
+        bins, key=lambda x: (x.score, -len(x.contigs), x.N50, -x.id), reverse=True
+    )
+
+    logging.info("Selecting bins")
+    selected_bins = []
+    for b in sorted_bins:
+        if b in bins:
+            overlapping_bins = {b2 for b2 in bins if b.overlaps_with(b2)}
+            bins -= overlapping_bins
+
+            selected_bins.append(b)
+            if len(selected_bins) == n:
+                return selected_bins
+
+    logging.info(f"Selected {len(selected_bins)} bins")
+    return selected_bins
+
+
+def get_n_best_bins(input_bins, n):
+    sorted_bins = sorted(
+        input_bins, key=lambda x: (x.score, -len(x.contigs), x.N50, -x.id), reverse=True
+    )
+    best_bins = sorted_bins[:n]
+
+    return best_bins

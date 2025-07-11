@@ -26,6 +26,7 @@ from binette import (
 from typing import List, Dict, Optional, Set, Tuple, Union, Sequence, Any
 from pathlib import Path
 import pyfastx
+from collections import Counter
 
 
 def init_logging(verbose, debug):
@@ -155,6 +156,13 @@ def parse_arguments(args):
     )
 
     other_group.add_argument(
+        "--max_contamination",
+        default=10,
+        type=int,
+        help="Maximum contamination required for final bin selections.",
+    )
+
+    other_group.add_argument(
         "-t", "--threads", default=1, type=int, help="Number of threads to use."
     )
 
@@ -171,6 +179,10 @@ def parse_arguments(args):
         "A low contamination_weight favor complete bins over low contaminated bins.",
     )
 
+    other_group.add_argument("--min_bin_size", default=200_000, type=int, help="")
+
+    other_group.add_argument("--max_bin_size", default=10_000_000, type=int, help="")
+
     other_group.add_argument(
         "-e",
         "--fasta_extensions",
@@ -185,6 +197,12 @@ def parse_arguments(args):
         type=Path,
         help="Provide a path for the CheckM2 diamond database. "
         "By default the database set via <checkm2 database> is used.",
+    )
+
+    other_group.add_argument(
+        "--greedy",
+        help="Use greedy appraoch to create intermediate bins and select best ones",
+        action="store_true",
     )
 
     other_group.add_argument(
@@ -469,6 +487,129 @@ def log_selected_bin_info(
     logging.info(
         f"{hq_bins}/{len(selected_bins)} selected bins have a high quality {thresholds}."
     )
+    for sb in selected_bins:
+        contig_base = {c.split("_")[0] for c in sb.contigs}
+        logging.info(
+            f"  - {sb.name} (id={sb.id}, length={sb.length}, contigs={len(sb.contigs)}, with base--> {contig_base}\n"
+        )
+        logging.info(
+            f"    completeness={sb.completeness}, contamination={sb.contamination})"
+        )
+
+
+def greedy_selection(
+    original_bins,
+    contig_info,
+    contig_to_length,
+    best_bins_chunck_size,
+    min_bin_size,
+    max_bin_size,
+    contamination_weight,
+    threads,
+    max_diff_jacard_index=0.2,
+    min_jaccard_index=0.5,
+):
+    """
+    Iteratively selects the best set of non-overlapping bins using a greedy approach.
+    """
+    selected_bins = set()
+    total_bins_scored = 0
+    iteration = 1
+    input_bins = set(original_bins)
+
+    while input_bins:
+        logging.info(f"\n🔁 === Iteration {iteration} ===")
+
+        best_bins = bin_manager.get_n_best_bins(input_bins, best_bins_chunck_size)
+
+        intermediate_bins = bin_manager.get_intermediate_bins(
+            input_bins,
+            best_bins,
+            contig_to_length,
+            max_diff_jacard_index=max_diff_jacard_index,
+            min_jaccard_index=min_jaccard_index,
+        )
+
+        logging.info(f"🧬 Generated {len(intermediate_bins)} intermediate bin(s)")
+
+        if intermediate_bins:
+            bin_quality.add_bin_size_and_N50(
+                intermediate_bins, contig_info["contig_to_length"]
+            )
+
+            intermediate_bins = {
+                b for b in intermediate_bins if min_bin_size < b.length < max_bin_size
+            }
+
+            if intermediate_bins:
+                logging.info(
+                    f"🧠 Scoring {len(intermediate_bins)} new intermediate bin(s)..."
+                )
+                bin_quality.add_bin_metrics(
+                    intermediate_bins,
+                    contig_info,
+                    contamination_weight,
+                    threads=threads,
+                )
+                total_bins_scored += len(intermediate_bins)
+
+        combined_bins = input_bins | intermediate_bins
+
+        best_bins_selected = bin_manager.select_n_non_overlaping_bins(
+            combined_bins, n=best_bins_chunck_size
+        )
+
+        logging.info(
+            f"📊 Origin of selected bins: {Counter(origin for bb in best_bins_selected for origin in bb.origin)}"
+        )
+
+        selected_bins |= set(best_bins_selected)
+        input_bins -= set(best_bins_selected)
+
+        best_bins_selected_contigs = {
+            contig for b in best_bins_selected for contig in b.contigs
+        }
+
+        input_bins = bin_manager.remove_contigs_from_bins(
+            best_bins_selected_contigs, input_bins
+        )
+
+        bins_to_score = {b for b in input_bins if b.score is None}
+        input_bins -= bins_to_score
+
+        bin_quality.add_bin_size_and_N50(bins_to_score, contig_info["contig_to_length"])
+
+        logging.info(
+            f"📋 Unscored bins: {[(b.name, b.id, b.length, tuple(sorted(b.contigs))) for b in bins_to_score]}"
+        )
+
+        bins_to_score = {
+            b for b in bins_to_score if min_bin_size < b.length < max_bin_size
+        }
+
+        if bins_to_score:
+            logging.info(f"🧠 Scoring {len(bins_to_score)} unscored bin(s)...")
+            bin_quality.add_bin_metrics(
+                bins_to_score, contig_info, contamination_weight, threads=1
+            )
+            total_bins_scored += len(bins_to_score)
+
+        input_bins |= bins_to_score
+
+        contig_count = sum(len(b.contigs) for b in input_bins)
+        logging.info(
+            f"📉 {len(input_bins)} bin(s) and {contig_count} contigs remaining after cleanup"
+        )
+        logging.info(f"📦 {len(selected_bins)} bins selected")
+
+        iteration += 1
+
+    logging.info("\n🎉 Selection complete!")
+    logging.info(f"📦 Total bins selected: {len(selected_bins)}")
+    logging.info(f"🔁 Total rounds: {iteration - 1}")
+    logging.info(f"🧠 Total bins scored: {total_bins_scored}")
+
+    return selected_bins
 
 
 def main():
@@ -549,14 +690,14 @@ def main():
 
     # Extract cds metadata ##
     logging.info("Compute cds metadata.")
-    contig_metadat = cds.get_contig_cds_metadata(contig_to_genes, args.threads)
+    contig_metadata = cds.get_contig_cds_metadata(contig_to_genes, args.threads)
 
-    contig_metadat["contig_to_kegg_counter"] = contig_to_kegg_counter
-    contig_metadat["contig_to_length"] = contig_to_length
+    contig_metadata["contig_to_kegg_counter"] = contig_to_kegg_counter
+    contig_metadata["contig_to_length"] = contig_to_length
 
     logging.info("Add size and assess quality of input bins")
     bin_quality.add_bin_metrics(
-        original_bins, contig_metadat, args.contamination_weight, args.threads
+        original_bins, contig_metadata, args.contamination_weight, args.threads
     )
 
     logging.info(
@@ -564,30 +705,51 @@ def main():
     )
     io.write_original_bin_metrics(original_bins, original_bin_report_dir)
 
-    logging.info("Create intermediate bins:")
-    new_bins = bin_manager.create_intermediate_bins(original_bins)
+    if args.greedy:
+        logging.info("Using greedy approach to select best bins.")
+        selected_bins = greedy_selection(
+            original_bins=original_bins,
+            contig_info=contig_metadata,
+            contig_to_length=contig_to_length,
+            best_bins_chunck_size=len(original_bins),
+            min_bin_size=200_000,
+            max_bin_size=10_000_000,
+            contamination_weight=args.contamination_weight,
+            threads=args.threads,
+            max_diff_jacard_index=0.2,
+            min_jaccard_index=0.8,
+        )
 
-    logging.info(f"Assess quality for {len(new_bins)} intermediate bins.")
-    bin_quality.add_bin_metrics(
-        new_bins,
-        contig_metadat,
-        args.contamination_weight,
-        args.threads,
-    )
+        for b in selected_bins:
+            b.contigs = {index_to_contig[c_index] for c_index in b.contigs}
 
-    logging.info("Dereplicating input bins and new bins")
-    all_bins = original_bins | new_bins
+        io.write_bin_info(selected_bins, final_bin_report)
 
-    selected_bins = select_bins_and_write_them(
-        all_bins=all_bins,
-        contigs_fasta=args.contigs,
-        final_bin_report=final_bin_report,
-        min_completeness=args.min_completeness,
-        index_to_contig=index_to_contig,
-        outdir=args.outdir,
-        temporary_dir=out_tmp_dir,
-        debug=args.debug,
-    )
+    else:
+        logging.info("Create intermediate bins:")
+        new_bins = bin_manager.create_intermediate_bins(original_bins)
+
+        logging.info(f"Assess quality for {len(new_bins)} intermediate bins.")
+        bin_quality.add_bin_metrics(
+            new_bins,
+            contig_metadata,
+            args.contamination_weight,
+            args.threads,
+        )
+
+        logging.info("Dereplicating input bins and new bins")
+        all_bins = original_bins | new_bins
+
+        selected_bins = select_bins_and_write_them(
+            all_bins=all_bins,
+            contigs_fasta=args.contigs,
+            final_bin_report=final_bin_report,
+            min_completeness=args.min_completeness,
+            index_to_contig=index_to_contig,
+            outdir=args.outdir,
+            temporary_dir=out_tmp_dir,
+            debug=args.debug,
+        )
 
     log_selected_bin_info(selected_bins, hq_min_completeness, hq_max_conta)
 
