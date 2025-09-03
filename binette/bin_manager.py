@@ -10,6 +10,7 @@ from typing import List, Dict, Iterable, Tuple, Set
 from tqdm import tqdm
 
 from collections import Counter
+from pyroaring import BitMap
 
 
 class Bin:
@@ -88,19 +89,6 @@ class Bin:
         """
         return self.contigs & other.contigs
 
-    # def __and__(self, other: 'Bin') -> 'Bin':
-    #     """
-    #     Perform a logical AND operation between this bin and another bin.
-
-    #     :param other: The other Bin object.
-    #     :return: A new Bin object representing the intersection of the bins.
-    #     """
-    #     contigs = self.contigs & other.contigs
-    #     name = f"{self.name} & {other.name}"
-    #     origin = "intersection"
-
-    #     return Bin(contigs, origin, name)
-
     def add_length(self, length: int) -> None:
         """
         Add the length attribute to the Bin object if the provided length is a positive integer.
@@ -139,48 +127,48 @@ class Bin:
         self.contamination = contamination
         self.score = completeness - contamination_weight * contamination
 
-    def intersection(self, *others: "Bin") -> "Bin":
-        """
-        Compute the intersection of the bin with other bins.
+    # def intersection(self, *others: "Bin") -> "Bin":
+    #     """
+    #     Compute the intersection of the bin with other bins.
 
-        :param others: Other bins to compute the intersection with.
-        :return: A new Bin representing the intersection of the bins.
-        """
-        other_contigs = (o.contigs for o in others)
-        contigs = self.contigs.intersection(*other_contigs)
-        name = f"{self.id} & {' & '.join([str(other.id) for other in sorted(others)])}"
-        origin = "intersec"
+    #     :param others: Other bins to compute the intersection with.
+    #     :return: A new Bin representing the intersection of the bins.
+    #     """
+    #     other_contigs = (o.contigs for o in others)
+    #     contigs = self.contigs.intersection(*other_contigs)
+    #     name = f"{self.id} & {' & '.join([str(other.id) for other in sorted(others)])}"
+    #     origin = "intersec"
 
-        return Bin(contigs, origin, name)
+    #     return Bin(contigs, origin, name)
 
-    def difference(self, *others: "Bin") -> "Bin":
-        """
-        Compute the difference between the bin and other bins.
+    # def difference(self, *others: "Bin") -> "Bin":
+    #     """
+    #     Compute the difference between the bin and other bins.
 
-        :param others: Other bins to compute the difference with.
-        :return: A new Bin representing the difference between the bins.
-        """
-        other_contigs = (o.contigs for o in others)
-        contigs = self.contigs.difference(*other_contigs)
-        name = f"{self.id} - {' - '.join([str(other.id) for other in sorted(others)])}"
-        origin = "diff"
+    #     :param others: Other bins to compute the difference with.
+    #     :return: A new Bin representing the difference between the bins.
+    #     """
+    #     other_contigs = (o.contigs for o in others)
+    #     contigs = self.contigs.difference(*other_contigs)
+    #     name = f"{self.id} - {' - '.join([str(other.id) for other in sorted(others)])}"
+    #     origin = "diff"
 
-        return Bin(contigs, origin, name)
+    #     return Bin(contigs, origin, name)
 
-    def union(self, *others: "Bin") -> "Bin":
-        """
-        Compute the union of the bin with other bins.
+    # def union(self, *others: "Bin") -> "Bin":
+    #     """
+    #     Compute the union of the bin with other bins.
 
-        :param others: Other bins to compute the union with.
-        :return: A new Bin representing the union of the bins.
-        """
-        other_contigs = (o.contigs for o in others)
-        contigs = self.contigs.union(*other_contigs)
-        name = f"{self.id} | {' | '.join([str(other.id) for other in sorted(others)])}"
+    #     :param others: Other bins to compute the union with.
+    #     :return: A new Bin representing the union of the bins.
+    #     """
+    #     other_contigs = (o.contigs for o in others)
+    #     contigs = self.contigs.union(*other_contigs)
+    #     name = f"{self.id} | {' | '.join([str(other.id) for other in sorted(others)])}"
 
-        origin = "union"
+    #     origin = "union"
 
-        return Bin(contigs, origin, name)
+    #     return Bin(contigs, origin, name)
 
     def is_complete_enough(self, min_completeness: float) -> bool:
         """
@@ -615,6 +603,11 @@ def create_intermediate_bins(original_bins: Set[Bin]) -> Set[Bin]:
 
     :return: A set of intermediate bins created from intersections, differences, and unions.
     """
+    min_comp = 40
+    max_conta = 20
+
+    min_len = 500_000
+    max_len = 6_000_000
 
     logging.info("Making bin graph...")
     connected_bins_graph = from_bins_to_bin_graph(original_bins)
@@ -623,35 +616,77 @@ def create_intermediate_bins(original_bins: Set[Bin]) -> Set[Bin]:
         [sorted(clique) for clique in nx.clique.find_cliques(connected_bins_graph)]
     )
 
-    logging.info("Creating intersection bins...")
-    intersection_bins = get_intersection_bins(cliques_of_bins)
+    bin_id_to_bitmap_bin = {
+        bin_obj.id: BitMap(bin_obj.contigs) for bin_obj in original_bins
+    }
+    new_bitmap_bins = []
 
-    logging.info(f"{len(intersection_bins)} bins created on intersections.")
+    bins_serializers_to_id = {
+        bitmap_bin.serialize(): bin_id
+        for bin_id, bitmap_bin in bin_id_to_bitmap_bin.items()
+    }
 
-    logging.info("Creating difference bins...")
-    difference_bins = get_difference_bins(cliques_of_bins)
+    logging.info("Creating union, difference, and intersection bins...")
 
-    logging.info(f"{len(difference_bins)} bins created based on symmetric difference.")
+    intersec_count = 0
+    union_count = 0
+    diff_count = 0
 
-    logging.info("Creating union bins...")
-    union_bins = get_union_bins(cliques_of_bins)
+    for clique in tqdm(
+        cliques_of_bins, total=len(cliques_of_bins), unit="clique of bins"
+    ):
+        bins_combinations = get_all_possible_combinations(clique)
 
-    logging.info(f"{len(union_bins)} bins created on unions.")
+        for bins in bins_combinations:
+            bitmap_bins = [bin_id_to_bitmap_bin[bin_obj.id] for bin_obj in bins]
 
-    new_bins = difference_bins | intersection_bins | union_bins
+            if max((b.completeness for b in bins)) > min_comp:
 
-    new_bins = dereplicate_bin_sets((difference_bins, intersection_bins, union_bins))
+                intersec_bin = bitmap_bins[0].intersection(*bitmap_bins[1:])
 
-    # dereplicate from the original bins
-    original_hashes = [b.hash for b in original_bins]
-    new_bins_not_in_original = set()
+                if intersec_bin:  # and intersec_bin not in clique:
+                    intersec_bin_serialize = intersec_bin.serialize()
+                    if intersec_bin_serialize not in bins_serializers_to_id:
+                        bins_serializers_to_id[intersec_bin_serialize] = None
+                        new_bitmap_bins.append(intersec_bin)
+                        intersec_count += 1
 
-    for b in new_bins:
-        if b.hash not in original_hashes:
-            new_bins_not_in_original.add(b)
+            for bin_a in bins:
+                bitmap_bin_a = bin_id_to_bitmap_bin[bin_a.id]
+                if bin_a.completeness >= min_comp:
+                    bin_diff = bitmap_bin_a.difference(
+                        *(b for b in bitmap_bins if b != bitmap_bin_a)
+                    )
+
+                    if bin_diff:
+                        bin_diff_serialize = bin_diff.serialize()
+                        if bin_diff_serialize not in bins_serializers_to_id:
+                            bins_serializers_to_id[bin_diff_serialize] = None
+                            new_bitmap_bins.append(bin_diff)
+                            diff_count += 1
+
+            if max((b.contamination for b in bins)) <= max_conta:
+
+                bin_union = bitmap_bins[0].union(*bitmap_bins[1:])
+                if bin_union:
+                    bin_union_serialize = bin_union.serialize()
+                    if bin_union_serialize not in bins_serializers_to_id:
+                        bins_serializers_to_id[bin_union_serialize] = None
+                        new_bitmap_bins.append(bin_union)
+                        union_count += 1
+
+    logging.info(f"{intersec_count} bins created on intersections.")
+
+    logging.info(f"{diff_count} bins created based on symmetric difference.")
+
+    logging.info(f"{union_count} bins created on unions.")
 
     logging.info(
-        f"{len(new_bins)} new bins created from {len(original_bins)} input bins."
+        f"{len(new_bitmap_bins)} new bins created from {len(original_bins)} input bins."
     )
+    # b_list = sorted([sorted(list(new_bin)) for new_bin in new_bitmap_bins])
 
-    return new_bins_not_in_original
+    # for i, contigs in enumerate(b_list):
+    #     print(f"{i + 1} - {contigs}")
+
+    return new_bitmap_bins

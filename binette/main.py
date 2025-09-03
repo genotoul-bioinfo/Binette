@@ -253,6 +253,7 @@ def parse_input_files(
         logging.info(f" {bin_set_id} - {len(bins)} bins")
 
     contigs_in_bins = bin_manager.get_contigs_in_bin_sets(bin_set_name_to_bins)
+
     original_bins = bin_manager.dereplicate_bin_sets(bin_set_name_to_bins.values())
 
     logging.info(f"Parsing contig fasta file: {contigs_fasta}")
@@ -567,6 +568,8 @@ def main():
     logging.info("Create intermediate bins:")
     new_bins = bin_manager.create_intermediate_bins(original_bins)
 
+    print("STOP HERE")
+    return 0
     logging.info(f"Assess quality for {len(new_bins)} intermediate bins.")
     bin_quality.add_bin_metrics(
         new_bins,
