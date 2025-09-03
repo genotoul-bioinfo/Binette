@@ -26,7 +26,7 @@ from binette import (
 from typing import List, Dict, Optional, Set, Tuple, Union, Sequence, Any
 from pathlib import Path
 import pyfastx
-
+from pyroaring import BitMap
 
 def init_logging(verbose, debug):
     """Initialise logging."""
@@ -155,6 +155,13 @@ def parse_arguments(args):
     )
 
     other_group.add_argument(
+        "--max_contamination",
+        default=10,
+        type=int,
+        help="Maximum contamination required for final bin selections.",
+    )
+
+    other_group.add_argument(
         "-t", "--threads", default=1, type=int, help="Number of threads to use."
     )
 
@@ -215,9 +222,7 @@ def parse_input_files(
     contig2bin_tables: List[Path],
     contigs_fasta: Path,
     fasta_extensions: Set[str] = {".fasta", ".fna", ".fa"},
-) -> Tuple[
-    Dict[str, Set[bin_manager.Bin]], Set[bin_manager.Bin], Set[str], Dict[str, int]
-]:
+):
     """
     Parses input files to retrieve information related to bins and contigs.
 
@@ -225,7 +230,7 @@ def parse_input_files(
     :param contig2bin_tables: List of paths to contig-to-bin tables.
     :param contigs_fasta: Path to the contigs FASTA file.
     :param temporary_dir: Path to the temporary directory to store intermediate files.
-    :fasta_extensions: Possible fasta extensions to look for in the bin directory.
+    :param fasta_extensions: Possible fasta extensions to look for in the bin directory.
 
     :return: A tuple containing:
         - List of original bins.
@@ -236,7 +241,7 @@ def parse_input_files(
     if bin_dirs:
         logging.info("Parsing bin directories.")
         bin_name_to_bin_dir = io.infer_bin_set_names_from_input_paths(bin_dirs)
-        bin_set_name_to_bins = bin_manager.parse_bin_directories(
+        bin_set_name_to_bins_info = bin_manager.parse_bin_directories(
             bin_name_to_bin_dir, fasta_extensions
         )
     else:
@@ -244,17 +249,23 @@ def parse_input_files(
         bin_name_to_bin_table = io.infer_bin_set_names_from_input_paths(
             contig2bin_tables
         )
-        bin_set_name_to_bins = bin_manager.parse_contig2bin_tables(
+        bin_set_name_to_bins_info = bin_manager.parse_contig2bin_tables(
             bin_name_to_bin_table
         )
 
-    logging.info(f"Processing {len(bin_set_name_to_bins)} bin sets.")
-    for bin_set_id, bins in bin_set_name_to_bins.items():
-        logging.info(f" {bin_set_id} - {len(bins)} bins")
+    logging.info(f"Processing {len(bin_set_name_to_bins_info)} bin sets.")
+    for bin_set_id, bins_info in bin_set_name_to_bins_info.items():
+        logging.info(f" {bin_set_id} - {len(bins_info)} bins")
 
-    contigs_in_bins = bin_manager.get_contigs_in_bin_sets(bin_set_name_to_bins)
+    contigs_in_bins = bin_manager.get_contigs_in_bin_sets(bin_set_name_to_bins_info)
 
-    original_bins = bin_manager.dereplicate_bin_sets(bin_set_name_to_bins.values())
+    contig_to_index = contig_manager.make_contig_index(contigs_in_bins)
+
+    contig_key_to_bin = bin_manager.make_bins_from_bins_info(
+        bin_set_name_to_bins_info, contig_to_index, are_original_bins=True
+    )
+
+    # original_bins = bin_manager.dereplicate_bin_sets(bin_set_name_to_bins.values())
 
     logging.info(f"Parsing contig fasta file: {contigs_fasta}")
 
@@ -275,13 +286,20 @@ def parse_input_files(
             f"The missing contigs are: {', '.join(unexpected_contigs)}. Please ensure all contigs from input bins are present in contig file."
         )
 
-    return original_bins, contigs_in_bins, contig_to_length
+    contig_id_to_length = {
+        contig_to_index[name]: length for name, length in contig_to_length.items()
+    }
+    return (
+        contig_key_to_bin,
+        contigs_in_bins,
+        contig_id_to_length,
+        contig_to_index,
+    )
 
 
 def manage_protein_alignement(
     faa_file: Path,
     contigs_fasta: Path,
-    contig_to_length: Dict[str, int],
     contigs_in_bins: Set[str],
     diamond_result_file: Path,
     checkm2_db: Optional[Path],
@@ -295,7 +313,6 @@ def manage_protein_alignement(
 
     :param faa_file: The path to the .faa file.
     :param contigs_fasta: The path to the contigs FASTA file.
-    :param contig_to_length: Dictionary mapping contig names to their lengths.
     :param contigs_in_bins: Dictionary mapping bin names to lists of contigs.
     :param diamond_result_file: The path to the diamond result file.
     :param checkm2_db: The path to the CheckM2 database.
@@ -312,7 +329,7 @@ def manage_protein_alignement(
         logging.info(f"Parsing faa file: {faa_file}.")
         contig_to_genes = cds.parse_faa_file(faa_file.as_posix())
         io.check_contig_consistency(
-            contig_to_length,
+            contigs_in_bins,
             contig_to_genes,
             contigs_fasta.as_posix(),
             faa_file.as_posix(),
@@ -356,7 +373,7 @@ def manage_protein_alignement(
 
     # Check contigs from diamond vs input assembly consistency
     io.check_contig_consistency(
-        contig_to_length,
+        contigs_in_bins,
         contig_to_kegg_counter,
         contigs_fasta.as_posix(),
         diamond_result_file.as_posix(),
@@ -365,63 +382,21 @@ def manage_protein_alignement(
     return contig_to_kegg_counter, contig_to_genes
 
 
-def select_bins_and_write_them(
-    all_bins: Set[bin_manager.Bin],
+def write_bins_fasta(
+    selected_bins: List[bin_manager.Bin],
     contigs_fasta: Path,
-    final_bin_report: Path,
-    min_completeness: float,
-    index_to_contig: dict,
+    contigs_in_bins: dict,
     outdir: Path,
-    temporary_dir: Path,
-    debug: bool,
-) -> List[bin_manager.Bin]:
-    """
-    Selects and writes bins based on specific criteria.
-
-    :param all_bins: Set of Bin objects.
-    :param contigs_fasta: Path to the contigs FASTA file.
-    :param final_bin_report: Path to write the final bin report.
-    :param min_completeness: Minimum completeness threshold for bin selection.
-    :param index_to_contig: Dictionary mapping indices to contig names.
-    :param outdir: Output directory to save final bins and reports.
-    :param temporary_dir: Path to the temporary directory to store intermediate files.
-    :param debug: Debug mode flag.
-    :return: Selected bins that meet the completeness threshold.
-    """
-
-    outdir_final_bin_set = outdir / "final_bins"
-    os.makedirs(outdir_final_bin_set, exist_ok=True)
-
-    logging.info(
-        f"Filtering bins: only bins with completeness >= {min_completeness} are kept"
-    )
-    all_bins_complete_enough = {
-        b for b in all_bins if b.is_complete_enough(min_completeness)
-    }
-
-    logging.info("Selecting best bins")
-    selected_bins = bin_manager.select_best_bins(all_bins_complete_enough)
-
-    logging.info(f"Bin Selection: {len(selected_bins)} selected bins")
-
-    logging.info(f"Writing selected bins in {final_bin_report}")
+):
 
     for b in selected_bins:
-        b.contigs = {index_to_contig[c_index] for c_index in b.contigs}
+        b.contigs = {contigs_in_bins[c_index] for c_index in b.contigs}
 
-    io.write_bin_info(selected_bins, final_bin_report)
+    outdir_final_bin_set = outdir / "final_bins"
 
-    io.write_bins_fasta(selected_bins, contigs_fasta, outdir_final_bin_set)
-
-    if debug:
-        all_bin_compo_file = outdir / "all_bins_quality_reports.tsv"
-
-        logging.info(f"Writing all bins in {all_bin_compo_file}")
-
-        io.write_bin_info(all_bins, all_bin_compo_file, add_contigs=True)
-
-        with open(os.path.join(outdir, "index_to_contig.tsv"), "w") as flout:
-            flout.write("\n".join((f"{i}\t{c}" for i, c in index_to_contig.items())))
+    io.write_bins_fasta(
+        selected_bins, contigs_fasta, outdir_final_bin_set, contigs_in_bins
+    )
 
     return selected_bins
 
@@ -485,6 +460,8 @@ def main():
     hq_max_conta = 5
     hq_min_completeness = 90
 
+    write_final_fasta_bins = True
+
     # Temporary files #
     out_tmp_dir: Path = args.outdir / "temporary_files"
     os.makedirs(out_tmp_dir, exist_ok=True)
@@ -503,12 +480,25 @@ def main():
         io.check_resume_file(faa_file, diamond_result_file)
         use_existing_protein_file = True
 
-    original_bins, contigs_in_bins, contig_to_length = parse_input_files(
+    (
+        contig_key_to_original_bin,
+        contigs_in_bins,
+        contig_to_length,
+        contig_to_index,
+    ) = parse_input_files(
         args.bin_dirs,
         args.contig2bin_tables,
         args.contigs,
         fasta_extensions=set(args.fasta_extensions),
     )
+
+    if args.debug:
+        index_to_contig_file = args.outdir / "index_to_contig.tsv"
+        logging.info(f"Writing index to contig mapping in {index_to_contig_file}")
+        with open(index_to_contig_file, "w") as flout:
+            flout.write("\n".join((f"{i}\t{c}" for i, c in enumerate(contigs_in_bins))))
+
+    original_bins = list(contig_key_to_original_bin.values())
 
     if args.proteins and not args.resume:
         logging.info(f"Using the provided protein sequences file: {args.proteins}")
@@ -520,10 +510,9 @@ def main():
             filtered_faa_file=faa_file,
         )
 
-    contig_to_kegg_counter, contig_to_genes = manage_protein_alignement(
+    contig_name_to_kegg_counter, contig_name_to_genes = manage_protein_alignement(
         faa_file=faa_file,
         contigs_fasta=args.contigs,
-        contig_to_length=contig_to_length,
         contigs_in_bins=contigs_in_bins,
         diamond_result_file=diamond_result_file,
         checkm2_db=args.checkm2_db,
@@ -533,20 +522,12 @@ def main():
         low_mem=args.low_mem,
     )
 
-    # Use contig index instead of contig name to save memory
-    contig_to_index, index_to_contig = contig_manager.make_contig_index(contigs_in_bins)
-
     contig_to_kegg_counter = contig_manager.apply_contig_index(
-        contig_to_index, contig_to_kegg_counter
+        contig_to_index, contig_name_to_kegg_counter
     )
     contig_to_genes = contig_manager.apply_contig_index(
-        contig_to_index, contig_to_genes
+        contig_to_index, contig_name_to_genes
     )
-    contig_to_length = contig_manager.apply_contig_index(
-        contig_to_index, contig_to_length
-    )
-
-    bin_manager.rename_bin_contigs(original_bins, contig_to_index)
 
     # Extract cds metadata ##
     logging.info("Compute cds metadata.")
@@ -559,6 +540,7 @@ def main():
     bin_quality.add_bin_metrics(
         original_bins, contig_metadat, args.contamination_weight, args.threads
     )
+    bin_quality.add_bin_size_and_N50(original_bins, contig_to_length)
 
     logging.info(
         f"Writting original input bin metrics to directory: {original_bin_report_dir}"
@@ -566,32 +548,47 @@ def main():
     io.write_original_bin_metrics(original_bins, original_bin_report_dir)
 
     logging.info("Create intermediate bins:")
-    new_bins = bin_manager.create_intermediate_bins(original_bins)
-    print("STOP HERE")
-    return 0
 
-    logging.info(f"Assess quality for {len(new_bins)} intermediate bins.")
+    contig_key_to_new_bin = bin_manager.create_intermediate_bins(
+        contig_key_to_original_bin
+    )
+
+    logging.info(f"Assess quality for {len(contig_key_to_new_bin)} intermediate bins.")
 
     bin_quality.add_bin_metrics(
-        new_bins,
+        contig_key_to_new_bin.values(),
         contig_metadat,
         args.contamination_weight,
         args.threads,
     )
 
-    logging.info("Dereplicating input bins and new bins")
-    all_bins = original_bins | new_bins
+    contig_key_to_all_bin = contig_key_to_original_bin | contig_key_to_new_bin
 
-    selected_bins = select_bins_and_write_them(
-        all_bins=all_bins,
-        contigs_fasta=args.contigs,
-        final_bin_report=final_bin_report,
+    bin_quality.add_bin_size_and_N50(contig_key_to_all_bin.values(), contig_to_length)
+
+    if args.debug:
+        all_bin_compo_file = args.outdir / "all_bins_quality_reports.tsv"
+        logging.info(f"Writing all bins in {all_bin_compo_file}")
+        io.write_bin_info(
+            contig_key_to_all_bin.values(), all_bin_compo_file, add_contigs=True
+        )
+
+    selected_bins = bin_manager.select_best_bins(
+        contig_key_to_all_bin,
         min_completeness=args.min_completeness,
-        index_to_contig=index_to_contig,
-        outdir=args.outdir,
-        temporary_dir=out_tmp_dir,
-        debug=args.debug,
+        max_contamination=args.max_contamination,
     )
+
+    logging.info(f"Writing selected bins in {final_bin_report}")
+    io.write_bin_info(selected_bins, output=final_bin_report)
+
+    if write_final_fasta_bins:
+        io.write_bins_fasta(
+            selected_bins,
+            args.contigs,
+            outdir=args.outdir / "final_bins",
+            contigs_names=contigs_in_bins,
+        )
 
     log_selected_bin_info(selected_bins, hq_min_completeness, hq_max_conta)
 

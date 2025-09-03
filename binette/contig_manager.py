@@ -1,5 +1,5 @@
 import pyfastx
-from typing import Dict, Iterable, Tuple, Set, Any, Union
+from typing import Dict, Iterable, Set, Any, Union
 
 
 def parse_fasta_file(fasta_file: str, index_file: str) -> pyfastx.Fasta:
@@ -14,7 +14,7 @@ def parse_fasta_file(fasta_file: str, index_file: str) -> pyfastx.Fasta:
     return fa
 
 
-def make_contig_index(contigs: Set[str]) -> Tuple[Dict[str, int], Dict[int, str]]:
+def make_contig_index(contigs: Set[str]) -> Dict[str, int]:
     """
     Create an index mapping for contigs.
 
@@ -23,8 +23,7 @@ def make_contig_index(contigs: Set[str]) -> Tuple[Dict[str, int], Dict[int, str]
     :return: A tuple containing the contig index mapping dictionaries (contig_to_index, index_to_contig).
     """
     contig_to_index = {contig: index for index, contig in enumerate(contigs)}
-    index_to_contig = {index: contig for contig, index in contig_to_index.items()}
-    return contig_to_index, index_to_contig
+    return contig_to_index
 
 
 def apply_contig_index(

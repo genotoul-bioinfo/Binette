@@ -3,11 +3,11 @@ import logging
 import os
 from collections import Counter
 from itertools import islice
-from typing import Dict, Iterable, Optional, Tuple, Iterator, Set
+from typing import Dict, Iterable, Optional, Tuple, Iterator, List
 
 import numpy as np
 import pandas as pd
-from binette.bin_manager import Bin
+from binette.bin_manager import Bin, BitmapBin
 from tqdm import tqdm
 
 # Suppress unnecessary TensorFlow warnings
@@ -19,7 +19,7 @@ from checkm2 import keggData, modelPostprocessing, modelProcessing  # noqa: E402
 
 
 def get_bins_metadata_df(
-    bins: Iterable[Bin],
+    bins: List[BitmapBin],
     contig_to_cds_count: Dict[str, int],
     contig_to_aa_counter: Dict[str, Counter],
     contig_to_aa_length: Dict[str, int],
@@ -40,7 +40,7 @@ def get_bins_metadata_df(
     bin_metadata_list = []
     for bin_obj in bins:
         bin_metadata = {
-            "Name": bin_obj.id,
+            "Name": bin_obj.contigs_key,
             "CDS": sum(
                 (
                     contig_to_cds_count[c]
@@ -76,7 +76,7 @@ def get_bins_metadata_df(
 
 
 def get_diamond_feature_per_bin_df(
-    bins: Iterable[Bin], contig_to_kegg_counter: Dict[str, Counter]
+    bins: List[BitmapBin], contig_to_kegg_counter: Dict[str, Counter]
 ) -> Tuple[pd.DataFrame, int]:
     """
     Generate a DataFrame containing Diamond feature counts per bin and completeness information for pathways, categories, and modules.
@@ -101,7 +101,7 @@ def get_diamond_feature_per_bin_df(
                 # No KO annotation found in this contig
                 continue
 
-        bin_to_ko_counter[bin_obj.id] = bin_ko_counter
+        bin_to_ko_counter[bin_obj.contigs_key] = bin_ko_counter
 
     ko_count_per_bin_df = (
         pd.DataFrame(bin_to_ko_counter, index=defaultKOs).transpose().fillna(0)
@@ -128,43 +128,49 @@ def get_diamond_feature_per_bin_df(
     return diamond_complete_results, len(defaultKOs)
 
 
-def compute_N50(list_of_lengths) -> int:
+def prepare_contig_sizes(contig_to_size: Dict[int, int]):
     """
-    Calculate N50 for a sequence of numbers.
-
-    :param list_of_lengths: List of numbers.
-    :param list_of_lengths: list
-    :return: N50 value.
+    Prepare a numpy array of contig sizes for fast access.
     """
-    list_of_lengths = sorted(list_of_lengths)
-    sum_len = sum(list_of_lengths)
 
-    cum_length = 0
-    length = 0
-    for length in list_of_lengths:
-        if cum_length + length >= sum_len / 2:
-            return length
-        cum_length += length
-    return length
+    max_id = max(contig_to_size)
+    contig_sizes = np.zeros(max_id + 1, dtype=np.int64)
+    for cid, size in contig_to_size.items():
+        contig_sizes[cid] = size
+    return contig_sizes
 
 
-def add_bin_size_and_N50(bins: Iterable[Bin], contig_to_size: Dict[str, int]):
+def compute_N50(lengths: np.ndarray) -> int:
+    arr = np.sort(lengths)
+    half = arr.sum() / 2
+    csum = np.cumsum(arr)
+    return arr[np.searchsorted(csum, half)]
+
+
+def add_bin_size_and_N50(bins: Iterable[Bin], contig_to_size: Dict[int, int]):
     """
     Add bin size and N50 to a list of bin objects.
 
     :param bins: List of bin objects.
     :param contig_to_size: Dictionary mapping contig names to their sizes.
     """
+    # TODO use numpy array everywhere instead of contig_to_size
+    contig_sizes = prepare_contig_sizes(contig_to_size)
+
     for bin_obj in bins:
-        lengths = [contig_to_size[c] for c in bin_obj.contigs]
+        lengths = contig_sizes[list(bin_obj.contigs)]  # fast bulk lookup
+        total_len = lengths.sum()
         n50 = compute_N50(lengths)
 
-        bin_obj.add_length(sum(lengths))
-        bin_obj.add_N50(n50)
+        bin_obj.add_length(int(total_len))
+        bin_obj.add_N50(int(n50))
 
 
 def add_bin_metrics(
-    bins: Set[Bin], contig_info: Dict, contamination_weight: float, threads: int = 1
+    bins: List[Bin],
+    contig_info: Dict,
+    contamination_weight: float,
+    threads: int = 1,
 ):
     """
     Add metrics to a Set of bins.
@@ -182,13 +188,11 @@ def add_bin_metrics(
     contig_to_cds_count = contig_info["contig_to_cds_count"]
     contig_to_aa_counter = contig_info["contig_to_aa_counter"]
     contig_to_aa_length = contig_info["contig_to_aa_length"]
-    contig_to_length = contig_info["contig_to_length"]
 
     logging.info("Getting bin length and N50")
 
-    add_bin_size_and_N50(bins, contig_to_length)
-
     logging.info(f"Assessing bin quality for {len(bins)} bins.")
+
     assess_bins_quality_by_chunk(
         bins,
         contig_to_kegg_counter,
@@ -243,7 +247,7 @@ def assess_bins_quality_by_chunk(
     """
     with tqdm(total=len(bins), unit="bin", disable=disable_bar) as pbar:
         for i, chunk_bins_iter in enumerate(chunks(bins, chunk_size)):
-            chunk_bins = set(chunk_bins_iter)
+            chunk_bins = list(chunk_bins_iter)
             logging.debug(f"chunk {i}: assessing quality of {len(chunk_bins)} bins")
             bins_scored = assess_bins_quality(
                 bins=chunk_bins,
@@ -335,8 +339,9 @@ def assess_bins_quality(
     final_results["Contamination"] = np.round(final_cont, 2)
 
     for bin_obj in bins:
-        completeness = final_results.at[bin_obj.id, "Completeness"]
-        contamination = final_results.at[bin_obj.id, "Contamination"]
+        completeness = final_results.at[bin_obj.contigs_key, "Completeness"]
+        contamination = final_results.at[bin_obj.contigs_key, "Contamination"]
 
         bin_obj.add_quality(completeness, contamination, contamination_weight)
+
     return bins
