@@ -567,10 +567,11 @@ def main():
 
     logging.info("Create intermediate bins:")
     new_bins = bin_manager.create_intermediate_bins(original_bins)
-
     print("STOP HERE")
     return 0
+
     logging.info(f"Assess quality for {len(new_bins)} intermediate bins.")
+
     bin_quality.add_bin_metrics(
         new_bins,
         contig_metadat,

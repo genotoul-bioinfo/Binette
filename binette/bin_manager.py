@@ -31,7 +31,12 @@ class Bin:
         self.origin = {origin}
         self.name = name
         self.id = Bin.counter
-        self.contigs = set(contigs)
+        # check contigs type
+        if isinstance(contigs, BitMap):
+            self.contigs = contigs
+        else:
+            self.contigs = set(contigs)
+
         self.hash = hash(str(sorted(self.contigs)))
 
         self.length = None
@@ -591,7 +596,7 @@ def rename_bin_contigs(bins: Iterable[Bin], contig_to_index: dict):
     :param contig_to_index: A dictionary mapping old contig names to new index names.
     """
     for b in bins:
-        b.contigs = {contig_to_index[contig] for contig in b.contigs}
+        b.contigs = BitMap(contig_to_index[contig] for contig in b.contigs)
         b.hash = hash(str(sorted(b.contigs)))
 
 
@@ -640,7 +645,7 @@ def create_intermediate_bins(original_bins: Set[Bin]) -> Set[Bin]:
         for bins in bins_combinations:
             bitmap_bins = [bin_id_to_bitmap_bin[bin_obj.id] for bin_obj in bins]
 
-            if max((b.completeness for b in bins)) > min_comp:
+            if all((b.completeness for b in bins)) > min_comp:
 
                 intersec_bin = bitmap_bins[0].intersection(*bitmap_bins[1:])
 
@@ -665,7 +670,7 @@ def create_intermediate_bins(original_bins: Set[Bin]) -> Set[Bin]:
                             new_bitmap_bins.append(bin_diff)
                             diff_count += 1
 
-            if max((b.contamination for b in bins)) <= max_conta:
+            if all((b.contamination for b in bins)) <= max_conta:
 
                 bin_union = bitmap_bins[0].union(*bitmap_bins[1:])
                 if bin_union:
@@ -684,9 +689,10 @@ def create_intermediate_bins(original_bins: Set[Bin]) -> Set[Bin]:
     logging.info(
         f"{len(new_bitmap_bins)} new bins created from {len(original_bins)} input bins."
     )
-    # b_list = sorted([sorted(list(new_bin)) for new_bin in new_bitmap_bins])
 
-    # for i, contigs in enumerate(b_list):
-    #     print(f"{i + 1} - {contigs}")
+    new_bins = [
+        Bin(contigs, origin="intermediate", name=i)
+        for i, contigs in enumerate(new_bitmap_bins)
+    ]
 
-    return new_bitmap_bins
+    return set(new_bins)
