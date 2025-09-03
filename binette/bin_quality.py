@@ -7,7 +7,7 @@ from typing import Dict, Iterable, Optional, Tuple, Iterator, List
 
 import numpy as np
 import pandas as pd
-from binette.bin_manager import Bin, BitmapBin
+from binette.bin_manager import Bin
 from tqdm import tqdm
 
 # Suppress unnecessary TensorFlow warnings
@@ -19,7 +19,7 @@ from checkm2 import keggData, modelPostprocessing, modelProcessing  # noqa: E402
 
 
 def get_bins_metadata_df(
-    bins: List[BitmapBin],
+    bins: List[Bin],
     contig_to_cds_count: Dict[str, int],
     contig_to_aa_counter: Dict[str, Counter],
     contig_to_aa_length: Dict[str, int],
@@ -76,7 +76,7 @@ def get_bins_metadata_df(
 
 
 def get_diamond_feature_per_bin_df(
-    bins: List[BitmapBin], contig_to_kegg_counter: Dict[str, Counter]
+    bins: List[Bin], contig_to_kegg_counter: Dict[str, Counter]
 ) -> Tuple[pd.DataFrame, int]:
     """
     Generate a DataFrame containing Diamond feature counts per bin and completeness information for pathways, categories, and modules.
