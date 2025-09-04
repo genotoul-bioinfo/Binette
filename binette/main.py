@@ -258,6 +258,7 @@ def parse_input_files(
         logging.info(f" {bin_set_id} - {len(bins_info)} bins")
 
     contigs_in_bins = bin_manager.get_contigs_in_bin_sets(bin_set_name_to_bins_info)
+    logging.info(f"Found {len(contigs_in_bins)} contigs in input bins")
 
     contig_to_index = contig_manager.make_contig_index(contigs_in_bins)
 
@@ -267,7 +268,9 @@ def parse_input_files(
 
     # original_bins = bin_manager.dereplicate_bin_sets(bin_set_name_to_bins.values())
 
-    logging.info(f"Parsing contig fasta file: {contigs_fasta}")
+    logging.info(
+        f"Parsing contig fasta file to retrieve lengths of contigs: {contigs_fasta}"
+    )
 
     contig_to_length = {
         name: len(seq)
@@ -275,6 +278,7 @@ def parse_input_files(
         if name in contigs_in_bins
     }
 
+    logging.debug("Parsing contig fasta is done")
     # check if all contigs from input bins are present in contigs file
     unexpected_contigs = {
         contig for contig in contigs_in_bins if contig not in contig_to_length
@@ -285,10 +289,12 @@ def parse_input_files(
             f"{len(unexpected_contigs)} contigs from the input bins were not found in the contigs file '{contigs_fasta}'. "
             f"The missing contigs are: {', '.join(unexpected_contigs)}. Please ensure all contigs from input bins are present in contig file."
         )
+    logging.debug("No unexpected contigs found.")
 
     contig_id_to_length = {
         contig_to_index[name]: length for name, length in contig_to_length.items()
     }
+
     return (
         contig_key_to_bin,
         contigs_in_bins,
