@@ -272,10 +272,11 @@ def parse_input_files(
         f"Parsing contig fasta file to retrieve lengths of contigs: {contigs_fasta}"
     )
 
+    contigs_in_bins_set = set(contigs_in_bins)
     contig_to_length = {
         name: len(seq)
         for name, seq in pyfastx.Fastx(contigs_fasta.as_posix())
-        if name in contigs_in_bins
+        if name in contigs_in_bins_set
     }
 
     logging.debug("Parsing contig fasta is done")
