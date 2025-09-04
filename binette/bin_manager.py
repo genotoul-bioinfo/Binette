@@ -701,7 +701,7 @@ def create_intermediate_bins(contig_key_to_initial_bin: Dict[bytes, Bin]):
 
             bins = [contig_key_to_initial_bin[ck] for ck in bin_contig_keys]
 
-            if all((b.completeness for b in bins)) > min_comp:
+            if all(b.completeness >= min_comp for b in bins):
 
                 intersec_contigs = bins[0].contig_intersection(*bins[1:])
 
@@ -731,7 +731,7 @@ def create_intermediate_bins(contig_key_to_initial_bin: Dict[bytes, Bin]):
                             contig_key_to_new_contigs_set[contig_key] = diff_contigs
                             diff_count += 1
 
-            if all((b.contamination for b in bins)) <= max_conta:
+            if all(b.contamination <= max_conta for b in bins):
 
                 union_contigs = bins[0].contig_union(*bins[1:])
                 if union_contigs:
