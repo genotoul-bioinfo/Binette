@@ -26,7 +26,6 @@ from binette import (
 from typing import List, Dict, Optional, Set, Tuple, Union, Sequence, Any
 from pathlib import Path
 import pyfastx
-from pyroaring import BitMap
 
 
 def init_logging(verbose, debug):
