@@ -556,8 +556,15 @@ def main():
 
     logging.info("Create intermediate bins:")
 
+    contig_lengths = bin_quality.prepare_contig_sizes(contig_to_length)
+
     contig_key_to_new_bin = bin_manager.create_intermediate_bins(
-        contig_key_to_original_bin
+        contig_key_to_original_bin,
+        contig_lengths=contig_lengths,
+        min_comp=args.min_completeness,
+        max_conta=args.max_contamination,
+        min_len=200_000,
+        max_len=10_000_000,
     )
 
     logging.info(f"Assess quality for {len(contig_key_to_new_bin)} intermediate bins.")

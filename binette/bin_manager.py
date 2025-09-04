@@ -12,7 +12,7 @@ from tqdm import tqdm
 from collections import Counter
 from pyroaring import BitMap
 from functools import cached_property
-
+import numpy as np
 
 class Bin:
 
@@ -526,7 +526,38 @@ def get_contigs_in_bin_sets(bin_set_name_to_bins: Dict[str, Set[Bin]]) -> List[s
     return list(all_contigs_in_bins)
 
 
-def create_intermediate_bins(contig_key_to_initial_bin: Dict[bytes, Bin]):
+def get_contigs_in_bins(bins: Iterable[Bin]) -> List[str]:
+    """
+    Retrieves all contigs present in the given list of bins.
+
+    :param bins: A list of Bin objects.
+
+    :return: A list of contigs present in the bins.
+    """
+    return [contig for b in bins for contig in b.contigs]
+
+
+def sum_contig_lengths(
+    bm_contigs: BitMap,
+    contig_lengths: np.ndarray,
+    cache: Dict[bytes, int] = {},
+    key: Optional[bytes] = None,
+):
+    if key is None:
+        key = bm_contigs.serialize()
+    if key not in cache:
+        cache[key] = int(contig_lengths[np.fromiter(bm_contigs, dtype=np.int32)].sum())
+    return cache[key]
+
+
+def create_intermediate_bins(
+    contig_key_to_initial_bin: Dict[bytes, Bin],
+    contig_lengths: np.ndarray,
+    min_comp: float,
+    max_conta: float,
+    min_len: int,
+    max_len: int,
+) -> Dict[bytes, Bin]:
     """
     Creates intermediate bins from a dictionary of bin sets.
 
@@ -534,11 +565,7 @@ def create_intermediate_bins(contig_key_to_initial_bin: Dict[bytes, Bin]):
 
     :return: A set of intermediate bins created from intersections, differences, and unions.
     """
-    min_comp = 40
-    max_conta = 20
-
-    min_len = 500_000
-    max_len = 6_000_000
+    bin_length_cache = {}
 
     logging.info("Making bin graph...")
     connected_bins_graph = from_bins_to_bin_graph(contig_key_to_initial_bin.values())
@@ -548,11 +575,25 @@ def create_intermediate_bins(contig_key_to_initial_bin: Dict[bytes, Bin]):
     )
 
     logging.info("Creating union, difference, and intersection bins...")
-
+    logging.debug(f"{min_comp} min completeness for intersection and difference bins.")
+    logging.debug(
+        f"{max_conta} max contamination for intersection and difference bins."
+    )
+    logging.debug(f"{min_len} min length for intersection and difference bins.")
+    logging.debug(f"{max_len} max length for intersection and difference bins.")
+    logging.info(
+        f"Intermediate bins filtered by minimum length of {min_len} and maximum length of {max_len}."
+    )
     intersec_count = 0
     union_count = 0
     diff_count = 0
+
+    intersec_size_discarded_count = 0
+    diff_size_discarded_count = 0
+    union_size_discarded_count = 0
+
     contig_key_to_new_contigs_set = {}
+    discarded_contig_set_keys = set()
     for clique in tqdm(
         cliques_of_bins, total=len(cliques_of_bins), unit="clique of bins"
     ):
@@ -562,21 +603,34 @@ def create_intermediate_bins(contig_key_to_initial_bin: Dict[bytes, Bin]):
 
             bins = [contig_key_to_initial_bin[ck] for ck in bin_contig_keys]
 
-            if all(b.completeness >= min_comp for b in bins):
+            if all(b.completeness >= min_comp and b.length >= min_len for b in bins):
 
                 intersec_contigs = bins[0].contig_intersection(*bins[1:])
 
                 if intersec_contigs:
                     contig_key = intersec_contigs.serialize()
+
                     if (
                         contig_key not in contig_key_to_initial_bin
                         and contig_key not in contig_key_to_new_contigs_set
+                        and contig_key not in discarded_contig_set_keys
                     ):
-                        contig_key_to_new_contigs_set[contig_key] = intersec_contigs
-                        intersec_count += 1
+                        contigs_length = sum_contig_lengths(
+                            intersec_contigs,
+                            contig_lengths,
+                            cache=bin_length_cache,
+                            key=contig_key,
+                        )
+
+                        if contigs_length >= min_len and contigs_length <= max_len:
+                            contig_key_to_new_contigs_set[contig_key] = intersec_contigs
+                            intersec_count += 1
+                        else:
+                            discarded_contig_set_keys.add(contig_key)
+                            intersec_size_discarded_count += 1
 
             for bin_a in bins:
-                if bin_a.completeness >= min_comp:
+                if bin_a.completeness >= min_comp and bin_a.length >= min_len:
 
                     diff_contigs = bin_a.contig_difference(
                         *(b for b in bins if b != bin_a)
@@ -588,11 +642,23 @@ def create_intermediate_bins(contig_key_to_initial_bin: Dict[bytes, Bin]):
                         if (
                             contig_key not in contig_key_to_initial_bin
                             and contig_key not in contig_key_to_new_contigs_set
+                            and contig_key not in discarded_contig_set_keys
                         ):
-                            contig_key_to_new_contigs_set[contig_key] = diff_contigs
-                            diff_count += 1
+                            contigs_length = sum_contig_lengths(
+                                diff_contigs,
+                                contig_lengths,
+                                cache=bin_length_cache,
+                                key=contig_key,
+                            )
 
-            if all(b.contamination <= max_conta for b in bins):
+                            if contigs_length >= min_len and contigs_length <= max_len:
+                                contig_key_to_new_contigs_set[contig_key] = diff_contigs
+                                diff_count += 1
+                            else:
+                                discarded_contig_set_keys.add(contig_key)
+                                diff_size_discarded_count += 1
+
+            if all(b.contamination <= max_conta and b.length <= max_len for b in bins):
 
                 union_contigs = bins[0].contig_union(*bins[1:])
                 if union_contigs:
@@ -600,15 +666,32 @@ def create_intermediate_bins(contig_key_to_initial_bin: Dict[bytes, Bin]):
                     if (
                         contig_key not in contig_key_to_initial_bin
                         and contig_key not in contig_key_to_new_contigs_set
+                        and contig_key not in discarded_contig_set_keys
                     ):
-                        contig_key_to_new_contigs_set[contig_key] = union_contigs
-                        union_count += 1
+                        contigs_length = sum_contig_lengths(
+                            union_contigs,
+                            contig_lengths,
+                            cache=bin_length_cache,
+                            key=contig_key,
+                        )
+                        if contigs_length >= min_len and contigs_length <= max_len:
+                            contig_key_to_new_contigs_set[contig_key] = union_contigs
+                            union_count += 1
+                        else:
+                            discarded_contig_set_keys.add(contig_key)
+                            union_size_discarded_count += 1
 
-    logging.info(f"{intersec_count} bins created on intersections.")
+    logging.info(
+        f"Intersection: {intersec_count} bins created, {intersec_size_discarded_count} discarded due to size constraints."
+    )
 
-    logging.info(f"{diff_count} bins created based on symmetric difference.")
+    logging.info(
+        f"Symmetric Difference: {diff_count} bins created, {diff_size_discarded_count} discarded due to size constraints."
+    )
 
-    logging.info(f"{union_count} bins created on unions.")
+    logging.info(
+        f"Union: {union_count} bins created, {union_size_discarded_count} discarded due to size constraints."
+    )
 
     contig_key_to_new_bin: Dict[bytes, Bin] = {
         contig_key: Bin(contigs, is_original=False)
