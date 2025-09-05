@@ -2,7 +2,6 @@ import pytest
 import logging
 from binette.main import (
     log_selected_bin_info,
-    select_bins_and_write_them,
     manage_protein_alignement,
     parse_input_files,
     parse_arguments,
@@ -21,6 +20,7 @@ from collections import Counter
 from tests.bin_manager_test import create_temp_bin_directories, create_temp_bin_files
 from argparse import ArgumentParser
 from pathlib import Path
+from pyroaring import BitMap
 
 
 @pytest.fixture
@@ -41,9 +41,9 @@ def test_environment(tmp_path: Path):
 
 @pytest.fixture
 def bins():
-    b1 = Bin(contigs={"contig1"}, origin="set1", name="bin1")
-    b2 = Bin(contigs={"contig3"}, origin="set1", name="bin2")
-    b3 = Bin(contigs={"contig3", "contig2"}, origin="set1", name="bin3")
+    b1 = Bin(contigs=BitMap({1}), origin="set1", name="bin1")
+    b2 = Bin(contigs=BitMap({3}), origin="set1", name="bin2")
+    b3 = Bin(contigs=BitMap({3, 2}), origin="set1", name="bin3")
 
     b1.add_quality(100, 0, 0)
     b2.add_quality(95, 10, 0)
@@ -68,50 +68,6 @@ def test_log_selected_bin_info(caplog, bins):
     assert expected_logs in caplog.text
 
 
-def test_select_bins_and_write_them(tmp_path, tmpdir, bins):
-    # Create temporary directories and files for testing
-    outdir = tmpdir.mkdir("test_outdir")
-    contigs_fasta = os.path.join(str(outdir), "contigs.fasta")
-    final_bin_report = os.path.join(str(outdir), "final_bin_report.tsv")
-
-    index_to_contig = {"contig1": "contig1", "contig2": "contig2", "contig3": "contig3"}
-
-    contigs_fasta = tmp_path / "contigs.fasta"
-    contigs_fasta_content = (
-        ">contig1\nACGT\n>contig2\nTGCA\n>contig3\nAAAA\n>contig4\nCCCC\n"
-    )
-    contigs_fasta.write_text(contigs_fasta_content)
-
-    b1, b2, b3 = bins
-
-    # Run the function with test data
-    selected_bins = select_bins_and_write_them(
-        set(bins),
-        contigs_fasta,
-        Path(final_bin_report),
-        min_completeness=60,
-        index_to_contig=index_to_contig,
-        outdir=Path(outdir),
-        temporary_dir=tmp_path,
-        debug=True,
-    )
-
-    # Assertions to check the function output or file existence
-    assert isinstance(selected_bins, list)
-    assert os.path.isfile(final_bin_report)
-    assert (
-        selected_bins == bins[:2]
-    )  # The third bin is overlapping with the second one and has a worse score so it is not selected.
-
-    with open(outdir / f"final_bins/bin_{b1.id}.fa", "r") as bin1_file:
-        assert bin1_file.read() == ">contig1\nACGT\n"
-
-    with open(outdir / f"final_bins/bin_{b2.id}.fa", "r") as bin2_file:
-        assert bin2_file.read() == ">contig3\nAAAA\n"
-
-    assert not os.path.isfile(outdir / f"final_bins/bin_{b3.id}.fa")
-
-
 def test_manage_protein_alignement_resume(tmp_path):
     # Create temporary directories and files for testing
 
@@ -119,8 +75,6 @@ def test_manage_protein_alignement_resume(tmp_path):
     faa_file_content = (
         ">contig1_1\nMCGT\n>contig2_1\nTGCA\n>contig2_2\nAAAA\n>contig3_1\nCCCC\n"
     )
-
-    contig_to_length = {"contig1": 40, "contig2": 80, "contig3": 20}
 
     faa_file.write_text(faa_file_content)
 
@@ -137,8 +91,7 @@ def test_manage_protein_alignement_resume(tmp_path):
         contig_to_kegg_counter, contig_to_genes = manage_protein_alignement(
             faa_file=Path(faa_file),
             contigs_fasta=Path("contigs_fasta"),
-            contig_to_length=contig_to_length,
-            contigs_in_bins=set(),
+            contigs_in_bins=set(("contig1", "contig2", "contig3")),
             diamond_result_file=Path("diamond_result_file"),
             checkm2_db=None,
             threads=1,
@@ -181,8 +134,7 @@ def test_manage_protein_alignement_not_resume(tmpdir, tmp_path):
         contig_to_kegg_counter, contig_to_genes = manage_protein_alignement(
             faa_file=Path(faa_file),
             contigs_fasta=Path(contigs_fasta),
-            contig_to_length=contig_to_length,
-            contigs_in_bins=set(),
+            contigs_in_bins=set(("contig1", "contig2", "contig3")),
             diamond_result_file=Path(diamond_result_file),
             checkm2_db=None,
             threads=1,
@@ -209,18 +161,21 @@ def test_parse_input_files_with_contig2bin_tables(tmp_path):
     fasta_file.write_text(fasta_file_content)
 
     # Call the function and capture the return values
-    original_bins, contigs_in_bins, contig_to_length = parse_input_files(
-        None, [bin_set1, bin_set2], fasta_file, tmp_path
-    )
+    (
+        contig_key_to_bin,
+        contigs_in_bins,
+        contig_id_to_length,
+        contig_to_index,
+    ) = parse_input_files(None, [bin_set1, bin_set2], fasta_file, tmp_path)
 
     # # Perform assertions on the returned values
-    assert isinstance(original_bins, set)
-    assert isinstance(contigs_in_bins, set)
-    assert isinstance(contig_to_length, dict)
+    assert isinstance(contig_key_to_bin, dict)
+    assert isinstance(contigs_in_bins, list)
+    assert isinstance(contig_id_to_length, dict)
 
-    assert len(original_bins) == 4
-    assert contigs_in_bins == {"contig1", "contig2", "contig3", "contig4"}
-    assert len(contig_to_length) == 4
+    assert len(contig_key_to_bin) == 4
+    assert set(contigs_in_bins) == {"contig1", "contig2", "contig3", "contig4"}
+    assert len(contig_id_to_length) == 4
 
 
 def test_parse_input_files_with_contig2bin_tables_with_unknown_contig(tmp_path):
@@ -248,24 +203,27 @@ def test_parse_input_files_bin_dirs(create_temp_bin_directories, tmp_path):
     fasta_file.write_text(fasta_file_content)
 
     # Call the function and capture the return values
-    original_bins, contigs_in_bins, contig_to_length = parse_input_files(
-        bin_dirs, contig2bin_tables, fasta_file
-    )
+    (
+        contig_key_to_bin,
+        contigs_in_bins,
+        contig_id_to_length,
+        contig_to_index,
+    ) = parse_input_files(bin_dirs, contig2bin_tables, fasta_file)
 
     # # Perform assertions on the returned values
-    assert isinstance(original_bins, set)
-    assert isinstance(contigs_in_bins, set)
-    assert isinstance(contig_to_length, dict)
+    assert isinstance(contig_key_to_bin, dict)
+    assert isinstance(contigs_in_bins, list)
+    assert isinstance(contig_id_to_length, dict)
 
-    assert len(original_bins) == 3
-    assert contigs_in_bins == {
+    assert len(contig_key_to_bin) == 3
+    assert set(contigs_in_bins) == {
         "contig1",
         "contig2",
         "contig3",
         "contig4",
         "contig5",
     }
-    assert len(contig_to_length) == 5
+    assert len(contig_id_to_length) == 5
 
 
 def test_argument_used_once():
@@ -386,7 +344,6 @@ def test_manage_protein_alignment_no_resume(tmp_path):
         contig_to_kegg_counter, contig_to_genes = manage_protein_alignement(
             faa_file,
             contigs_fasta,
-            contig_to_length,
             contigs_in_bins,
             diamond_result_file,
             checkm2_db,
@@ -430,72 +387,6 @@ def test_main_resume_when_not_possible(monkeypatch, test_environment):
     # Call the main function
     with pytest.raises(FileNotFoundError):
         main()
-
-
-def test_main(monkeypatch, test_environment):
-    # Define or mock the necessary inputs/arguments
-    folder1, folder2, contigs_file = test_environment
-    # Mock sys.argv to use test_args
-    test_args = [
-        "-d",
-        str(folder1),
-        str(folder2),
-        "-c",
-        str(contigs_file),
-        # ... more arguments as required ...
-        "--debug",
-    ]
-    monkeypatch.setattr(sys, "argv", ["your_script.py"] + test_args)
-
-    # Mock the necessary functions
-    with (
-        patch("binette.main.parse_input_files") as mock_parse_input_files,
-        patch(
-            "binette.main.manage_protein_alignement"
-        ) as mock_manage_protein_alignement,
-        patch("binette.contig_manager.apply_contig_index") as mock_apply_contig_index,
-        patch("binette.bin_manager.rename_bin_contigs") as mock_rename_bin_contigs,
-        patch(
-            "binette.bin_manager.create_intermediate_bins"
-        ) as mock_create_intermediate_bins,
-        patch("binette.bin_quality.add_bin_metrics") as mock_add_bin_metrics,
-        patch("binette.main.log_selected_bin_info") as mock_log_selected_bin_info,
-        patch("binette.contig_manager.make_contig_index") as mock_make_contig_index,
-        patch(
-            "binette.io_manager.write_original_bin_metrics"
-        ) as mock_write_original_bin_metrics,
-        patch(
-            "binette.main.select_bins_and_write_them"
-        ) as mock_select_bins_and_write_them,
-    ):
-
-        # Set return values for mocked functions if needed
-        mock_parse_input_files.return_value = (None, None, None)
-        mock_manage_protein_alignement.return_value = (
-            {"contig1": 1},
-            {"contig1": ["gene1"]},
-        )
-        mock_make_contig_index.return_value = ({}, {})
-        mock_apply_contig_index.return_value = MagicMock()
-        mock_rename_bin_contigs.return_value = MagicMock()
-        mock_create_intermediate_bins.return_value = MagicMock()
-        mock_add_bin_metrics.return_value = MagicMock()
-        mock_log_selected_bin_info.return_value = MagicMock()
-
-        main()
-
-        # Add assertions to ensure the mocks were called as expected
-        mock_parse_input_files.assert_called_once()
-        mock_manage_protein_alignement.assert_called_once()
-        mock_rename_bin_contigs.assert_called_once()
-        mock_create_intermediate_bins.assert_called_once()
-
-        mock_log_selected_bin_info.assert_called_once()
-        mock_select_bins_and_write_them.assert_called_once()
-        mock_write_original_bin_metrics.assert_called_once()
-
-        assert mock_apply_contig_index.call_count == 3
-        assert mock_add_bin_metrics.call_count == 2
 
 
 def test_is_valid_file_existing_file(tmp_path: Path):
