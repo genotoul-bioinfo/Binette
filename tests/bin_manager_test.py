@@ -5,7 +5,7 @@ Unit tests for binette.
 
 import pytest
 
-from binette import bin_manager
+from binette import bin_manager, bin_quality
 import networkx as nx
 
 import logging
@@ -287,10 +287,12 @@ def test_intersection_bins_created():
     for b in set1:
         b.completeness = 100
         b.contamination = 0
+        b.length = 7000
 
     binA = bin_manager.Bin(contigs=BitMap({1, 3}), origin="B", name="binA")
     binA.contamination = 0
     binA.completeness = 100
+    binA.length = 7000
     set2 = [
         binA,
     ]
@@ -298,7 +300,18 @@ def test_intersection_bins_created():
 
     key_to_bins = {b.contigs_key: b for b in input_bins}
 
-    intermediate_bins_result = bin_manager.create_intermediate_bins(key_to_bins)
+    contig_lengths = bin_quality.prepare_contig_sizes(
+        {1: 5000, 2: 3000, 3: 4000, 4: 2000, 5: 1000}
+    )
+
+    intermediate_bins_result = bin_manager.create_intermediate_bins(
+        key_to_bins,
+        contig_lengths=contig_lengths,
+        min_len=0,
+        max_len=10_000_000,
+        min_comp=0,
+        max_conta=100,
+    )
 
     expected_bin_compositions = [
         BitMap({1, 2, 3}),
