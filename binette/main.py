@@ -28,6 +28,7 @@ from pathlib import Path
 import pyfastx
 from pyroaring import BitMap
 
+
 def init_logging(verbose, debug):
     """Initialise logging."""
     if debug:

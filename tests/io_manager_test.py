@@ -5,12 +5,14 @@ from unittest.mock import patch
 from binette.bin_manager import Bin
 from pyroaring import BitMap
 
+
 @pytest.fixture
 def bin1():
     b = Bin(contigs=BitMap({1, 3}), origin="test1", name="bin_1")
     b.score = 80
     b.N50 = 500
     return b
+
 
 @pytest.fixture
 def bin2():

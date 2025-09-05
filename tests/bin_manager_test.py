@@ -12,6 +12,7 @@ import logging
 from pathlib import Path
 from pyroaring import BitMap
 
+
 def test_get_all_possible_combinations():
     input_list = ["2", "3", "4"]
     expected_list = [("2", "3"), ("2", "4"), ("3", "4"), ("2", "3", "4")]
@@ -152,6 +153,7 @@ def test_bin_difference():
     assert bin1.contig_intersection(bin2, bin3) == diff_bin1_2_3
     assert bin1.contig_intersection(bin2) == diff_bin1_2
 
+
 def test_bin_intersection():
     bin1 = bin_manager.Bin(contigs=BitMap({5, 1, 6, 7, 8}), origin="test1", name="bin1")
     bin2 = bin_manager.Bin(contigs=BitMap({3, 6, 7}), origin="test2", name="bin2")
@@ -162,6 +164,7 @@ def test_bin_intersection():
 
     assert bin1.contig_intersection(bin2, bin3) == inter_bin123
     assert bin1.contig_intersection(bin2) == inter_bin1_2
+
 
 def test_select_best_bins_simple():
 
