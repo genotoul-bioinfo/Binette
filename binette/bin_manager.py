@@ -14,6 +14,7 @@ from pyroaring import BitMap
 from functools import cached_property
 import numpy as np
 
+
 class Bin:
 
     def __init__(
