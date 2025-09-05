@@ -1,5 +1,6 @@
 from collections import defaultdict
 import logging
+from operator import length_hint
 from typing import Iterable, List, Dict, Tuple, Set
 import csv
 
@@ -199,6 +200,10 @@ def write_bins_fasta(
             contig_name = contigs_names[contig_id]
             contig_to_bins[contig_name] = sbin.name
 
+    assert len(contig_to_bins) == sum(
+        len(sbin.contigs) for sbin in selected_bins
+    ), "Some contigs are present in multiple bins but should be unique."
+
     buffer = defaultdict(list)
     buffer_size = 0
 
@@ -282,7 +287,7 @@ def check_resume_file(faa_file: Path, diamond_result_file: Path) -> None:
         raise FileNotFoundError(error_msg)
 
 
-def write_original_bin_metrics(original_bins: Set[Bin], original_bin_report_dir: Path):
+def write_original_bin_metrics(original_bins: List[Bin], original_bin_report_dir: Path):
     """
     Write metrics of original input bins to a specified directory.
 
