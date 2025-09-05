@@ -259,7 +259,7 @@ def parse_bin_directories(
     :param bin_name_to_bin_dir: A dictionary mapping bin names to their respective bin directories.
     :fasta_extensions: Possible fasta extensions to look for in the bin directory.
 
-    :return: A dictionary mapping bin names to a list of Bin objects created from the bin directories.
+    :return: A dictionary mapping bin names to a list of dict created from the bin directories.
     """
     bin_set_name_to_bins_info = {}
 
@@ -321,14 +321,16 @@ def parse_contig2bin_tables(
     return bin_set_name_to_bins_info
 
 
-def get_bins_from_contig2bin_table(contig2bin_table: Path, set_name: str) -> List[Bin]:
+def get_bins_from_contig2bin_table(
+    contig2bin_table: Path, set_name: str
+) -> List[Dict[str, Any]]:
     """
     Retrieves a list of Bin objects from a contig-to-bin table.
 
     :param contig2bin_table: The path to the contig-to-bin table.
     :param set_name: The name of the set the bins belong to.
 
-    :return: A list of Bin objects created from the contig-to-bin table.
+    :return: A list of Bin info in dict created from the contig-to-bin table.
     """
     bin_name2contigs = defaultdict(set)
     with open(contig2bin_table) as fl:
@@ -347,7 +349,7 @@ def get_bins_from_contig2bin_table(contig2bin_table: Path, set_name: str) -> Lis
     return bins
 
 
-def from_bins_to_bin_graph(bins) -> nx.Graph:
+def from_bins_to_bin_graph(bins: Iterable[Bin]) -> nx.Graph:
     """
     Creates a bin graph made of overlapping gram a set of bins.
 
@@ -376,91 +378,11 @@ def get_all_possible_combinations(clique: List) -> Iterable[Tuple]:
     )
 
 
-def get_intersection_bins(cliques: List[List[Bin]]) -> Set[Bin]:
-    """
-    Retrieves the intersection bins from a given list of cliques.
-
-    :param cliques: A list of cliques.
-
-    :return: A set of Bin objects representing the intersection bins.
-    """
-    intersect_bins = set()
-
-    with tqdm(unit="clique of bins", total=len(cliques)) as pbar:
-
-        for clique in cliques:
-            pbar.update()
-            bins_combinations = get_all_possible_combinations(clique)
-            for bins in bins_combinations:
-                if max((b.completeness for b in bins)) < 40:
-                    continue
-
-                intersec_bin = bins[0].intersection(*bins[1:])
-
-                if intersec_bin.contigs:  # and intersec_bin not in clique:
-
-                    intersect_bins.add(intersec_bin)
-
-    return intersect_bins
-
-
-def get_difference_bins(cliques: List[List[Bin]]) -> Set[Bin]:
-    """
-    Retrieves the difference bins from a given graph.
-
-    :param cliques: A list of cliques.
-
-    :return: A set of Bin objects representing the difference bins.
-    """
-    difference_bins = set()
-    with tqdm(unit="clique of bins", total=len(cliques)) as pbar:
-
-        for clique in cliques:
-            pbar.update()
-            bins_combinations = get_all_possible_combinations(clique)
-            for bins in bins_combinations:
-
-                for bin_a in bins:
-                    if bin_a.completeness < 40:
-                        continue
-                    bin_diff = bin_a.difference(*(b for b in bins if b != bin_a))
-
-                    if bin_diff.contigs:  # and bin_diff not in clique:
-                        difference_bins.add(bin_diff)
-
-    return difference_bins
-
-
-def get_union_bins(cliques: List[List[Bin]]) -> Set[Bin]:
-    """
-    Retrieves the union bins from a given graph.
-
-    :param cliques: A list of cliques.
-
-    :return: A set of Bin objects representing the union bins.
-    """
-    union_bins = set()
-    with tqdm(unit="clique of bins", total=len(cliques)) as pbar:
-
-        for clique in cliques:
-            pbar.update()
-            bins_combinations = get_all_possible_combinations(clique)
-            for bins in bins_combinations:
-                if max((b.contamination for b in bins)) > 20:
-                    continue
-
-                bins = sorted(set(bins))
-                bin_a = bins.pop()
-                bin_union = bin_a.union(*bins)
-                if bin_union.contigs:  # and bin_union not in clique:
-                    union_bins.add(bin_union)
-
-    return union_bins
-
-
 def build_contig_index(bins_dict: dict[bytes, Bin]) -> dict[int, set[bytes]]:
     """
     Build an inverted index: contig_id -> set of contigs_key of bins containing it.
+    :param bins_dict: Mapping from contigs_key -> Bin.
+    :return: Inverted index (contig_id -> set of contigs_key).
     """
     contig_to_bins = defaultdict(set)
     for key, bin_obj in bins_dict.items():
@@ -559,56 +481,6 @@ def select_best_bins(
     return selected_bins
 
 
-def group_identical_bins(bins: Iterable[Bin]) -> List[List[Bin]]:
-    """
-    Group identical bins together
-
-    :param bins: list of bins
-
-    return List of list of identical bins
-    """
-    binhash_to_bins = defaultdict(list)
-
-    # Collect bins by their hash values
-    for bin_obj in bins:
-        binhash_to_bins[bin_obj.hash].append(bin_obj)
-
-    return list(binhash_to_bins.values())
-
-
-def dereplicate_bin_sets(bin_sets: Iterable[Set["Bin"]]) -> Set["Bin"]:
-    """
-    Consolidate bins from multiple bin sets into a single set of non-redundant bins.
-
-    Bins with the same hash are considered duplicates. For each group of duplicates,
-    the origins are merged, and only one representative bin is kept.
-
-    :param bin_sets: An iterable of sets, where each set contains `Bin` objects. These sets are merged
-                     into a single set of unique bins by consolidating bins with the same hash.
-
-    :return: A set of `Bin` objects with duplicates removed. Each `Bin` in the resulting set has
-             merged origins from the bins it was consolidated with.
-    """
-    all_bins = (bin_obj for bins in bin_sets for bin_obj in bins)
-    list_of_identical_bins = group_identical_bins(all_bins)
-
-    dereplicated_bins = set()
-
-    # Merge bins with the same hash
-    for identical_bins in list_of_identical_bins:
-        identical_bins.sort()
-        # Select the first bin as the representative
-        selected_bin = identical_bins[0]
-        for bin_obj in identical_bins[1:]:
-            # Merge origins of all bins with the same hash
-            selected_bin.origin |= bin_obj.origin
-
-        # Add the representative bin to the result set
-        dereplicated_bins.add(selected_bin)
-
-    return dereplicated_bins
-
-
 def get_contigs_in_bin_sets(bin_set_name_to_bins: Dict[str, Set[Bin]]) -> List[str]:
     """
     Processes bin sets to check for duplicated contigs and logs detailed information about each bin set.
@@ -652,17 +524,6 @@ def get_contigs_in_bin_sets(bin_set_name_to_bins: Dict[str, Set[Bin]]) -> List[s
         )
 
     return list(all_contigs_in_bins)
-
-
-def get_contigs_in_bins(bins: Iterable[Bin]) -> List[str]:
-    """
-    Retrieves all contigs present in the given list of bins.
-
-    :param bins: A list of Bin objects.
-
-    :return: A list of contigs present in the bins.
-    """
-    return [contig for b in bins for contig in b.contigs]
 
 
 def create_intermediate_bins(contig_key_to_initial_bin: Dict[bytes, Bin]):
@@ -749,7 +610,7 @@ def create_intermediate_bins(contig_key_to_initial_bin: Dict[bytes, Bin]):
 
     logging.info(f"{union_count} bins created on unions.")
 
-    contig_key_to_new_bin = {
+    contig_key_to_new_bin: Dict[bytes, Bin] = {
         contig_key: Bin(contigs, is_original=False)
         for contig_key, contigs in contig_key_to_new_contigs_set.items()
     }
