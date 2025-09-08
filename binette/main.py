@@ -213,6 +213,7 @@ def parse_arguments(args):
     filter_group.add_argument(
         "-w",
         "--contamination-weight",
+        "--contamination_weight",
         default=2,
         type=float,
         help="Bins are scored as: completeness - weight * contamination. "
@@ -227,6 +228,7 @@ def parse_arguments(args):
     advanced_group.add_argument(
         "-e",
         "--fasta-extensions",
+        "--fasta_extensions",
         nargs="+",
         default={".fasta", ".fa", ".fna"},
         type=str,
@@ -235,6 +237,7 @@ def parse_arguments(args):
 
     advanced_group.add_argument(
         "--checkm2-db",
+        "--checkm2_db",
         type=Path,
         help="Path to CheckM2 diamond database. "
         "By default the database set via <checkm2 database> is used.",
