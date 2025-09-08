@@ -95,6 +95,7 @@ def is_valid_file(parser: ArgumentParser, arg: str) -> Path:
 
     return path_arg
 
+
 def parse_arguments(args):
     """Parse script arguments."""
 
