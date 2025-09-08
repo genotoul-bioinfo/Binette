@@ -1,0 +1,5 @@
+name	origin	is_original	original_name	completeness	contamination	score	size	N50	contig_count
+binette_1	binette	False	binette_1	99.67	0.05	99.57	1043034	333900	3
+binette_2	B	True	binC	100.0	0.28	99.44	719535	378240	2
+binette_3	binette	False	binette_3	98.72	0.48	97.76	490885	133360	4
+binette_4	binette	False	binette_4	75.42	1.16	73.1	560035	39288	25
