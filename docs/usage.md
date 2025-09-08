@@ -85,16 +85,18 @@ In this directory you will find:
 
 
 The `final_bins_quality_reports.tsv` file contains the following columns:
-| Column Name         | Description                                                                                                  |
-|---------------------|--------------------------------------------------------------------------------------------------------------|
-| **bin_id**          | This column displays the unique ID of the bin.                                                             |
-| **origin**          | Indicates the source or origin of the bin, specifying from which bin set it originates or the intermediate set operation that created it. |
-| **name**            | The name of the bin.                                                                                        |
-| **completeness**    | The completeness of the bin, determined by CheckM2.                                                         |
-| **contamination**   | The contamination of the bin, determined by CheckM2.                                                       |
-| **score**           | This column displays the computed score, which is calculated as: `completeness - contamination * weight`. You can customize the contamination weight using the `--contamination_weight` option. |
-| **size**            | Represents the size of the bin in nucleotides.                                                              |
-| **N50**             | Displays the N50 of the bin.                                                                                |
-| **contig_count**    | The number of contigs contained within the bin.          
+| Column Name        | Description                                                                                                                                    |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| **name**           | The unique name of the bin.                                                                                                                    |
+| **origin**         | Indicates the source of the bin: either an original bin set (e.g., `B`) or `binette` for intermediate bins.                                    |
+| **is\_original**   | Boolean flag indicating if the bin is an original bin (`True`) or an intermediate bin (`False`).                                               |
+| **original\_name** | The name of the original bin from which this bin was derived.                                                                                  |
+| **completeness**   | The completeness of the bin, determined by CheckM2.                                                                                            |
+| **contamination**  | The contamination of the bin, determined by CheckM2.                                                                                           |
+| **score**          | Computed score: `completeness - contamination * weight`. The contamination weight can be customized using the `--contamination_weight` option. |
+| **size**           | Total size of the bin in nucleotides.                                                                                                          |
+| **N50**            | The N50 of the bin, representing the length for which 50% of the total nucleotides are in contigs of that length or longer.                    |
+| **contig\_count**  | Number of contigs contained within the bin.                                                                                                    |
+   
 
 
