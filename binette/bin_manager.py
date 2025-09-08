@@ -6,17 +6,23 @@ import pyfastx
 
 import itertools
 import networkx as nx
-from typing import List, Dict, Iterable, Tuple, Set
+from typing import Any, List, Dict, Iterable, Tuple, Set, Optional
 from tqdm import tqdm
 
 from collections import Counter
+from pyroaring import BitMap
+from functools import cached_property
+import numpy as np
 
 
 class Bin:
-    counter = 0
 
     def __init__(
-        self, contigs: Iterable[str], origin: str, name: str, is_original: bool = False
+        self,
+        contigs: BitMap,
+        origin: Optional[Set[str]] = None,
+        name: Optional[str] = None,
+        is_original: bool = False,
     ) -> None:
         """
         Initialize a Bin object.
@@ -25,13 +31,20 @@ class Bin:
         :param origin: Origin/source of the bin.
         :param name: Name of the bin.
         """
-        Bin.counter += 1
 
-        self.origin = {origin}
+        if not isinstance(contigs, BitMap):
+            raise TypeError("Contigs should be a BitMap object.")
+
+        if origin is None:
+            self.origin = set()
+        else:
+            self.origin = {origin}
+
         self.name = name
-        self.id = Bin.counter
-        self.contigs = set(contigs)
-        self.hash = hash(str(sorted(self.contigs)))
+
+        self.is_original = is_original
+
+        self.contigs = contigs
 
         self.length = None
         self.N50 = None
@@ -39,8 +52,14 @@ class Bin:
         self.completeness = None
         self.contamination = None
         self.score = None
+        self.original_name = None
 
-        self.is_original = is_original
+    @cached_property
+    def contigs_key(self):
+        """
+        Serialize the contigs for easier comparison.
+        """
+        return self.contigs.serialize()
 
     def __eq__(self, other: "Bin") -> bool:
         """
@@ -49,15 +68,11 @@ class Bin:
         :param other: The object to compare with.
         :return: True if the objects are equal, False otherwise.
         """
-        return self.contigs == other.contigs
 
-    def __hash__(self) -> int:
-        """
-        Compute the hash value of the Bin object.
+        if not isinstance(other, Bin):
+            return NotImplemented
 
-        :return: The hash value.
-        """
-        return self.hash
+        return self.contigs_key == other.contigs_key
 
     def __str__(self) -> str:
         """
@@ -65,19 +80,7 @@ class Bin:
 
         :return: The string representation of the Bin object.
         """
-        return (
-            f"Bin {self.id} from {';'.join(self.origin)}  ({len(self.contigs)} contigs)"
-        )
-
-    def __lt__(self, other: "Bin") -> bool:
-        """
-        Compare the Bin object with another object based on their id. This is useful to be able to sort the bins.
-
-        :param other: The object to compare with.
-        :return: True if self has an id lower than the other bin.
-        """
-
-        return self.id < other.id
+        return f"Bin {self.name} from {';'.join(self.origin)}  ({len(self.contigs)} contigs)"
 
     def overlaps_with(self, other: "Bin") -> Set[str]:
         """
@@ -87,19 +90,6 @@ class Bin:
         :return: A set of contig names that overlap between the bins.
         """
         return self.contigs & other.contigs
-
-    # def __and__(self, other: 'Bin') -> 'Bin':
-    #     """
-    #     Perform a logical AND operation between this bin and another bin.
-
-    #     :param other: The other Bin object.
-    #     :return: A new Bin object representing the intersection of the bins.
-    #     """
-    #     contigs = self.contigs & other.contigs
-    #     name = f"{self.name} & {other.name}"
-    #     origin = "intersection"
-
-    #     return Bin(contigs, origin, name)
 
     def add_length(self, length: int) -> None:
         """
@@ -139,67 +129,29 @@ class Bin:
         self.contamination = contamination
         self.score = completeness - contamination_weight * contamination
 
-    def intersection(self, *others: "Bin") -> "Bin":
+    def contig_intersection(self, *others: "Bin") -> BitMap:
         """
         Compute the intersection of the bin with other bins.
 
         :param others: Other bins to compute the intersection with.
-        :return: A new Bin representing the intersection of the bins.
         """
-        other_contigs = (o.contigs for o in others)
-        contigs = self.contigs.intersection(*other_contigs)
-        name = f"{self.id} & {' & '.join([str(other.id) for other in sorted(others)])}"
-        origin = "intersec"
+        return self.contigs.intersection(*(o.contigs for o in others))
 
-        return Bin(contigs, origin, name)
-
-    def difference(self, *others: "Bin") -> "Bin":
+    def contig_difference(self, *others: "Bin") -> BitMap:
         """
         Compute the difference between the bin and other bins.
 
         :param others: Other bins to compute the difference with.
-        :return: A new Bin representing the difference between the bins.
         """
-        other_contigs = (o.contigs for o in others)
-        contigs = self.contigs.difference(*other_contigs)
-        name = f"{self.id} - {' - '.join([str(other.id) for other in sorted(others)])}"
-        origin = "diff"
+        return self.contigs.difference(*(o.contigs for o in others))
 
-        return Bin(contigs, origin, name)
-
-    def union(self, *others: "Bin") -> "Bin":
+    def contig_union(self, *others: "Bin") -> BitMap:
         """
         Compute the union of the bin with other bins.
 
         :param others: Other bins to compute the union with.
-        :return: A new Bin representing the union of the bins.
         """
-        other_contigs = (o.contigs for o in others)
-        contigs = self.contigs.union(*other_contigs)
-        name = f"{self.id} | {' | '.join([str(other.id) for other in sorted(others)])}"
-
-        origin = "union"
-
-        return Bin(contigs, origin, name)
-
-    def is_complete_enough(self, min_completeness: float) -> bool:
-        """
-        Determine if a bin is complete enough based on completeness threshold.
-
-        :param min_completeness: The minimum completeness required for a bin.
-
-        :raises ValueError: If completeness has not been set (is None).
-
-        :return: True if the bin meets the min_completeness threshold; False otherwise.
-        """
-
-        if self.completeness is None:
-            raise ValueError(
-                f"The bin '{self.name}' with ID '{self.id}' has not been evaluated for completeness or contamination, "
-                "and therefore cannot be assessed."
-            )
-
-        return self.completeness >= min_completeness
+        return self.contigs.union(*(o.contigs for o in others))
 
     def is_high_quality(
         self, min_completeness: float, max_contamination: float
@@ -224,6 +176,44 @@ class Bin:
             self.completeness >= min_completeness
             and self.contamination <= max_contamination
         )
+
+
+def make_bins_from_bins_info(
+    bin_set_name_to_bins_info: Dict[str, List[Dict[str, Any]]],
+    contig_to_index: Dict[str, int],
+    are_original_bins: bool,
+):
+    """
+    Create Bin objects from the provided bin information.
+
+    :param bin_set_name_to_bins_info: A dictionary mapping bin set names to their bin information.
+    :param contig_to_index: A mapping of contig names to their indices.
+    :param are_original_bins: A boolean indicating whether the bins are original.
+
+    :return: A dictionary mapping serialized contig bitmaps to their corresponding Bin objects.
+    """
+
+    contig_key_to_bin: Dict[bytes, Bin] = {}
+
+    for set_name, bins_info in bin_set_name_to_bins_info.items():
+
+        for bin_info in bins_info:
+            bitmap_contigs = BitMap(
+                (contig_to_index[contig] for contig in bin_info["contigs"])
+            )
+
+            bin_obj = Bin(
+                contigs=bitmap_contigs,
+                origin=set_name,
+                name=bin_info["bin_name"],
+                is_original=are_original_bins,
+            )
+            if bin_obj.contigs_key not in contig_key_to_bin:
+                contig_key_to_bin[bin_obj.contigs_key] = bin_obj
+            else:
+                bin_obj.origin.add(set_name)
+
+    return contig_key_to_bin
 
 
 def get_bins_from_directory(
@@ -254,48 +244,50 @@ def get_bins_from_directory(
 
         contigs = {name for name, _ in pyfastx.Fastx(str(bin_fasta_path))}
 
-        bin_obj = Bin(contigs, set_name, bin_name)
+        bin_dict = {"contigs": contigs, "set_name": set_name, "bin_name": bin_name}
 
-        bins.append(bin_obj)
+        bins.append(bin_dict)
 
     return bins
 
 
 def parse_bin_directories(
     bin_name_to_bin_dir: Dict[str, Path], fasta_extensions: Set[str]
-) -> Dict[str, Set[Bin]]:
+) -> Dict[str, List[Dict[str, Any]]]:
     """
     Parses multiple bin directories and returns a dictionary mapping bin names to a list of Bin objects.
 
     :param bin_name_to_bin_dir: A dictionary mapping bin names to their respective bin directories.
     :fasta_extensions: Possible fasta extensions to look for in the bin directory.
 
-    :return: A dictionary mapping bin names to a list of Bin objects created from the bin directories.
+    :return: A dictionary mapping bin names to a list of dict created from the bin directories.
     """
-    bin_set_name_to_bins = {}
+    bin_set_name_to_bins_info = {}
 
     for name, bin_dir in sorted(bin_name_to_bin_dir.items()):
         bins = get_bins_from_directory(bin_dir, name, fasta_extensions)
-        set_of_bins = set(bins)
 
-        # Calculate the number of duplicates
-        num_duplicates = len(bins) - len(set_of_bins)
+        # TODO: redo this check
+        # set_of_bins = set(bins)
 
-        if num_duplicates > 0:
-            logging.warning(
-                f'{num_duplicates} bins with identical contig compositions detected in bin set "{name}". '
-                "These bins were merged to ensure uniqueness."
-            )
+        # # Calculate the number of duplicates
+        # num_duplicates = len(bins) - len(set_of_bins)
+
+        # if num_duplicates > 0:
+        #     logging.warning(
+        #         f'{num_duplicates} bins with identical contig compositions detected in bin set "{name}". '
+        #         "These bins were merged to ensure uniqueness."
+        #     )
 
         # Store the unique set of bins
-        bin_set_name_to_bins[name] = set_of_bins
+        bin_set_name_to_bins_info[name] = bins
 
-    return bin_set_name_to_bins
+    return bin_set_name_to_bins_info
 
 
 def parse_contig2bin_tables(
     bin_name_to_bin_tables: Dict[str, Path],
-) -> Dict[str, Set["Bin"]]:
+) -> Dict[str, List[Dict[str, Any]]]:
     """
     Parses multiple contig-to-bin tables and returns a dictionary mapping bin names to a set of unique Bin objects.
 
@@ -307,35 +299,39 @@ def parse_contig2bin_tables(
     :return: A dictionary where keys are bin set names and values are sets of Bin objects. Duplicates are removed based
              on contig composition.
     """
-    bin_set_name_to_bins = {}
+    bin_set_name_to_bins_info = {}
 
     for name, contig2bin_table in sorted(bin_name_to_bin_tables.items()):
         bins = get_bins_from_contig2bin_table(contig2bin_table, name)
-        set_of_bins = set(bins)
 
-        # Calculate the number of duplicates
-        num_duplicates = len(bins) - len(set_of_bins)
+        # TODO: redo this check
+        # set_of_bins = set(bins)
 
-        if num_duplicates > 0:
-            logging.warning(
-                f'{num_duplicates*2} bins with identical contig compositions detected in bin set "{name}". '
-                "These bins were merged to ensure uniqueness."
-            )
+        # # Calculate the number of duplicates
+        # num_duplicates = len(bins) - len(set_of_bins)
+
+        # if num_duplicates > 0:
+        #     logging.warning(
+        #         f'{num_duplicates*2} bins with identical contig compositions detected in bin set "{name}". '
+        #         "These bins were merged to ensure uniqueness."
+        #     )
 
         # Store the unique set of bins
-        bin_set_name_to_bins[name] = set_of_bins
+        bin_set_name_to_bins_info[name] = bins
 
-    return bin_set_name_to_bins
+    return bin_set_name_to_bins_info
 
 
-def get_bins_from_contig2bin_table(contig2bin_table: Path, set_name: str) -> List[Bin]:
+def get_bins_from_contig2bin_table(
+    contig2bin_table: Path, set_name: str
+) -> List[Dict[str, Any]]:
     """
     Retrieves a list of Bin objects from a contig-to-bin table.
 
     :param contig2bin_table: The path to the contig-to-bin table.
     :param set_name: The name of the set the bins belong to.
 
-    :return: A list of Bin objects created from the contig-to-bin table.
+    :return: A list of Bin info in dict created from the contig-to-bin table.
     """
     bin_name2contigs = defaultdict(set)
     with open(contig2bin_table) as fl:
@@ -349,12 +345,12 @@ def get_bins_from_contig2bin_table(contig2bin_table: Path, set_name: str) -> Lis
 
     bins = []
     for bin_name, contigs in bin_name2contigs.items():
-        bin_obj = Bin(contigs, set_name, bin_name)
-        bins.append(bin_obj)
+        bin_dict = {"contigs": contigs, "set_name": set_name, "bin_name": bin_name}
+        bins.append(bin_dict)
     return bins
 
 
-def from_bins_to_bin_graph(bins) -> nx.Graph:
+def from_bins_to_bin_graph(bins: Iterable[Bin]) -> nx.Graph:
     """
     Creates a bin graph made of overlapping gram a set of bins.
 
@@ -366,7 +362,7 @@ def from_bins_to_bin_graph(bins) -> nx.Graph:
 
     for bin1, bin2 in itertools.combinations(bins, 2):
         if bin1.overlaps_with(bin2):
-            G.add_edge(bin1, bin2)
+            G.add_edge(bin1.contigs_key, bin2.contigs_key)
     return G
 
 
@@ -383,165 +379,110 @@ def get_all_possible_combinations(clique: List) -> Iterable[Tuple]:
     )
 
 
-def get_intersection_bins(cliques: List[List[Bin]]) -> Set[Bin]:
+def build_contig_index(bins_dict: dict[bytes, Bin]) -> dict[int, set[bytes]]:
     """
-    Retrieves the intersection bins from a given list of cliques.
-
-    :param cliques: A list of cliques.
-
-    :return: A set of Bin objects representing the intersection bins.
+    Build an inverted index: contig_id -> set of contigs_key of bins containing it.
+    :param bins_dict: Mapping from contigs_key -> Bin.
+    :return: Inverted index (contig_id -> set of contigs_key).
     """
-    intersect_bins = set()
-
-    with tqdm(unit="clique of bins", total=len(cliques)) as pbar:
-
-        for clique in cliques:
-            pbar.update()
-            bins_combinations = get_all_possible_combinations(clique)
-            for bins in bins_combinations:
-                if max((b.completeness for b in bins)) < 40:
-                    continue
-
-                intersec_bin = bins[0].intersection(*bins[1:])
-
-                if intersec_bin.contigs:  # and intersec_bin not in clique:
-
-                    intersect_bins.add(intersec_bin)
-
-    return intersect_bins
+    contig_to_bins = defaultdict(set)
+    for key, bin_obj in bins_dict.items():
+        for contig in bin_obj.contigs:
+            contig_to_bins[contig].add(key)
+    return contig_to_bins
 
 
-def get_difference_bins(cliques: List[List[Bin]]) -> Set[Bin]:
+def remove_bins_from_index(
+    bin_keys: set[bytes],
+    bins_dict: dict[bytes, Bin],
+    contig_to_bins: dict[int, set[bytes]],
+) -> None:
     """
-    Retrieves the difference bins from a given graph.
+    Remove a set of bins from the inverted index.
 
-    :param cliques: A list of cliques.
-
-    :return: A set of Bin objects representing the difference bins.
+    :param bin_keys: The contig_keys of bins to remove.
+    :param bins_dict: Mapping from contig_key -> Bin.
+    :param contig_to_bins: Inverted index (contig_id -> set of contig_keys).
     """
-    difference_bins = set()
-    with tqdm(unit="clique of bins", total=len(cliques)) as pbar:
-
-        for clique in cliques:
-            pbar.update()
-            bins_combinations = get_all_possible_combinations(clique)
-            for bins in bins_combinations:
-
-                for bin_a in bins:
-                    if bin_a.completeness < 40:
-                        continue
-                    bin_diff = bin_a.difference(*(b for b in bins if b != bin_a))
-
-                    if bin_diff.contigs:  # and bin_diff not in clique:
-                        difference_bins.add(bin_diff)
-
-    return difference_bins
+    for key in bin_keys:
+        ob = bins_dict.get(key)
+        if ob is not None:
+            for c in ob.contigs:
+                contig_to_bins[c].discard(key)
 
 
-def get_union_bins(cliques: List[List[Bin]]) -> Set[Bin]:
+def select_best_bins(
+    bins_dict: dict[bytes, Bin],
+    min_completeness: float,
+    max_contamination: float,
+) -> list[Bin]:
     """
-    Retrieves the union bins from a given graph.
-
-    :param cliques: A list of cliques.
-
-    :return: A set of Bin objects representing the union bins.
+    Select the best non-overlapping bins based on score, N50, and ID.
     """
-    union_bins = set()
-    with tqdm(unit="clique of bins", total=len(cliques)) as pbar:
+    logging.info("Selecting best bins...")
 
-        for clique in cliques:
-            pbar.update()
-            bins_combinations = get_all_possible_combinations(clique)
-            for bins in bins_combinations:
-                if max((b.contamination for b in bins)) > 20:
-                    continue
-
-                bins = sorted(set(bins))
-                bin_a = bins.pop()
-                bin_union = bin_a.union(*bins)
-                if bin_union.contigs:  # and bin_union not in clique:
-                    union_bins.add(bin_union)
-
-    return union_bins
-
-
-def select_best_bins(bins: Set[Bin]) -> List[Bin]:
-    """
-    Selects the best bins from a list of bins based on their scores, N50 values, and IDs.
-
-    :param bins: A list of Bin objects.
-
-    :return: A list of selected Bin objects.
-    """
+    logging.info(
+        f"Filtering bins: only bins with completeness >= {min_completeness} "
+        f"and contamination <= {max_contamination}"
+    )
+    good_enough_bins = {
+        k: b
+        for k, b in bins_dict.items()
+        if b.completeness >= min_completeness and b.contamination <= max_contamination
+    }
 
     logging.info("Sorting bins")
-    # Sort on score, N50, and ID. Smaller ID values are preferred to select original bins first.
-    sorted_bins = sorted(bins, key=lambda x: (x.score, x.N50, -x.id), reverse=True)
+    sorted_bin_keys = sorted(
+        good_enough_bins,
+        key=lambda k: (
+            -good_enough_bins[k].score,
+            -good_enough_bins[k].N50,
+            -good_enough_bins[k].is_original,
+            k,  # contigs_key itself is sortable (bytes)
+        ),
+    )
+
+    logging.info("Building contig index")
+    contig_to_bin_keys = build_contig_index(good_enough_bins)
 
     logging.info("Selecting bins")
     selected_bins = []
-    for b in sorted_bins:
-        if b in bins:
-            overlapping_bins = {b2 for b2 in bins if b.overlaps_with(b2)}
-            bins -= overlapping_bins
+    discarded_keys = set()
 
-            selected_bins.append(b)
+    for bin_key in sorted_bin_keys:
+        if bin_key in discarded_keys:
+            continue
+
+        bin_obj = good_enough_bins[bin_key]
+        selected_bins.append(bin_obj)
+
+        # Gather overlapping bins via inverted index
+        overlapping_bin_keys = set()
+        for contig in bin_obj.contigs:
+            overlapping_bin_keys |= contig_to_bin_keys[contig]
+
+        # Discard them
+        discarded_keys |= overlapping_bin_keys
+
+        # Remove discarded bins from index to shrink future lookups
+        remove_bins_from_index(
+            overlapping_bin_keys, good_enough_bins, contig_to_bin_keys
+        )
 
     logging.info(f"Selected {len(selected_bins)} bins")
+
+    # TODO use with a prefix from an optional argument of cli
+    prefix = "binette"
+    for i, selected_bin in enumerate(selected_bins, start=1):
+        if not selected_bin.origin:
+            selected_bin.origin = {"binette"}
+        if selected_bin.name is not None:
+            selected_bin.original_name = selected_bin.name
+        selected_bin.name = f"{prefix}_{i}"
     return selected_bins
 
 
-def group_identical_bins(bins: Iterable[Bin]) -> List[List[Bin]]:
-    """
-    Group identical bins together
-
-    :param bins: list of bins
-
-    return List of list of identical bins
-    """
-    binhash_to_bins = defaultdict(list)
-
-    # Collect bins by their hash values
-    for bin_obj in bins:
-        binhash_to_bins[bin_obj.hash].append(bin_obj)
-
-    return list(binhash_to_bins.values())
-
-
-def dereplicate_bin_sets(bin_sets: Iterable[Set["Bin"]]) -> Set["Bin"]:
-    """
-    Consolidate bins from multiple bin sets into a single set of non-redundant bins.
-
-    Bins with the same hash are considered duplicates. For each group of duplicates,
-    the origins are merged, and only one representative bin is kept.
-
-    :param bin_sets: An iterable of sets, where each set contains `Bin` objects. These sets are merged
-                     into a single set of unique bins by consolidating bins with the same hash.
-
-    :return: A set of `Bin` objects with duplicates removed. Each `Bin` in the resulting set has
-             merged origins from the bins it was consolidated with.
-    """
-    all_bins = (bin_obj for bins in bin_sets for bin_obj in bins)
-    list_of_identical_bins = group_identical_bins(all_bins)
-
-    dereplicated_bins = set()
-
-    # Merge bins with the same hash
-    for identical_bins in list_of_identical_bins:
-        identical_bins.sort()
-        # Select the first bin as the representative
-        selected_bin = identical_bins[0]
-        for bin_obj in identical_bins[1:]:
-            # Merge origins of all bins with the same hash
-            selected_bin.origin |= bin_obj.origin
-
-        # Add the representative bin to the result set
-        dereplicated_bins.add(selected_bin)
-
-    return dereplicated_bins
-
-
-def get_contigs_in_bin_sets(bin_set_name_to_bins: Dict[str, Set[Bin]]) -> Set[str]:
+def get_contigs_in_bin_sets(bin_set_name_to_bins: Dict[str, Set[Bin]]) -> List[str]:
     """
     Processes bin sets to check for duplicated contigs and logs detailed information about each bin set.
 
@@ -552,8 +493,10 @@ def get_contigs_in_bin_sets(bin_set_name_to_bins: Dict[str, Set[Bin]]) -> Set[st
     # To track all unique contigs across bin sets
     all_contigs_in_bins = set()
 
-    for bin_set_name, bins in bin_set_name_to_bins.items():
-        list_contigs_in_bin_sets = get_contigs_in_bins(bins)
+    for bin_set_name, bins_info in bin_set_name_to_bins.items():
+        list_contigs_in_bin_sets = [
+            contig for bin_info in bins_info for contig in bin_info["contigs"]
+        ]
 
         contig_counts = Counter(list_contigs_in_bin_sets)
         duplicated_contigs = {
@@ -578,10 +521,10 @@ def get_contigs_in_bin_sets(bin_set_name_to_bins: Dict[str, Set[Bin]]) -> Set[st
 
         # Log summary for the current bin set
         logging.debug(
-            f"Bin set '{bin_set_name}': {len(bins)} bins, {len(unique_contigs_in_bin_set)} unique contigs."
+            f"Bin set '{bin_set_name}': {len(bins_info)} bins, {len(unique_contigs_in_bin_set)} unique contigs."
         )
 
-    return all_contigs_in_bins
+    return list(all_contigs_in_bins)
 
 
 def get_contigs_in_bins(bins: Iterable[Bin]) -> List[str]:
@@ -595,19 +538,27 @@ def get_contigs_in_bins(bins: Iterable[Bin]) -> List[str]:
     return [contig for b in bins for contig in b.contigs]
 
 
-def rename_bin_contigs(bins: Iterable[Bin], contig_to_index: dict):
-    """
-    Renames the contigs in the bins based on the provided mapping.
+def sum_contig_lengths(
+    bm_contigs: BitMap,
+    contig_lengths: np.ndarray,
+    cache: Dict[bytes, int] = {},
+    key: Optional[bytes] = None,
+):
+    if key is None:
+        key = bm_contigs.serialize()
+    if key not in cache:
+        cache[key] = int(contig_lengths[np.fromiter(bm_contigs, dtype=np.int32)].sum())
+    return cache[key]
 
-    :param bins: A list of Bin objects.
-    :param contig_to_index: A dictionary mapping old contig names to new index names.
-    """
-    for b in bins:
-        b.contigs = {contig_to_index[contig] for contig in b.contigs}
-        b.hash = hash(str(sorted(b.contigs)))
 
-
-def create_intermediate_bins(original_bins: Set[Bin]) -> Set[Bin]:
+def create_intermediate_bins(
+    contig_key_to_initial_bin: Dict[bytes, Bin],
+    contig_lengths: np.ndarray,
+    min_comp: float,
+    max_conta: float,
+    min_len: int,
+    max_len: int,
+) -> Dict[bytes, Bin]:
     """
     Creates intermediate bins from a dictionary of bin sets.
 
@@ -615,43 +566,141 @@ def create_intermediate_bins(original_bins: Set[Bin]) -> Set[Bin]:
 
     :return: A set of intermediate bins created from intersections, differences, and unions.
     """
+    bin_length_cache = {}
 
     logging.info("Making bin graph...")
-    connected_bins_graph = from_bins_to_bin_graph(original_bins)
+    connected_bins_graph = from_bins_to_bin_graph(contig_key_to_initial_bin.values())
 
     cliques_of_bins = sorted(
         [sorted(clique) for clique in nx.clique.find_cliques(connected_bins_graph)]
     )
 
-    logging.info("Creating intersection bins...")
-    intersection_bins = get_intersection_bins(cliques_of_bins)
+    logging.info("Creating union, difference, and intersection bins...")
+    logging.debug(f"{min_comp} min completeness for intersection and difference bins.")
+    logging.debug(
+        f"{max_conta} max contamination for intersection and difference bins."
+    )
+    logging.debug(f"{min_len} min length for intersection and difference bins.")
+    logging.debug(f"{max_len} max length for intersection and difference bins.")
+    logging.info(
+        f"Intermediate bins filtered by minimum length of {min_len} and maximum length of {max_len}."
+    )
+    intersec_count = 0
+    union_count = 0
+    diff_count = 0
 
-    logging.info(f"{len(intersection_bins)} bins created on intersections.")
+    intersec_size_discarded_count = 0
+    diff_size_discarded_count = 0
+    union_size_discarded_count = 0
 
-    logging.info("Creating difference bins...")
-    difference_bins = get_difference_bins(cliques_of_bins)
+    contig_key_to_new_contigs_set = {}
+    discarded_contig_set_keys = set()
+    for clique in tqdm(
+        cliques_of_bins, total=len(cliques_of_bins), unit="clique of bins"
+    ):
+        bins_combinations = get_all_possible_combinations(clique)
 
-    logging.info(f"{len(difference_bins)} bins created based on symmetric difference.")
+        for bin_contig_keys in bins_combinations:
 
-    logging.info("Creating union bins...")
-    union_bins = get_union_bins(cliques_of_bins)
+            bins = [contig_key_to_initial_bin[ck] for ck in bin_contig_keys]
 
-    logging.info(f"{len(union_bins)} bins created on unions.")
+            if all(b.completeness >= min_comp and b.length >= min_len for b in bins):
 
-    new_bins = difference_bins | intersection_bins | union_bins
+                intersec_contigs = bins[0].contig_intersection(*bins[1:])
 
-    new_bins = dereplicate_bin_sets((difference_bins, intersection_bins, union_bins))
+                if intersec_contigs:
+                    contig_key = intersec_contigs.serialize()
 
-    # dereplicate from the original bins
-    original_hashes = [b.hash for b in original_bins]
-    new_bins_not_in_original = set()
+                    if (
+                        contig_key not in contig_key_to_initial_bin
+                        and contig_key not in contig_key_to_new_contigs_set
+                        and contig_key not in discarded_contig_set_keys
+                    ):
+                        contigs_length = sum_contig_lengths(
+                            intersec_contigs,
+                            contig_lengths,
+                            cache=bin_length_cache,
+                            key=contig_key,
+                        )
 
-    for b in new_bins:
-        if b.hash not in original_hashes:
-            new_bins_not_in_original.add(b)
+                        if contigs_length >= min_len and contigs_length <= max_len:
+                            contig_key_to_new_contigs_set[contig_key] = intersec_contigs
+                            intersec_count += 1
+                        else:
+                            discarded_contig_set_keys.add(contig_key)
+                            intersec_size_discarded_count += 1
+
+            for bin_a in bins:
+                if bin_a.completeness >= min_comp and bin_a.length >= min_len:
+
+                    diff_contigs = bin_a.contig_difference(
+                        *(b for b in bins if b != bin_a)
+                    )
+
+                    if diff_contigs:
+                        contig_key = diff_contigs.serialize()
+
+                        if (
+                            contig_key not in contig_key_to_initial_bin
+                            and contig_key not in contig_key_to_new_contigs_set
+                            and contig_key not in discarded_contig_set_keys
+                        ):
+                            contigs_length = sum_contig_lengths(
+                                diff_contigs,
+                                contig_lengths,
+                                cache=bin_length_cache,
+                                key=contig_key,
+                            )
+
+                            if contigs_length >= min_len and contigs_length <= max_len:
+                                contig_key_to_new_contigs_set[contig_key] = diff_contigs
+                                diff_count += 1
+                            else:
+                                discarded_contig_set_keys.add(contig_key)
+                                diff_size_discarded_count += 1
+
+            if all(b.contamination <= max_conta and b.length <= max_len for b in bins):
+
+                union_contigs = bins[0].contig_union(*bins[1:])
+                if union_contigs:
+                    contig_key = union_contigs.serialize()
+                    if (
+                        contig_key not in contig_key_to_initial_bin
+                        and contig_key not in contig_key_to_new_contigs_set
+                        and contig_key not in discarded_contig_set_keys
+                    ):
+                        contigs_length = sum_contig_lengths(
+                            union_contigs,
+                            contig_lengths,
+                            cache=bin_length_cache,
+                            key=contig_key,
+                        )
+                        if contigs_length >= min_len and contigs_length <= max_len:
+                            contig_key_to_new_contigs_set[contig_key] = union_contigs
+                            union_count += 1
+                        else:
+                            discarded_contig_set_keys.add(contig_key)
+                            union_size_discarded_count += 1
 
     logging.info(
-        f"{len(new_bins)} new bins created from {len(original_bins)} input bins."
+        f"Intersection: {intersec_count} bins created, {intersec_size_discarded_count} discarded due to size constraints."
     )
 
-    return new_bins_not_in_original
+    logging.info(
+        f"Symmetric Difference: {diff_count} bins created, {diff_size_discarded_count} discarded due to size constraints."
+    )
+
+    logging.info(
+        f"Union: {union_count} bins created, {union_size_discarded_count} discarded due to size constraints."
+    )
+
+    contig_key_to_new_bin: Dict[bytes, Bin] = {
+        contig_key: Bin(contigs, is_original=False)
+        for contig_key, contigs in contig_key_to_new_contigs_set.items()
+    }
+
+    logging.info(
+        f"{len(contig_key_to_new_bin)} new bins created from {len(contig_key_to_initial_bin)} input bins."
+    )
+
+    return contig_key_to_new_bin

@@ -1,5 +1,6 @@
 from collections import defaultdict
 import logging
+from operator import length_hint
 from typing import Iterable, List, Dict, Tuple, Set
 import csv
 
@@ -123,9 +124,10 @@ def write_bin_info(bins: Iterable[Bin], output: Path, add_contigs: bool = False)
     """
 
     header = [
-        "bin_id",
-        "origin",
         "name",
+        "origin",
+        "is_original",
+        "original_name",
         "completeness",
         "contamination",
         "score",
@@ -137,14 +139,19 @@ def write_bin_info(bins: Iterable[Bin], output: Path, add_contigs: bool = False)
         header.append("contigs")
 
     bin_infos = []
-    for bin_obj in sorted(bins, key=lambda x: (x.score, x.N50, -x.id), reverse=True):
+    for bin_obj in sorted(
+        bins, key=lambda x: (-x.score, -x.N50, -x.is_original, x.contigs_key)
+    ):
+        original_name = bin_obj.original_name if bin_obj.original_name else bin_obj.name
+        origins = bin_obj.origin if bin_obj.is_original else {"binette"}
         bin_info = [
-            bin_obj.id,
-            ";".join(bin_obj.origin),
             bin_obj.name,
+            ";".join(origins),
+            bin_obj.is_original,
+            original_name,
             bin_obj.completeness,
             bin_obj.contamination,
-            bin_obj.score,
+            round(bin_obj.score, 2),
             bin_obj.length,
             bin_obj.N50,
             len(bin_obj.contigs),
@@ -163,9 +170,10 @@ def write_bin_info(bins: Iterable[Bin], output: Path, add_contigs: bool = False)
 
 
 def write_bins_fasta(
-    selected_bins: List,
+    selected_bins: List[Bin],
     contigs_fasta: Path,
     outdir: Path,
+    contigs_names: List[str],
     max_buffer_size: int = 50_000_000,
 ):
     """
@@ -181,37 +189,42 @@ def write_bins_fasta(
 
     # Clear existing files for selected bins
     for sbin in selected_bins:
-        out_path = outdir / f"bin_{sbin.id}.fa"
+        out_path = outdir / f"{sbin.name}.fa"
         if out_path.exists():
             out_path.unlink()  # remove the file
 
     # Map contig name to bin IDs
     contig_to_bins = {}
     for sbin in selected_bins:
-        for contig in sbin.contigs:
-            contig_to_bins[contig] = sbin.id
+        for contig_id in sbin.contigs:
+            contig_name = contigs_names[contig_id]
+            contig_to_bins[contig_name] = sbin.name
+
+    assert len(contig_to_bins) == sum(
+        len(sbin.contigs) for sbin in selected_bins
+    ), "Some contigs are present in multiple bins but should be unique."
 
     buffer = defaultdict(list)
     buffer_size = 0
 
     def flush_buffer():
         nonlocal buffer_size
-        for bin_id, seqs in buffer.items():
+        for bin_name, seqs in buffer.items():
             if seqs:
-                with open(outdir / f"bin_{bin_id}.fa", "a") as f:
+                with open(outdir / f"{bin_name}.fa", "a") as f:
                     f.writelines(seqs)
         buffer.clear()
         buffer_size = 0
 
     for name, seq in pyfastx.Fastx(contigs_fasta.as_posix()):
-        bin_id = contig_to_bins.get(name)
-        if not bin_id:
+        bin_name = contig_to_bins.get(name)
+        if not bin_name:
             continue
 
         fasta_entry = f">{name}\n{seq}\n"
         entry_size = len(fasta_entry)
 
-        buffer[bin_id].append(fasta_entry)
+        buffer[bin_name].append(fasta_entry)
 
         buffer_size += entry_size
         if buffer_size >= max_buffer_size:
@@ -274,7 +287,7 @@ def check_resume_file(faa_file: Path, diamond_result_file: Path) -> None:
         raise FileNotFoundError(error_msg)
 
 
-def write_original_bin_metrics(original_bins: Set[Bin], original_bin_report_dir: Path):
+def write_original_bin_metrics(original_bins: List[Bin], original_bin_report_dir: Path):
     """
     Write metrics of original input bins to a specified directory.
 
@@ -287,10 +300,10 @@ def write_original_bin_metrics(original_bins: Set[Bin], original_bin_report_dir:
 
     original_bin_report_dir.mkdir(parents=True, exist_ok=True)
 
-    bin_set_name_to_bins = defaultdict(set)
+    bin_set_name_to_bins = defaultdict(list)
     for bin_obj in original_bins:
         for origin in bin_obj.origin:
-            bin_set_name_to_bins[origin].add(bin_obj)
+            bin_set_name_to_bins[origin].append(bin_obj)
 
     for i, (set_name, bins) in enumerate(sorted(bin_set_name_to_bins.items())):
         bins_metric_file = (

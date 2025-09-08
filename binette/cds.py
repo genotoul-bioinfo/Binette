@@ -213,7 +213,7 @@ def get_contig_cds_metadata(
 
 
 def filter_faa_file(
-    contigs_to_keep: Set[str],
+    contigs_to_keep: List[str],
     input_faa_file: Path,
     filtered_faa_file: Path,
 ):
@@ -249,7 +249,7 @@ def filter_faa_file(
     # Calculate metrics
     total_contigs = len(contigs_to_keep)
     contigs_with_no_genes = total_contigs - len(contigs_with_genes)
-    contigs_not_in_keep_list = len(contigs_parsed - contigs_to_keep)
+    contigs_not_in_keep_list = len(contigs_parsed - set(contigs_to_keep))
 
     # Log the computed metrics
     logging.info(f"Processing protein sequences from '{input_faa_file}'.")
