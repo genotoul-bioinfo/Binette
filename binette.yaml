@@ -15,3 +15,4 @@ dependencies:
   - networkx>=3.0,<4.0
   - pyfastx>=2,<4
   - pyrodigal
+  - pyroaring>=1.0,<2.0
