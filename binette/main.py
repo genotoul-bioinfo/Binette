@@ -95,7 +95,6 @@ def is_valid_file(parser: ArgumentParser, arg: str) -> Path:
 
     return path_arg
 
-
 def parse_arguments(args):
     """Parse script arguments."""
 
@@ -104,13 +103,15 @@ def parse_arguments(args):
         formatter_class=ArgumentDefaultsHelpFormatter,
     )
 
-    # Input arguments category
+    # ------------------------
+    # Input arguments
+    # ------------------------
     input_group = parser.add_argument_group("Input Arguments")
     input_arg = input_group.add_mutually_exclusive_group(required=True)
 
     input_arg.add_argument(
         "-d",
-        "--bin_dirs",
+        "--bin-dirs",
         nargs="+",
         type=lambda x: is_valid_file(parser, x),
         action=UniqueStore,
@@ -119,12 +120,12 @@ def parse_arguments(args):
 
     input_arg.add_argument(
         "-b",
-        "--contig2bin_tables",
+        "--contig2bin-tables",
         nargs="+",
         action=UniqueStore,
         type=lambda x: is_valid_file(parser, x),
-        help="List of contig2bin table with two columns separated\
-            with a tabulation: contig, bin",
+        help="List of contig2bin tables with two columns separated "
+        "by a tabulation: contig, bin.",
     )
 
     input_group.add_argument(
@@ -132,7 +133,7 @@ def parse_arguments(args):
         "--contigs",
         required=True,
         type=lambda x: is_valid_file(parser, x),
-        help="Contigs in fasta format.",
+        help="Contigs in FASTA format.",
     )
 
     input_group.add_argument(
@@ -143,78 +144,107 @@ def parse_arguments(args):
         "Skips the gene prediction step if provided.",
     )
 
-    # Other parameters category
-    other_group = parser.add_argument_group("Other Arguments")
+    # ------------------------
+    # Output & runtime control
+    # ------------------------
+    runtime_group = parser.add_argument_group("Output and Runtime Control")
 
-    other_group.add_argument(
-        "-m",
-        "--min_completeness",
-        default=40,
-        type=int,
-        help="Minimum completeness required for final bin selections.",
-    )
-
-    other_group.add_argument(
-        "--max_contamination",
-        default=10,
-        type=int,
-        help="Maximum contamination required for final bin selections.",
-    )
-
-    other_group.add_argument(
-        "-t", "--threads", default=1, type=int, help="Number of threads to use."
-    )
-
-    other_group.add_argument(
+    runtime_group.add_argument(
         "-o", "--outdir", default=Path("results"), type=Path, help="Output directory."
     )
 
-    other_group.add_argument(
-        "-w",
-        "--contamination_weight",
-        default=2,
-        type=float,
-        help="Bin are scored as follow: completeness - weight * contamination. "
-        "A low contamination_weight favor complete bins over low contaminated bins.",
+    runtime_group.add_argument(
+        "-t", "--threads", default=1, type=int, help="Number of threads to use."
     )
 
-    other_group.add_argument(
+    runtime_group.add_argument(
+        "--resume",
+        action="store_true",
+        help="Resume mode: reuse existing temporary files if possible.",
+    )
+
+    runtime_group.add_argument(
+        "-v", "--verbose", help="Increase output verbosity.", action="store_true"
+    )
+
+    runtime_group.add_argument(
+        "--debug", help="Activate debug mode.", action="store_true"
+    )
+
+    runtime_group.add_argument(
+        "--version", action="version", version=binette.__version__
+    )
+
+    # ------------------------
+    # Bin filtering & scoring
+    # ------------------------
+    filter_group = parser.add_argument_group("Bin Filtering and Scoring")
+
+    filter_group.add_argument(
+        "--min-completeness",
+        "--min_completeness",
+        default=40,
+        type=int,
+        help="Minimum completeness required for intermediate bin creation and final bin selection.",
+    )
+
+    filter_group.add_argument(
+        "--max-contamination",
+        "--max_contamination",
+        default=10,
+        type=int,
+        help="Maximum contamination allowed for intermediate bin creation and final bin selection.",
+    )
+
+    filter_group.add_argument(
+        "--min-length",
+        default=200_000,
+        type=int,
+        help="Minimum length (bp) required for intermediate bin creation and final bin selection.",
+    )
+
+    filter_group.add_argument(
+        "--max-length",
+        default=10_000_000,
+        type=int,
+        help="Maximum length (bp) allowed for intermediate bin creation and final bin selection.",
+    )
+
+    filter_group.add_argument(
+        "-w",
+        "--contamination-weight",
+        default=2,
+        type=float,
+        help="Bins are scored as: completeness - weight * contamination. "
+        "A lower weight favors completeness over low contamination.",
+    )
+
+    # ------------------------
+    # Advanced options
+    # ------------------------
+    advanced_group = parser.add_argument_group("Advanced Options")
+
+    advanced_group.add_argument(
         "-e",
-        "--fasta_extensions",
+        "--fasta-extensions",
         nargs="+",
         default={".fasta", ".fa", ".fna"},
         type=str,
-        help="Specify the FASTA file extensions to search for in bin directories when using the --bin_dirs option.",
+        help="FASTA file extensions to search for in bin directories (used with --bin-dirs).",
     )
 
-    other_group.add_argument(
-        "--checkm2_db",
+    advanced_group.add_argument(
+        "--checkm2-db",
         type=Path,
-        help="Provide a path for the CheckM2 diamond database. "
+        help="Path to CheckM2 diamond database. "
         "By default the database set via <checkm2 database> is used.",
     )
 
-    other_group.add_argument(
-        "--low_mem", help="Use low mem mode when running diamond", action="store_true"
+    advanced_group.add_argument(
+        "--low-mem", help="Enable low-memory mode for Diamond.", action="store_true"
     )
 
-    other_group.add_argument(
-        "-v", "--verbose", help="increase output verbosity", action="store_true"
-    )
-
-    other_group.add_argument("--debug", help="Activate debug mode", action="store_true")
-
-    other_group.add_argument(
-        "--resume",
-        action="store_true",
-        help="Activate resume mode. Binette will examine the 'temporary_files' directory "
-        "within the output directory and reuse any existing files if possible.",
-    )
-
-    other_group.add_argument("--version", action="version", version=binette.__version__)
-
-    args = parser.parse_args(args)
-    return args
+    return parser.parse_args(args)
 
 
 def parse_input_files(
@@ -563,8 +593,8 @@ def main():
         contig_lengths=contig_lengths,
         min_comp=args.min_completeness,
         max_conta=args.max_contamination,
-        min_len=200_000,
-        max_len=10_000_000,
+        min_len=args.min_length,
+        max_len=args.max_length,
     )
 
     logging.info(f"Assess quality for {len(contig_key_to_new_bin)} intermediate bins.")
