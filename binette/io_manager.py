@@ -1,8 +1,7 @@
 from collections import defaultdict
 import logging
-from operator import length_hint
-from typing import Iterable, List, Dict, Tuple, Set
-import csv
+from typing import Iterable, List, Dict, Tuple
+import pandas as pd
 
 from binette.bin_manager import Bin
 
@@ -123,7 +122,8 @@ def write_bin_info(bins: Iterable[Bin], output: Path, add_contigs: bool = False)
     :param add_contigs: Flag indicating whether to include contig information.
     """
 
-    header = [
+    # Define columns for the DataFrame
+    columns = [
         "name",
         "origin",
         "is_original",
@@ -136,37 +136,37 @@ def write_bin_info(bins: Iterable[Bin], output: Path, add_contigs: bool = False)
         "contig_count",
     ]
     if add_contigs:
-        header.append("contigs")
+        columns.append("contigs")
 
-    bin_infos = []
+    # Create a list of dictionaries to build the DataFrame
+    data = []
     for bin_obj in sorted(
         bins, key=lambda x: (-x.score, -x.N50, -x.is_original, x.contigs_key)
     ):
         original_name = bin_obj.original_name if bin_obj.original_name else bin_obj.name
         origins = bin_obj.origin if bin_obj.is_original else {"binette"}
-        bin_info = [
-            bin_obj.name,
-            ";".join(origins),
-            bin_obj.is_original,
-            original_name,
-            bin_obj.completeness,
-            bin_obj.contamination,
-            round(bin_obj.score, 2),
-            bin_obj.length,
-            bin_obj.N50,
-            len(bin_obj.contigs),
-        ]
+
+        bin_info = {
+            "name": bin_obj.name,
+            "origin": ";".join(origins),
+            "is_original": bin_obj.is_original,
+            "original_name": original_name,
+            "completeness": bin_obj.completeness,
+            "contamination": bin_obj.contamination,
+            "score": round(bin_obj.score, 2),
+            "size": bin_obj.length,
+            "N50": bin_obj.N50,
+            "contig_count": len(bin_obj.contigs),
+        }
+
         if add_contigs:
-            bin_info.append(
-                ";".join(str(c) for c in bin_obj.contigs) if add_contigs else ""
-            )
+            bin_info["contigs"] = ";".join(str(c) for c in bin_obj.contigs)
 
-        bin_infos.append(bin_info)
+        data.append(bin_info)
 
-    with open(output, "w", newline="") as fl:
-        writer = csv.writer(fl, delimiter="\t")
-        writer.writerow(header)
-        writer.writerows(bin_infos)
+    # Create pandas DataFrame and write to TSV
+    df = pd.DataFrame(data, columns=columns)
+    df.to_csv(output, sep="\t", index=False)
 
 
 def write_bins_fasta(

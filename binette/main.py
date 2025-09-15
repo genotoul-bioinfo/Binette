@@ -153,6 +153,12 @@ def parse_arguments(args):
     runtime_group.add_argument(
         "-o", "--outdir", default=Path("results"), type=Path, help="Output directory."
     )
+    runtime_group.add_argument(
+        "--prefix",
+        type=str,
+        default="binette",
+        help="Prefix to add to final bin names (e.g. '--prefix sample1_' will produce 'sample1_bin1.fa', 'sample1_bin2.fa').",
+    )
 
     runtime_group.add_argument(
         "-t", "--threads", default=1, type=int, help="Number of threads to use."
@@ -604,10 +610,10 @@ def main():
     logging.info(f"Assess quality for {len(contig_key_to_new_bin)} intermediate bins.")
 
     bin_quality.add_bin_metrics(
-        contig_key_to_new_bin.values(),
-        contig_metadat,
-        args.contamination_weight,
-        args.threads,
+        bins=contig_key_to_new_bin.values(),
+        contig_info=contig_metadat,
+        contamination_weight=args.contamination_weight,
+        threads=args.threads,
     )
 
     contig_key_to_all_bin = contig_key_to_original_bin | contig_key_to_new_bin
@@ -625,6 +631,7 @@ def main():
         contig_key_to_all_bin,
         min_completeness=args.min_completeness,
         max_contamination=args.max_contamination,
+        prefix=args.prefix,
     )
 
     logging.info(f"Writing selected bins in {final_bin_report}")

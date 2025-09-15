@@ -415,9 +415,16 @@ def select_best_bins(
     bins_dict: dict[bytes, Bin],
     min_completeness: float,
     max_contamination: float,
+    prefix: str = "binette",
 ) -> list[Bin]:
     """
     Select the best non-overlapping bins based on score, N50, and ID.
+
+    :param bins_dict: Mapping from contig_key -> Bin.
+    :param min_completeness: Minimum completeness threshold for a bin to be considered.
+    :param max_contamination: Maximum contamination threshold for a bin to be considered.
+    :param prefix: Prefix to use for naming selected bins.
+
     """
     logging.info("Selecting best bins...")
 
@@ -471,14 +478,12 @@ def select_best_bins(
 
     logging.info(f"Selected {len(selected_bins)} bins")
 
-    # TODO use with a prefix from an optional argument of cli
-    prefix = "binette"
     for i, selected_bin in enumerate(selected_bins, start=1):
         if not selected_bin.origin:
             selected_bin.origin = {"binette"}
         if selected_bin.name is not None:
             selected_bin.original_name = selected_bin.name
-        selected_bin.name = f"{prefix}_{i}"
+        selected_bin.name = f"{prefix}_bin{i}"
     return selected_bins
 
 
