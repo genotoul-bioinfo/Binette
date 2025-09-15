@@ -11,7 +11,6 @@ dependencies:
   - setuptools
   - requests>=2,<3
   - packaging>=23,<24
-  - tqdm>=4,<5
   - networkx>=3.0,<4.0
   - pyfastx>=2,<4
   - pyrodigal

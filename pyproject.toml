@@ -23,7 +23,6 @@ classifiers=[
     "Programming Language :: Python :: 3",
     "Topic :: Scientific/Engineering :: Bio-Informatics"]
 requires-python = ">=3.12"
-license = {file="LICENSE"}
 
 dependencies = [
     "checkm2 @ git+https://github.com/chklovski/CheckM2.git@1.1.0",

@@ -65,10 +65,8 @@ binette -h
 Binette is available on [PyPI](https://pypi.org/project/Binette/) and can be installed using pip as follows:
 
 ```bash
-pip install binette[main_deps]
+pip install binette
 ```
-
-Omitting the `[main_deps]` option will result in the installation of Binette without any Python dependencies.
 
 In addition to Python dependencies, Binette requires [Diamond](https://github.com/bbuchfink/diamond) to be installed and executable.
 
