@@ -1,22 +1,48 @@
 #!/usr/bin/env python3
 import logging
 import os
-from collections import Counter
+from collections import Counter, defaultdict
 from itertools import islice
-from typing import Dict, Iterable, Optional, Tuple, Iterator, List
+from typing import Dict, Iterable, Tuple, Iterator, List
 
 import numpy as np
 import pandas as pd
-from binette.bin_manager import Bin
 from tqdm import tqdm
-from collections import defaultdict
+
+from binette.bin_manager import Bin
+from checkm2 import keggData
 
 # Suppress unnecessary TensorFlow warnings
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 logging.getLogger("tensorflow").setLevel(logging.FATAL)
 
+# Lazy loaders for checkm2 components that import keras
+# These will only be imported when explicitly called
+_modelPostprocessing = None
+_modelProcessing = None
 
-from checkm2 import keggData, modelPostprocessing, modelProcessing  # noqa: E402
+
+def get_modelPostprocessing():
+    """Lazy load modelPostprocessing module only when needed"""
+    global _modelPostprocessing
+    if _modelPostprocessing is None:
+        # Only import keras when absolutely needed
+        from checkm2 import modelPostprocessing
+
+        _modelPostprocessing = modelPostprocessing
+    return _modelPostprocessing
+
+
+def get_modelProcessing():
+    """Lazy load modelProcessing module only when needed"""
+    global _modelProcessing
+    if _modelProcessing is None:
+        # Only import keras when absolutely needed
+        from checkm2 import modelProcessing
+
+        _modelProcessing = modelProcessing
+
+    return _modelProcessing
 
 
 def get_bins_metadata_df(
@@ -300,6 +326,7 @@ def add_bin_metrics(
 
     :return: List of processed bin objects.
     """
+    modelPostprocessing = get_modelPostprocessing()
     postProcessor = modelPostprocessing.modelProcessor(threads)
 
     contig_to_kegg_counter = contig_info["contig_to_kegg_counter"]
@@ -340,7 +367,7 @@ def assess_bins_quality_by_chunk(
     contig_to_aa_counter: Dict,
     contig_to_aa_length: Dict,
     contamination_weight: float,
-    postProcessor: Optional[modelPostprocessing.modelProcessor] = None,
+    postProcessor=None,
     threads: int = 1,
     chunk_size: int = 2500,
     disable_bar=False,
@@ -384,7 +411,7 @@ def assess_bins_quality(
     contig_to_aa_counter: Dict,
     contig_to_aa_length: Dict,
     contamination_weight: float,
-    postProcessor: Optional[modelPostprocessing.modelProcessor] = None,
+    postProcessor=None,
     threads: int = 1,
 ):
     """
@@ -403,6 +430,7 @@ def assess_bins_quality(
     :param threads: Number of threads for parallel processing (default is 1).
     """
     if postProcessor is None:
+        modelPostprocessing = get_modelPostprocessing()
         postProcessor = modelPostprocessing.modelProcessor(threads)
 
     metadata_df = get_bins_metadata_df(
@@ -418,6 +446,7 @@ def assess_bins_quality(
     feature_vectors = feature_vectors.sort_values(by="Name")
 
     # 4: Call general model & specific models and derive predictions"""
+    modelProcessing = get_modelProcessing()
     modelProc = modelProcessing.modelProcessor(threads)
 
     vector_array = feature_vectors.iloc[:, 1:].values.astype(float)
