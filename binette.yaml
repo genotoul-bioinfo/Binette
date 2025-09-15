@@ -16,4 +16,3 @@ dependencies:
   - pyfastx>=2,<4
   - pyrodigal
   - pyroaring>=1.0,<2.0
-  - lazy_loader>=0.2,<1.0

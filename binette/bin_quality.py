@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 import logging
 import os
-import sys
 from collections import Counter, defaultdict
 from itertools import islice
 from typing import Dict, Iterable, Tuple, Iterator, List
 
-import lazy_loader as lazy
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
@@ -29,8 +27,6 @@ def get_modelPostprocessing():
     global _modelPostprocessing
     if _modelPostprocessing is None:
         # Only import keras when absolutely needed
-        sys.modules["keras"] = lazy.attach("keras")
-        sys.modules["keras.models"] = lazy.attach("keras.models")
         from checkm2 import modelPostprocessing
 
         _modelPostprocessing = modelPostprocessing
@@ -42,11 +38,10 @@ def get_modelProcessing():
     global _modelProcessing
     if _modelProcessing is None:
         # Only import keras when absolutely needed
-        sys.modules["keras"] = lazy.attach("keras")
-        sys.modules["keras.models"] = lazy.attach("keras.models")
         from checkm2 import modelProcessing
 
         _modelProcessing = modelProcessing
+
     return _modelProcessing
 
 

@@ -32,8 +32,7 @@ dependencies = [
     "pyfastx>=2,<3",
     "pyrodigal>=2,<3",
     "tqdm>=4,<5",
-    "pyroaring>=1.0.0,<2.0.0",
-    "lazy_loader>=0.2,<1.0",
+    "pyroaring>=1.0.0,<2.0.0"
 ]
 
 license = {file="LICENSE"}
