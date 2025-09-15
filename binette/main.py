@@ -35,50 +35,6 @@ logger = logging.getLogger(__name__)
 err_console = Console(stderr=True)
 
 
-def preprocess_args():
-    """
-    Typer doesn't support whitespace-separated multi-value options.
-
-    We preprocess the sysargv so that:
-    - python3 app.py some_command --filters filter1 filter2 filter3 --environments env1 env2 env3
-
-    becomes:
-    - python3 app.py some_command --filters filter1 --filters filter2 --filters filter3 --environments env1 --environments env2 --environments env3
-
-    //!\\ DOWNSIDE: options should always be after arguments in the CLI command //!\\
-    """
-
-    logger.debug(f"Initial CLI command is: {sys.argv}")
-
-    # get main cmd
-    final_cmd = []
-    for idx, arg in enumerate(sys.argv):
-        if any(arg.startswith(_) for _ in ["-", "--"]):
-            break
-        else:
-            final_cmd.append(arg)
-    logger.debug(f"Main command is: {final_cmd}")
-
-    # get options and their values
-    for idx, arg in enumerate(sys.argv):
-        if any(arg.startswith(_) for _ in ["-", "--"]):
-            opt_values = []
-            for value in sys.argv[idx + 1 :]:
-                if any(value.startswith(_) for _ in ["-", "--"]):
-                    break
-                else:
-                    opt_values.append(value)
-
-            if len(opt_values) >= 1:
-                [final_cmd.extend([arg, opt_value]) for opt_value in opt_values]
-            else:
-                final_cmd.append(arg)
-
-    # replace by reformatted
-    logger.debug(f"Final command is: {final_cmd}")
-    sys.argv = final_cmd
-
-
 def version_callback(
     value: bool,
     ctx: typer.Context,
@@ -112,6 +68,49 @@ def verbose_callback(
     logging.info(
         f'command line: {" ".join(sys.argv)}',
     )
+
+
+def preprocess_args():
+    """
+    Typer doesn't support whitespace-separated multi-value options.
+
+    We preprocess the sysargv so that:
+    - python3 app.py some_command --filters filter1 filter2 filter3 --environments env1 env2 env3
+
+    becomes:
+    - python3 app.py some_command --filters filter1 --filters filter2 --filters filter3 --environments env1 --environments env2 --environments env3
+
+    """
+
+    logger.debug(f"Initial CLI command is: {sys.argv}")
+
+    # get main cmd
+    final_cmd = []
+    for idx, arg in enumerate(sys.argv):
+        if any(arg.startswith(_) for _ in ["-", "--"]):
+            break
+        else:
+            final_cmd.append(arg)
+    logger.debug(f"Main command is: {final_cmd}")
+
+    # get options and their values
+    for idx, arg in enumerate(sys.argv):
+        if any(arg.startswith(_) for _ in ["-", "--"]):
+            opt_values = []
+            for value in sys.argv[idx + 1 :]:
+                if any(value.startswith(_) for _ in ["-", "--"]):
+                    break
+                else:
+                    opt_values.append(value)
+
+            if len(opt_values) >= 1:
+                [final_cmd.extend([arg, opt_value]) for opt_value in opt_values]
+            else:
+                final_cmd.append(arg)
+
+    # replace by reformatted
+    logger.debug(f"Final command is: {final_cmd}")
+    sys.argv = final_cmd
 
 
 # Create the Typer app with no args help enabled and rich formatting
@@ -365,7 +364,7 @@ def log_selected_bin_info(
     help=f"Binette {binette.__version__}: fast and accurate binning refinement tool to constructs high quality MAGs from the output of multiple binning tools.",
     no_args_is_help=True,
 )
-def main(
+def run_binette(
     # Input arguments - Mutually exclusive group (handled in code)
     bin_dirs: Annotated[
         Optional[List[Path]],
@@ -707,8 +706,7 @@ def main(
     return 0
 
 
-def main_main():
-    """Main function to run the application."""
+def main():
     preprocess_args()
 
     app()
