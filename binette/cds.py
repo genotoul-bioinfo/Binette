@@ -2,11 +2,11 @@ import concurrent.futures as cf
 import multiprocessing.pool
 import logging
 from collections import Counter, defaultdict
-from typing import Dict, List, Iterator, Tuple, Any, Union, Set
+from typing import Dict, List, Iterator, Tuple, Any, Union
 
 import pyfastx
 import pyrodigal
-from tqdm import tqdm
+
 from pathlib import Path
 import gzip
 
@@ -157,14 +157,13 @@ def get_contig_cds_metadata_flat(
     }
 
     contig_to_aa_counter = {
-        contig: get_aa_composition(genes)
-        for contig, genes in tqdm(contig_to_genes.items(), unit="contig")
+        contig: get_aa_composition(genes) for contig, genes in contig_to_genes.items()
     }
     logging.info("Calculating amino acid composition.")
 
     contig_to_aa_length = {
         contig: sum(counter.values())
-        for contig, counter in tqdm(contig_to_aa_counter.items(), unit="contig")
+        for contig, counter in contig_to_aa_counter.items()
     }
     logging.info("Calculating total amino acid length.")
 
@@ -188,18 +187,17 @@ def get_contig_cds_metadata(
     contig_to_future = {}
     logging.info(f"Collecting contig amino acid composition using {threads} threads.")
     with cf.ProcessPoolExecutor(max_workers=threads) as tpe:
-        for contig, genes in tqdm(contig_to_genes.items()):
+        for contig, genes in contig_to_genes.items():
             contig_to_future[contig] = tpe.submit(get_aa_composition, genes)
 
     contig_to_aa_counter = {
-        contig: future.result()
-        for contig, future in tqdm(contig_to_future.items(), unit="contig")
+        contig: future.result() for contig, future in contig_to_future.items()
     }
     logging.info("Calculating amino acid composition in parallel.")
 
     contig_to_aa_length = {
         contig: sum(counter.values())
-        for contig, counter in tqdm(contig_to_aa_counter.items(), unit="contig")
+        for contig, counter in contig_to_aa_counter.items()
     }
     logging.info("Calculating total amino acid length in parallel.")
 

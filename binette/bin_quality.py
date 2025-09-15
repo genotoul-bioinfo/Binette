@@ -8,8 +8,9 @@ from typing import Dict, Iterable, Optional, Tuple, Iterator, List
 import numpy as np
 import pandas as pd
 from binette.bin_manager import Bin
-from tqdm import tqdm
 from collections import defaultdict
+from rich.progress import Progress
+
 
 # Suppress unnecessary TensorFlow warnings
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
@@ -288,6 +289,7 @@ def add_bin_metrics(
     contamination_weight: float,
     threads: int = 1,
     chunk_size: int = 5000,
+    disable_progress_bar: bool = False,
 ):
     """
     Add metrics to a Set of bins.
@@ -297,6 +299,7 @@ def add_bin_metrics(
     :param contamination_weight: Weight for contamination assessment.
     :param threads: Number of threads for parallel processing (default is 1).
     :param chunk_size: Number of bins to process in each chunk (default is 5000).
+    :param disable_progress_bar: Disable the progress bar if True.
 
     :return: List of processed bin objects.
     """
@@ -317,6 +320,7 @@ def add_bin_metrics(
         contamination_weight,
         postProcessor,
         chunk_size=chunk_size,
+        disable_progress_bar=disable_progress_bar,
     )
     return bins
 
@@ -343,7 +347,7 @@ def assess_bins_quality_by_chunk(
     postProcessor: Optional[modelPostprocessing.modelProcessor] = None,
     threads: int = 1,
     chunk_size: int = 2500,
-    disable_bar=False,
+    disable_progress_bar=False,
 ):
     """
     Assess the quality of bins in chunks.
@@ -359,12 +363,14 @@ def assess_bins_quality_by_chunk(
     :param postProcessor: post-processor from checkm2
     :param threads: Number of threads for parallel processing (default is 1).
     :param chunk_size: The size of each chunk.
+    :param disable_progress_bar: Disable the progress bar if True.
     """
-    with tqdm(total=len(bins), unit="bin", disable=disable_bar) as pbar:
+    with Progress(disable=disable_progress_bar) as progress:
+        task = progress.add_task("Assessing bin quality", total=len(bins))
         for i, chunk_bins_iter in enumerate(chunks(bins, chunk_size)):
             chunk_bins = list(chunk_bins_iter)
             logging.debug(f"chunk {i}: assessing quality of {len(chunk_bins)} bins")
-            bins_scored = assess_bins_quality(
+            assess_bins_quality(
                 bins=chunk_bins,
                 contig_to_kegg_counter=contig_to_kegg_counter,
                 contig_to_cds_count=contig_to_cds_count,
@@ -374,7 +380,7 @@ def assess_bins_quality_by_chunk(
                 postProcessor=postProcessor,
                 threads=threads,
             )
-            pbar.update(len(bins_scored))
+            progress.update(task, advance=len(chunk_bins))
 
 
 def assess_bins_quality(

@@ -636,7 +636,11 @@ def main(
 
     logging.info("Add size and assess quality of input bins")
     bin_quality.add_bin_metrics(
-        original_bins, contig_metadat, contamination_weight, threads
+        original_bins,
+        contig_metadat,
+        contamination_weight,
+        threads,
+        disable_progress_bar=not progress,
     )
     bin_quality.add_bin_size_and_N50(original_bins, contig_to_length)
 
@@ -656,6 +660,7 @@ def main(
         max_conta=max_contamination,
         min_len=min_length,
         max_len=max_length,
+        disable_progress_bar=not progress,
     )
 
     logging.info(f"Assess quality for {len(contig_key_to_new_bin)} intermediate bins.")
@@ -665,6 +670,7 @@ def main(
         contig_info=contig_metadat,
         contamination_weight=contamination_weight,
         threads=threads,
+        disable_progress_bar=not progress,
     )
 
     contig_key_to_all_bin = contig_key_to_original_bin | contig_key_to_new_bin
