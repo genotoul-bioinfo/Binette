@@ -2,17 +2,23 @@
 """
 Module      : Main
 Description : The main entry point for the program.
-Copyright   : (c) Jean Mainguy, 28 nov. 2022 
-License     : MIT
+Copyright   : (c) Jean Mainguy, 28 nov. 2022
+License     : GPL-3.0
 Maintainer  : Jean Mainguy
 Portability : POSIX
 """
 
-from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, Action, Namespace
-
 import sys
 import logging
 import os
+import typer
+from typing import List, Dict, Optional, Set, Tuple, Annotated
+from pathlib import Path
+import pyfastx
+
+from rich.logging import RichHandler
+from rich.console import Console
+
 
 import binette
 from binette import (
@@ -23,238 +29,99 @@ from binette import (
     bin_manager,
     io_manager as io,
 )
-from typing import List, Dict, Optional, Set, Tuple, Union, Sequence, Any
-from pathlib import Path
-import pyfastx
 
 
-def init_logging(verbose, debug):
-    """Initialise logging."""
-    if debug:
-        level = logging.DEBUG
-    elif verbose:
-        level = logging.INFO
-    else:
-        level = logging.WARNING
+logger = logging.getLogger(__name__)
+err_console = Console(stderr=True)
 
+
+def preprocess_args():
+    """
+    Typer doesn't support whitespace-separated multi-value options.
+
+    We preprocess the sysargv so that:
+    - python3 app.py some_command --filters filter1 filter2 filter3 --environments env1 env2 env3
+
+    becomes:
+    - python3 app.py some_command --filters filter1 --filters filter2 --filters filter3 --environments env1 --environments env2 --environments env3
+
+    //!\\ DOWNSIDE: options should always be after arguments in the CLI command //!\\
+    """
+
+    logger.debug(f"Initial CLI command is: {sys.argv}")
+
+    # get main cmd
+    final_cmd = []
+    for idx, arg in enumerate(sys.argv):
+        if any(arg.startswith(_) for _ in ["-", "--"]):
+            break
+        else:
+            final_cmd.append(arg)
+    logger.debug(f"Main command is: {final_cmd}")
+
+    # get options and their values
+    for idx, arg in enumerate(sys.argv):
+        if any(arg.startswith(_) for _ in ["-", "--"]):
+            opt_values = []
+            for value in sys.argv[idx + 1 :]:
+                if any(value.startswith(_) for _ in ["-", "--"]):
+                    break
+                else:
+                    opt_values.append(value)
+
+            if len(opt_values) >= 1:
+                [final_cmd.extend([arg, opt_value]) for opt_value in opt_values]
+            else:
+                final_cmd.append(arg)
+
+    # replace by reformatted
+    logger.debug(f"Final command is: {final_cmd}")
+    sys.argv = final_cmd
+
+
+def version_callback(
+    value: bool,
+    ctx: typer.Context,
+):
+    """Prints the version and exits if --version is passed."""
+    if ctx.resilient_parsing:
+        return
+
+    if value:
+        typer.echo(f"Binette {binette.__version__}")
+        raise typer.Exit()
+
+
+def verbose_callback(
+    verbose: bool,
+):
+    """Sets the logging level to DEBUG if --verbose is passed."""
+    lvl = logging.INFO
+
+    if verbose:
+        lvl = logging.DEBUG
+
+    # Set up logging
     logging.basicConfig(
-        level=level,
-        format="%(asctime)s %(levelname)s - %(message)s",
-        datefmt="[%Y-%m-%d %H:%M:%S]",
+        level=lvl,
+        format="%(message)s",
+        datefmt="[%X]",
+        handlers=[RichHandler(console=err_console)],
     )
-
     logging.info("Program started")
     logging.info(
         f'command line: {" ".join(sys.argv)}',
     )
 
 
-class UniqueStore(Action):
-    """
-    Custom argparse action to ensure an argument is provided only once.
-    """
-
-    def __call__(
-        self,
-        parser: ArgumentParser,
-        namespace: Namespace,
-        values: Union[str, Sequence[Any], None],
-        option_string: Optional[str] = None,
-    ) -> None:
-        """
-        Ensures the argument is only used once. Raises an error if the argument appears multiple times.
-
-        :param parser: The argparse parser instance.
-        :param namespace: The namespace object that will contain the parsed arguments.
-        :param values: The value associated with the argument.
-        :param option_string: The option string that was used to invoke this action.
-        """
-        # Check if the argument has already been set
-        if getattr(namespace, self.dest, self.default) is not self.default:
-            parser.error(
-                f"Error: The argument {option_string} can only be specified once."
-            )
-
-        # Set the argument value
-        setattr(namespace, self.dest, values)
-
-
-def is_valid_file(parser: ArgumentParser, arg: str) -> Path:
-    """
-    Validates that the provided input file exists.
-
-    :param parser: The ArgumentParser instance handling command-line arguments.
-    :param arg: The path to the file provided as an argument.
-    :return: A Path object representing the valid file.
-    """
-    path_arg = Path(arg)
-
-    # Check if the file exists at the provided path
-    if not path_arg.exists():
-        parser.error(f"Error: The specified file '{arg}' does not exist.")
-
-    return path_arg
-
-
-def parse_arguments(args):
-    """Parse script arguments."""
-
-    parser = ArgumentParser(
-        description=f"Binette version={binette.__version__}",
-        formatter_class=ArgumentDefaultsHelpFormatter,
-    )
-
-    # ------------------------
-    # Input arguments
-    # ------------------------
-    input_group = parser.add_argument_group("Input Arguments")
-    input_arg = input_group.add_mutually_exclusive_group(required=True)
-
-    input_arg.add_argument(
-        "-d",
-        "--bin-dirs",
-        nargs="+",
-        type=lambda x: is_valid_file(parser, x),
-        action=UniqueStore,
-        help="List of bin folders containing each bin in a fasta file.",
-    )
-
-    input_arg.add_argument(
-        "-b",
-        "--contig2bin-tables",
-        nargs="+",
-        action=UniqueStore,
-        type=lambda x: is_valid_file(parser, x),
-        help="List of contig2bin tables with two columns separated "
-        "by a tabulation: contig, bin.",
-    )
-
-    input_group.add_argument(
-        "-c",
-        "--contigs",
-        required=True,
-        type=lambda x: is_valid_file(parser, x),
-        help="Contigs in FASTA format.",
-    )
-
-    input_group.add_argument(
-        "-p",
-        "--proteins",
-        type=lambda x: is_valid_file(parser, x),
-        help="FASTA file of predicted proteins in Prodigal format (>contigID_geneID). "
-        "Skips the gene prediction step if provided.",
-    )
-
-    # ------------------------
-    # Output & runtime control
-    # ------------------------
-    runtime_group = parser.add_argument_group("Output and Runtime Control")
-
-    runtime_group.add_argument(
-        "-o", "--outdir", default=Path("results"), type=Path, help="Output directory."
-    )
-    runtime_group.add_argument(
-        "--prefix",
-        type=str,
-        default="binette",
-        help="Prefix to add to final bin names (e.g. '--prefix sample1_' will produce 'sample1_bin1.fa', 'sample1_bin2.fa').",
-    )
-
-    runtime_group.add_argument(
-        "-t", "--threads", default=1, type=int, help="Number of threads to use."
-    )
-
-    runtime_group.add_argument(
-        "--resume",
-        action="store_true",
-        help="Resume mode: reuse existing temporary files if possible.",
-    )
-
-    runtime_group.add_argument(
-        "-v", "--verbose", help="Increase output verbosity.", action="store_true"
-    )
-
-    runtime_group.add_argument(
-        "--debug", help="Activate debug mode.", action="store_true"
-    )
-
-    runtime_group.add_argument(
-        "--version", action="version", version=binette.__version__
-    )
-
-    # ------------------------
-    # Bin filtering & scoring
-    # ------------------------
-    filter_group = parser.add_argument_group("Bin Filtering and Scoring")
-
-    filter_group.add_argument(
-        "--min-completeness",
-        "--min_completeness",
-        default=40,
-        type=int,
-        help="Minimum completeness required for intermediate bin creation and final bin selection.",
-    )
-
-    filter_group.add_argument(
-        "--max-contamination",
-        "--max_contamination",
-        default=10,
-        type=int,
-        help="Maximum contamination allowed for intermediate bin creation and final bin selection.",
-    )
-
-    filter_group.add_argument(
-        "--min-length",
-        default=200_000,
-        type=int,
-        help="Minimum length (bp) required for intermediate bin creation and final bin selection.",
-    )
-
-    filter_group.add_argument(
-        "--max-length",
-        default=10_000_000,
-        type=int,
-        help="Maximum length (bp) allowed for intermediate bin creation and final bin selection.",
-    )
-
-    filter_group.add_argument(
-        "-w",
-        "--contamination-weight",
-        "--contamination_weight",
-        default=2,
-        type=float,
-        help="Bins are scored as: completeness - weight * contamination. "
-        "A lower weight favors completeness over low contamination.",
-    )
-
-    # ------------------------
-    # Advanced options
-    # ------------------------
-    advanced_group = parser.add_argument_group("Advanced Options")
-
-    advanced_group.add_argument(
-        "-e",
-        "--fasta-extensions",
-        "--fasta_extensions",
-        nargs="+",
-        default={".fasta", ".fa", ".fna"},
-        type=str,
-        help="FASTA file extensions to search for in bin directories (used with --bin-dirs).",
-    )
-
-    advanced_group.add_argument(
-        "--checkm2-db",
-        "--checkm2_db",
-        type=Path,
-        help="Path to CheckM2 diamond database. "
-        "By default the database set via <checkm2 database> is used.",
-    )
-
-    advanced_group.add_argument(
-        "--low-mem", help="Enable low-memory mode for Diamond.", action="store_true"
-    )
-
-    return parser.parse_args(args)
+# Create the Typer app with no args help enabled and rich formatting
+app = typer.Typer(
+    name="binette",
+    help=f"Binette: binning refinement tool to constructs high quality MAGs. Version: {binette.__version__}",
+    add_completion=False,
+    context_settings={"help_option_names": ["-h", "--help"]},
+    rich_markup_mode="rich",
+)
 
 
 def parse_input_files(
@@ -494,14 +361,198 @@ def log_selected_bin_info(
     )
 
 
-def main():
-    "Orchestrate the execution of the program"
+@app.command(
+    help=f"Binette {binette.__version__}: fast and accurate binning refinement tool to constructs high quality MAGs from the output of multiple binning tools.",
+    no_args_is_help=True,
+)
+def main(
+    # Input arguments - Mutually exclusive group (handled in code)
+    bin_dirs: Annotated[
+        Optional[List[Path]],
+        typer.Option(
+            "--bin-dirs",
+            "-d",
+            help="List of bin folders containing each bin in a fasta file.",
+            # callback=lambda x: [is_valid_file(str(p)) for p in x] if x else None,
+            exists=True,
+            rich_help_panel="Input Arguments",
+        ),
+    ] = None,
+    contig2bin_tables: Annotated[
+        Optional[List[Path]],
+        typer.Option(
+            "--contig2bin-tables",
+            "-b",
+            help="List of contig2bin tables with two columns: contig, bin.",
+            exists=True,
+            rich_help_panel="Input Arguments",
+        ),
+    ] = None,
+    contigs: Annotated[
+        Path,
+        typer.Option(
+            "--contigs",
+            "-c",
+            help="Contigs in FASTA format.",
+            exists=True,
+            rich_help_panel="Input Arguments",
+        ),
+    ] = ...,  # Required
+    proteins: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--proteins",
+            "-p",
+            help="FASTA file of predicted proteins in Prodigal format (>contigID_geneID). Skips the gene prediction step if provided.",
+            exists=True,
+            rich_help_panel="Input Arguments",
+        ),
+    ] = None,
+    # Output & runtime control
+    outdir: Annotated[
+        Path,
+        typer.Option(
+            "--outdir",
+            "-o",
+            help="Output directory.",
+            rich_help_panel="Output and Runtime Control",
+        ),
+    ] = Path("results"),
+    prefix: Annotated[
+        str,
+        typer.Option(
+            "--prefix",
+            help="Prefix to add to final bin names (e.g. '--prefix sample1' will produce 'sample1_bin1.fa', 'sample1_bin2.fa').",
+            rich_help_panel="Output and Runtime Control",
+        ),
+    ] = "binette",
+    threads: Annotated[
+        int,
+        typer.Option(
+            "--threads",
+            "-t",
+            help="Number of threads to use.",
+            rich_help_panel="Output and Runtime Control",
+        ),
+    ] = 1,
+    verbose: Annotated[
+        bool,
+        typer.Option(
+            "--verbose",
+            "-v",
+            help="Enable verbose logging.",
+            callback=verbose_callback,
+            rich_help_panel="Output and Runtime Control",
+        ),
+    ] = False,
+    debug: Annotated[
+        bool,
+        typer.Option(
+            help="Activate debug mode.",
+            rich_help_panel="Output and Runtime Control",
+        ),
+    ] = False,
+    # Bin filtering & scoring
+    min_completeness: Annotated[
+        int,
+        typer.Option(
+            "--min-completeness",
+            help="Minimum completeness required for intermediate bin creation and final bin selection.",
+            rich_help_panel="Bin Filtering and Scoring",
+        ),
+    ] = 40,
+    max_contamination: Annotated[
+        int,
+        typer.Option(
+            "--max-contamination",
+            help="Maximum contamination allowed for intermediate bin creation and final bin selection.",
+            rich_help_panel="Bin Filtering and Scoring",
+        ),
+    ] = 10,
+    min_length: Annotated[
+        int,
+        typer.Option(
+            "--min-length",
+            help="Minimum length (bp) required for intermediate bin creation and final bin selection.",
+            rich_help_panel="Bin Filtering and Scoring",
+        ),
+    ] = 200_000,
+    max_length: Annotated[
+        int,
+        typer.Option(
+            "--max-length",
+            help="Maximum length (bp) allowed for intermediate bin creation and final bin selection.",
+            rich_help_panel="Bin Filtering and Scoring",
+        ),
+    ] = 10_000_000,
+    contamination_weight: Annotated[
+        float,
+        typer.Option(
+            "--contamination-weight",
+            "-w",
+            help="Bins are scored as: completeness - weight * contamination. A lower weight favors completeness over low contamination.",
+            rich_help_panel="Bin Filtering and Scoring",
+        ),
+    ] = 2.0,
+    # Advanced options
+    fasta_extensions: Annotated[
+        List[str],
+        typer.Option(
+            "--fasta-extensions",
+            "-e",
+            help="FASTA file extensions to search for in bin directories (used with --bin-dirs).",
+            rich_help_panel="Advanced Options",
+        ),
+    ] = [".fasta", ".fa", ".fna"],
+    checkm2_db: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--checkm2-db",
+            help="Path to CheckM2 diamond database. By default the database set via <checkm2 database> is used.",
+            rich_help_panel="Advanced Options",
+        ),
+    ] = None,
+    low_mem: Annotated[
+        bool,
+        typer.Option(
+            "--low-mem",
+            help="Enable low-memory mode for Diamond.",
+            rich_help_panel="Advanced Options",
+        ),
+    ] = False,
+    resume: Annotated[
+        bool,
+        typer.Option(
+            help="Resume mode: reuse existing temporary files if possible.",
+            rich_help_panel="Advanced Options",
+        ),
+    ] = False,
+    version: Annotated[
+        bool,
+        typer.Option(
+            "--version",
+            help="Show version and exit.",
+            callback=version_callback,
+        ),
+    ] = None,
+    progress: Annotated[
+        bool,
+        typer.Option(
+            help="Show progress bar while fetching pangenomes (disable with --no-progress).",
+            rich_help_panel="Output and Runtime Control",
+        ),
+    ] = True,
+) -> int:
+    """Orchestrate the execution of the program"""
 
-    args = parse_arguments(
-        sys.argv[1:]
-    )  # sys.argv is passed in order to be able to test the function parse_arguments
-
-    init_logging(args.verbose, args.debug)
+    # Validate that exactly one of bin_dirs or contig2bin_tables is provided
+    if (bin_dirs is None and contig2bin_tables is None) or (
+        bin_dirs is not None and contig2bin_tables is not None
+    ):
+        typer.echo(
+            "Error: Either --bin-dirs or --contig2bin-tables must be provided, but not both."
+        )
+        raise typer.Exit(code=1)
 
     # High quality threshold used just to log number of high quality bins.
     hq_max_conta = 5
@@ -510,7 +561,7 @@ def main():
     write_final_fasta_bins = True
 
     # Temporary files #
-    out_tmp_dir: Path = args.outdir / "temporary_files"
+    out_tmp_dir: Path = outdir / "temporary_files"
     os.makedirs(out_tmp_dir, exist_ok=True)
 
     use_existing_protein_file = False
@@ -520,10 +571,10 @@ def main():
     diamond_result_file = out_tmp_dir / "diamond_result.tsv.gz"
 
     # Output files #
-    final_bin_report: Path = args.outdir / "final_bins_quality_reports.tsv"
-    original_bin_report_dir: Path = args.outdir / "input_bins_quality_reports"
+    final_bin_report: Path = outdir / "final_bins_quality_reports.tsv"
+    original_bin_report_dir: Path = outdir / "input_bins_quality_reports"
 
-    if args.resume:
+    if resume:
         io.check_resume_file(faa_file, diamond_result_file)
         use_existing_protein_file = True
 
@@ -533,40 +584,40 @@ def main():
         contig_to_length,
         contig_to_index,
     ) = parse_input_files(
-        args.bin_dirs,
-        args.contig2bin_tables,
-        args.contigs,
-        fasta_extensions=set(args.fasta_extensions),
+        bin_dirs,
+        contig2bin_tables,
+        contigs,
+        fasta_extensions=set(fasta_extensions),
     )
 
-    if args.debug:
-        index_to_contig_file = args.outdir / "index_to_contig.tsv"
+    if debug:
+        index_to_contig_file = outdir / "index_to_contig.tsv"
         logging.info(f"Writing index to contig mapping in {index_to_contig_file}")
         with open(index_to_contig_file, "w") as flout:
             flout.write("\n".join((f"{i}\t{c}" for i, c in enumerate(contigs_in_bins))))
 
     original_bins = list(contig_key_to_original_bin.values())
 
-    if args.proteins and not args.resume:
-        logging.info(f"Using the provided protein sequences file: {args.proteins}")
+    if proteins and not resume:
+        logging.info(f"Using the provided protein sequences file: {proteins}")
         use_existing_protein_file = True
 
         cds.filter_faa_file(
             contigs_in_bins,
-            input_faa_file=args.proteins,
+            input_faa_file=proteins,
             filtered_faa_file=faa_file,
         )
 
     contig_name_to_kegg_counter, contig_name_to_genes = manage_protein_alignement(
         faa_file=faa_file,
-        contigs_fasta=args.contigs,
+        contigs_fasta=contigs,
         contigs_in_bins=contigs_in_bins,
         diamond_result_file=diamond_result_file,
-        checkm2_db=args.checkm2_db,
-        threads=args.threads,
+        checkm2_db=checkm2_db,
+        threads=threads,
         use_existing_protein_file=use_existing_protein_file,
-        resume_diamond=args.resume,
-        low_mem=args.low_mem,
+        resume_diamond=resume,
+        low_mem=low_mem,
     )
 
     contig_to_kegg_counter = contig_manager.apply_contig_index(
@@ -578,14 +629,14 @@ def main():
 
     # Extract cds metadata ##
     logging.info("Compute cds metadata.")
-    contig_metadat = cds.get_contig_cds_metadata(contig_to_genes, args.threads)
+    contig_metadat = cds.get_contig_cds_metadata(contig_to_genes, threads)
 
     contig_metadat["contig_to_kegg_counter"] = contig_to_kegg_counter
     contig_metadat["contig_to_length"] = contig_to_length
 
     logging.info("Add size and assess quality of input bins")
     bin_quality.add_bin_metrics(
-        original_bins, contig_metadat, args.contamination_weight, args.threads
+        original_bins, contig_metadat, contamination_weight, threads
     )
     bin_quality.add_bin_size_and_N50(original_bins, contig_to_length)
 
@@ -601,10 +652,10 @@ def main():
     contig_key_to_new_bin = bin_manager.create_intermediate_bins(
         contig_key_to_original_bin,
         contig_lengths=contig_lengths,
-        min_comp=args.min_completeness,
-        max_conta=args.max_contamination,
-        min_len=args.min_length,
-        max_len=args.max_length,
+        min_comp=min_completeness,
+        max_conta=max_contamination,
+        min_len=min_length,
+        max_len=max_length,
     )
 
     logging.info(f"Assess quality for {len(contig_key_to_new_bin)} intermediate bins.")
@@ -612,16 +663,16 @@ def main():
     bin_quality.add_bin_metrics(
         bins=contig_key_to_new_bin.values(),
         contig_info=contig_metadat,
-        contamination_weight=args.contamination_weight,
-        threads=args.threads,
+        contamination_weight=contamination_weight,
+        threads=threads,
     )
 
     contig_key_to_all_bin = contig_key_to_original_bin | contig_key_to_new_bin
 
     bin_quality.add_bin_size_and_N50(contig_key_to_all_bin.values(), contig_to_length)
 
-    if args.debug:
-        all_bin_compo_file = args.outdir / "all_bins_quality_reports.tsv"
+    if debug:
+        all_bin_compo_file = outdir / "all_bins_quality_reports.tsv"
         logging.info(f"Writing all bins in {all_bin_compo_file}")
         io.write_bin_info(
             contig_key_to_all_bin.values(), all_bin_compo_file, add_contigs=True
@@ -629,9 +680,9 @@ def main():
 
     selected_bins = bin_manager.select_best_bins(
         contig_key_to_all_bin,
-        min_completeness=args.min_completeness,
-        max_contamination=args.max_contamination,
-        prefix=args.prefix,
+        min_completeness=min_completeness,
+        max_contamination=max_contamination,
+        prefix=prefix,
     )
 
     logging.info(f"Writing selected bins in {final_bin_report}")
@@ -640,11 +691,18 @@ def main():
     if write_final_fasta_bins:
         io.write_bins_fasta(
             selected_bins,
-            args.contigs,
-            outdir=args.outdir / "final_bins",
+            contigs,
+            outdir=outdir / "final_bins",
             contigs_names=contigs_in_bins,
         )
 
     log_selected_bin_info(selected_bins, hq_min_completeness, hq_max_conta)
 
     return 0
+
+
+def main_main():
+    """Main function to run the application."""
+    preprocess_args()
+
+    app()
