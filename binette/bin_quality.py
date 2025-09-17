@@ -12,6 +12,7 @@ from collections import defaultdict
 from rich.progress import Progress
 
 
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from binette.bin_manager import Bin
 from checkm2 import keggData
 
@@ -339,8 +340,13 @@ def add_bin_metrics(
     contig_to_aa_counter = contig_info["contig_to_aa_counter"]
     contig_to_aa_length = contig_info["contig_to_aa_length"]
 
+    parallel_chunks = threads
+    model_threads = 1
     logging.info(f"Assessing bin quality for {len(bins)} bins.")
-    assess_bins_quality_by_chunk(
+    logging.debug(
+        f"Using chunk size of {chunk_size} and parallel chunks of {parallel_chunks}."
+    )
+    bins = assess_bins_quality_by_chunk(
         bins,
         contig_to_kegg_counter,
         contig_to_cds_count,
@@ -349,8 +355,11 @@ def add_bin_metrics(
         contamination_weight,
         postProcessor,
         chunk_size=chunk_size,
+        parallel_chunks=threads,
+        threads=model_threads,
         disable_progress_bar=disable_progress_bar,
     )
+
     return bins
 
 
@@ -366,7 +375,104 @@ def chunks(iterable: Iterable, size: int) -> Iterator[Tuple]:
     return iter(lambda: tuple(islice(it, size)), ())
 
 
+def _process_chunk(
+    chunk_bins,
+    contig_to_kegg_counter,
+    contig_to_cds_count,
+    contig_to_aa_counter,
+    contig_to_aa_length,
+    contamination_weight,
+    threads,
+):
+    """
+    Worker function for processing a chunk of bins.
+    Each worker creates its own modelProcessor instance.
+    """
+    # We do NOT pass postProcessor here to avoid cross-process object sharing
+    return assess_bins_quality(
+        bins=chunk_bins,
+        contig_to_kegg_counter=contig_to_kegg_counter,
+        contig_to_cds_count=contig_to_cds_count,
+        contig_to_aa_counter=contig_to_aa_counter,
+        contig_to_aa_length=contig_to_aa_length,
+        contamination_weight=contamination_weight,
+        postProcessor=None,
+        threads=threads,
+    )
+
+
 def assess_bins_quality_by_chunk(
+    bins,
+    contig_to_kegg_counter,
+    contig_to_cds_count,
+    contig_to_aa_counter,
+    contig_to_aa_length,
+    contamination_weight,
+    postProcessor=None,
+    threads: int = 1,
+    chunk_size: int = 2500,
+    parallel_chunks: int = 1,
+    disable_progress_bar: bool = False,
+):
+    bins = list(bins)
+    chunks_list = [chunk for chunk in chunks(bins, chunk_size)]
+
+    logging.info(
+        f"Assessing quality of {len(bins)} bins in {len(chunks_list)} chunks "
+        f"(parallel_chunks={parallel_chunks}, threads={threads})"
+    )
+
+    bins_scored = []
+
+    # Cap parallel_chunks to number of chunks
+    parallel_chunks = min(parallel_chunks, len(chunks_list))
+
+    with Progress(disable=disable_progress_bar) as progress:
+        task = progress.add_task("Assessing bin quality", total=len(bins))
+
+        if parallel_chunks > 1:
+            # Multiprocessing mode
+            with ProcessPoolExecutor(max_workers=parallel_chunks) as executor:
+                futures = {
+                    executor.submit(
+                        _process_chunk,
+                        chunk_bins,
+                        contig_to_kegg_counter,
+                        contig_to_cds_count,
+                        contig_to_aa_counter,
+                        contig_to_aa_length,
+                        contamination_weight,
+                        threads,
+                    ): chunk_bins
+                    for chunk_bins in chunks_list
+                }
+
+                for future in as_completed(futures):
+                    chunk_bins_scored = future.result()
+                    bins_scored.extend(chunk_bins_scored)
+                    progress.update(task, advance=len(chunk_bins_scored))
+
+        else:
+            # Sequential mode
+            for i, chunk_bins in enumerate(chunks_list):
+                logging.debug(f"chunk {i}: assessing quality of {len(chunk_bins)} bins")
+                chunk_bins_scored = assess_bins_quality(
+                    bins=chunk_bins,
+                    contig_to_kegg_counter=contig_to_kegg_counter,
+                    contig_to_cds_count=contig_to_cds_count,
+                    contig_to_aa_counter=contig_to_aa_counter,
+                    contig_to_aa_length=contig_to_aa_length,
+                    contamination_weight=contamination_weight,
+                    postProcessor=postProcessor,
+                    threads=threads,
+                )
+                bins_scored.extend(chunk_bins_scored)
+                progress.update(task, advance=len(chunk_bins_scored))
+
+    return bins_scored
+
+
+def assess_bins_quality_by_chunk_old(
     bins: Iterable[Bin],
     contig_to_kegg_counter: Dict,
     contig_to_cds_count: Dict,
