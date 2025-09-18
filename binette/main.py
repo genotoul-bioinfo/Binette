@@ -675,6 +675,7 @@ def run_binette(
         contamination_weight=contamination_weight,
         threads=threads,
         disable_progress_bar=not progress,
+        chunk_size=20000,
     )
     contig_key_to_new_bin = {b.contigs_key: b for b in new_bins}
 

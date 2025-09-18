@@ -8,12 +8,10 @@ from typing import Dict, Iterable, Tuple, Iterator, List
 import numpy as np
 import pandas as pd
 from binette.bin_manager import Bin
-from collections import defaultdict
 from rich.progress import Progress
 
 
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from binette.bin_manager import Bin
 from checkm2 import keggData
 
 # Suppress unnecessary TensorFlow warnings
