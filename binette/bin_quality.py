@@ -24,12 +24,47 @@ logging.getLogger("tensorflow").setLevel(logging.FATAL)
 # These will only be imported when explicitly called
 _modelPostprocessing = None
 _modelProcessing = None
+_keras_initialized = False
+
+
+def _initialize_keras_environment():
+    """Initialize TensorFlow/Keras to ensure thread safety and memory management"""
+    global _keras_initialized
+    if not _keras_initialized:
+        # This helps avoid memory leaks and threading issues
+        import os
+
+        os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"  # Suppress TF warnings
+
+        try:
+            # Only import keras-related modules when needed
+            import tensorflow as tf
+
+            # Set memory growth to avoid OOM errors
+            gpus = tf.config.experimental.list_physical_devices("GPU")
+            if gpus:
+                for gpu in gpus:
+                    tf.config.experimental.set_memory_growth(gpu, True)
+
+            # Use a single thread for predictions to avoid thread contention
+            tf.config.threading.set_intra_op_parallelism_threads(1)
+            tf.config.threading.set_inter_op_parallelism_threads(1)
+
+            _keras_initialized = True
+            logging.debug("TensorFlow/Keras environment initialized")
+        except Exception as e:
+            logging.warning(
+                f"Failed to fully initialize TensorFlow environment: {str(e)}"
+            )
 
 
 def get_modelPostprocessing():
     """Lazy load modelPostprocessing module only when needed"""
     global _modelPostprocessing
     if _modelPostprocessing is None:
+        # Initialize Keras environment
+        _initialize_keras_environment()
+
         # Only import keras when absolutely needed
         from checkm2 import modelPostprocessing
 
@@ -41,6 +76,9 @@ def get_modelProcessing():
     """Lazy load modelProcessing module only when needed"""
     global _modelProcessing
     if _modelProcessing is None:
+        # Initialize Keras environment
+        _initialize_keras_environment()
+
         # Only import keras when absolutely needed
         from checkm2 import modelProcessing
 
@@ -326,26 +364,48 @@ def add_bin_metrics(
     :param bins: Set of bin objects.
     :param contig_info: Dictionary containing contig information.
     :param contamination_weight: Weight for contamination assessment.
-    :param threads: Number of threads for parallel processing (default is 1).
+    :param threads: Number of threads/processes for parallel processing (default is 1).
     :param chunk_size: Number of bins to process in each chunk (default is 5000).
     :param disable_progress_bar: Disable the progress bar if True.
 
     :return: List of processed bin objects.
     """
-    modelPostprocessing = get_modelPostprocessing()
-    postProcessor = modelPostprocessing.modelProcessor(threads)
+    if not bins:
+        logging.warning("No bins provided for quality assessment")
+        return []
 
+    logging.info(f"Assessing bin quality for {len(bins)} bins using {threads} threads.")
+
+    # Initialize in the main process
+    modelPostprocessing = get_modelPostprocessing()
+    postProcessor = modelPostprocessing.modelProcessor(
+        1
+    )  # Use 1 thread for main process
+
+    # Extract data from contig_info
     contig_to_kegg_counter = contig_info["contig_to_kegg_counter"]
     contig_to_cds_count = contig_info["contig_to_cds_count"]
     contig_to_aa_counter = contig_info["contig_to_aa_counter"]
     contig_to_aa_length = contig_info["contig_to_aa_length"]
 
-    parallel_chunks = threads
+    # Configure parallel execution
+    # If threads=1, use sequential processing
+    # Otherwise, use parallel processing with threads-1 processes
+    # and 1 thread per worker process
+    parallel_chunks = max(1, threads - 1) if threads > 1 else 0
     model_threads = 1
-    logging.info(f"Assessing bin quality for {len(bins)} bins.")
+
+    # Adjust chunk size based on number of bins and processes
+    if len(bins) < chunk_size and parallel_chunks > 1:
+        # If we have fewer bins than chunk size, reduce chunk size to distribute work
+        adjusted_chunk_size = max(1, len(bins) // parallel_chunks)
+        chunk_size = min(chunk_size, adjusted_chunk_size)
+
     logging.debug(
         f"Using chunk size of {chunk_size} and parallel chunks of {parallel_chunks}."
     )
+
+    # Process bins in chunks
     bins = assess_bins_quality_by_chunk(
         bins,
         contig_to_kegg_counter,
@@ -355,7 +415,7 @@ def add_bin_metrics(
         contamination_weight,
         postProcessor,
         chunk_size=chunk_size,
-        parallel_chunks=threads,
+        parallel_chunks=parallel_chunks,
         threads=model_threads,
         disable_progress_bar=disable_progress_bar,
     )
@@ -387,18 +447,41 @@ def _process_chunk(
     """
     Worker function for processing a chunk of bins.
     Each worker creates its own modelProcessor instance.
+
+    This function runs in a separate process, so we need to ensure all
+    objects can be properly pickled/unpickled.
     """
-    # We do NOT pass postProcessor here to avoid cross-process object sharing
-    return assess_bins_quality(
-        bins=chunk_bins,
-        contig_to_kegg_counter=contig_to_kegg_counter,
-        contig_to_cds_count=contig_to_cds_count,
-        contig_to_aa_counter=contig_to_aa_counter,
-        contig_to_aa_length=contig_to_aa_length,
-        contamination_weight=contamination_weight,
-        postProcessor=None,
-        threads=threads,
-    )
+    # Initialize logging in subprocess to avoid sharing logging handlers
+    logging.basicConfig(level=logging.INFO)
+
+    try:
+        # We explicitly create our own postProcessor here rather than sharing
+        modelPostprocessing = get_modelPostprocessing()
+        local_postProcessor = modelPostprocessing.modelProcessor(threads)
+
+        # Process the bins
+        result = assess_bins_quality(
+            bins=chunk_bins,
+            contig_to_kegg_counter=contig_to_kegg_counter,
+            contig_to_cds_count=contig_to_cds_count,
+            contig_to_aa_counter=contig_to_aa_counter,
+            contig_to_aa_length=contig_to_aa_length,
+            contamination_weight=contamination_weight,
+            postProcessor=local_postProcessor,
+            threads=threads,
+        )
+
+        # Clean up to help with memory management
+        import gc
+
+        del local_postProcessor
+        gc.collect()
+
+        return result
+    except Exception as e:
+        logging.error(f"Error in worker process: {str(e)}")
+        # Return empty list if processing failed
+        return []
 
 
 def assess_bins_quality_by_chunk(
@@ -414,8 +497,15 @@ def assess_bins_quality_by_chunk(
     parallel_chunks: int = 1,
     disable_progress_bar: bool = False,
 ):
+    """
+    Assess bins quality in chunks, optionally using multiple processes.
+
+    This function can process chunks sequentially or in parallel using ProcessPoolExecutor.
+
+    :return: List of processed bin objects with quality metrics added.
+    """
     bins = list(bins)
-    chunks_list = [chunk for chunk in chunks(bins, chunk_size)]
+    chunks_list = list(chunks(bins, chunk_size))
 
     logging.info(
         f"Assessing quality of {len(bins)} bins in {len(chunks_list)} chunks "
@@ -423,6 +513,11 @@ def assess_bins_quality_by_chunk(
     )
 
     bins_scored = []
+
+    # Handle empty bins list
+    if not bins:
+        logging.warning("No bins to process")
+        return bins_scored
 
     # Cap parallel_chunks to number of chunks
     parallel_chunks = min(parallel_chunks, len(chunks_list))
@@ -432,27 +527,49 @@ def assess_bins_quality_by_chunk(
 
         if parallel_chunks > 1:
             # Multiprocessing mode
-            with ProcessPoolExecutor(max_workers=parallel_chunks) as executor:
-                futures = {
-                    executor.submit(
-                        _process_chunk,
-                        chunk_bins,
-                        contig_to_kegg_counter,
-                        contig_to_cds_count,
-                        contig_to_aa_counter,
-                        contig_to_aa_length,
-                        contamination_weight,
-                        threads,
-                    ): chunk_bins
-                    for chunk_bins in chunks_list
-                }
+            try:
+                logging.debug(
+                    f"Starting multiprocessing with {parallel_chunks} workers"
+                )
+                with ProcessPoolExecutor(max_workers=parallel_chunks) as executor:
+                    # Submit all jobs first
+                    futures = []
+                    for chunk_bins in chunks_list:
+                        futures.append(
+                            executor.submit(
+                                _process_chunk,
+                                chunk_bins,
+                                contig_to_kegg_counter,
+                                contig_to_cds_count,
+                                contig_to_aa_counter,
+                                contig_to_aa_length,
+                                contamination_weight,
+                                threads,
+                            )
+                        )
 
-                for future in as_completed(futures):
-                    chunk_bins_scored = future.result()
-                    bins_scored.extend(chunk_bins_scored)
-                    progress.update(task, advance=len(chunk_bins_scored))
+                    # Process results as they complete
+                    for future in as_completed(futures):
+                        try:
+                            chunk_bins_scored = future.result()
+                            bins_scored.extend(chunk_bins_scored)
+                            progress.update(task, advance=len(chunk_bins_scored))
+                        except Exception as e:
+                            logging.error(f"Error in worker process: {str(e)}")
+                            # Continue with other chunks if one fails
+                            continue
+            except Exception as e:
+                logging.error(
+                    f"Multiprocessing failed: {str(e)}. Falling back to sequential mode."
+                )
+                # Reset progress
+                progress.update(task, completed=0)
+                bins_scored = []
+                # Fall back to sequential mode
+                parallel_chunks = 0
 
-        else:
+        # Either sequential mode was requested or multiprocessing failed
+        if parallel_chunks <= 1:
             # Sequential mode
             for i, chunk_bins in enumerate(chunks_list):
                 logging.debug(f"chunk {i}: assessing quality of {len(chunk_bins)} bins")
