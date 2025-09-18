@@ -11,8 +11,8 @@ from binette.bin_manager import Bin
 from rich.progress import Progress
 
 
-from concurrent.futures import ProcessPoolExecutor, as_completed
 from checkm2 import keggData
+import joblib
 
 # Suppress unnecessary TensorFlow warnings
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
@@ -362,23 +362,23 @@ def add_bin_metrics(
     :param bins: Set of bin objects.
     :param contig_info: Dictionary containing contig information.
     :param contamination_weight: Weight for contamination assessment.
-    :param threads: Number of threads/processes for parallel processing (default is 1).
+    :param threads: Number of threads for parallel processing (default is 1).
+                    If threads=1, all processing happens sequentially using one thread.
+                    If threads>1, processing is parallelized across multiple processes 
+                    with threads distributed across workers.
     :param chunk_size: Number of bins to process in each chunk (default is 5000).
     :param disable_progress_bar: Disable the progress bar if True.
 
-    :return: List of processed bin objects.
+    :return: List of processed bin objects with quality metrics added.
     """
     if not bins:
         logging.warning("No bins provided for quality assessment")
         return []
 
-    logging.info(f"Assessing bin quality for {len(bins)} bins using {threads} threads.")
-
-    # Initialize in the main process
-    modelPostprocessing = get_modelPostprocessing()
-    postProcessor = modelPostprocessing.modelProcessor(
-        1
-    )  # Use 1 thread for main process
+    bins_list = list(bins)
+    logging.info(
+        f"Assessing bin quality for {len(bins_list)} bins using {threads} threads."
+    )
 
     # Extract data from contig_info
     contig_to_kegg_counter = contig_info["contig_to_kegg_counter"]
@@ -386,39 +386,76 @@ def add_bin_metrics(
     contig_to_aa_counter = contig_info["contig_to_aa_counter"]
     contig_to_aa_length = contig_info["contig_to_aa_length"]
 
-    # Configure parallel execution
-    # If threads=1, use sequential processing
-    # Otherwise, use parallel processing with threads-1 processes
-    # and 1 thread per worker process
-    parallel_chunks = max(1, threads - 1) if threads > 1 else 0
-    model_threads = 1
+    # Simple sequential processing if only 1 thread or few bins
+    if threads == 1 or len(bins_list) <= 1:
+        # Initialize in the main process
+        modelPostprocessing = get_modelPostprocessing()
+        postProcessor = modelPostprocessing.modelProcessor(threads)  # Use all threads
 
-    # Adjust chunk size based on number of bins and processes
-    if len(bins) < chunk_size and parallel_chunks > 1:
-        # If we have fewer bins than chunk size, reduce chunk size to distribute work
-        adjusted_chunk_size = max(1, len(bins) // parallel_chunks)
-        chunk_size = min(chunk_size, adjusted_chunk_size)
+        # Process all bins at once with sequential processing
+        return assess_bins_quality(
+            bins=bins_list,
+            contig_to_kegg_counter=contig_to_kegg_counter,
+            contig_to_cds_count=contig_to_cds_count,
+            contig_to_aa_counter=contig_to_aa_counter,
+            contig_to_aa_length=contig_to_aa_length,
+            contamination_weight=contamination_weight,
+            postProcessor=postProcessor,
+            threads=threads,  # Use all available threads in sequential mode
+        )
+    else:
+        # For parallel processing, use joblib
 
-    logging.debug(
-        f"Using chunk size of {chunk_size} and parallel chunks of {parallel_chunks}."
-    )
+        # Split bins into chunks for better parallelism
+        chunks_list = list(chunks(bins_list, chunk_size))
+        n_chunks = len(chunks_list)
+        n_jobs = min(threads, n_chunks)
 
-    # Process bins in chunks
-    bins = assess_bins_quality_by_chunk(
-        bins,
-        contig_to_kegg_counter,
-        contig_to_cds_count,
-        contig_to_aa_counter,
-        contig_to_aa_length,
-        contamination_weight,
-        postProcessor,
-        chunk_size=chunk_size,
-        parallel_chunks=parallel_chunks,
-        threads=model_threads,
-        disable_progress_bar=disable_progress_bar,
-    )
+        logging.info(
+            f"Using {n_jobs} parallel jobs to process {n_chunks} chunks of bins"
+        )
 
-    return bins
+        # Define a simple function to process a chunk
+        def process_chunk(chunk_bins):
+            # Initialize TensorFlow/Keras environment for this subprocess
+            _initialize_keras_environment()
+            
+            # Determine optimal thread count for this worker
+            # For best efficiency, we allocate a portion of total threads to each worker
+            # Math.ceil(total_threads / n_jobs) would be most aggressive
+            # But we use 1 thread per worker as the default to avoid oversubscription
+            worker_threads = max(1, threads // (2 * n_jobs))  # Conservative thread allocation
+            
+            # Create local processor instance
+            modelPostprocessing = get_modelPostprocessing()
+            local_postProcessor = modelPostprocessing.modelProcessor(worker_threads)
+            
+            # Process bins
+            return assess_bins_quality(
+                bins=chunk_bins,
+                contig_to_kegg_counter=contig_to_kegg_counter,
+                contig_to_cds_count=contig_to_cds_count,
+                contig_to_aa_counter=contig_to_aa_counter,
+                contig_to_aa_length=contig_to_aa_length,
+                contamination_weight=contamination_weight,
+                postProcessor=local_postProcessor,
+                threads=worker_threads,  # Use allocated threads in each worker
+            )        # Process chunks in parallel using joblib
+        with Progress(disable=disable_progress_bar) as progress:
+            task = progress.add_task("Assessing bin quality", total=len(bins_list))
+
+            # Use joblib for parallelization - it handles many complexities automatically
+            results = joblib.Parallel(n_jobs=n_jobs, verbose=0)(
+                joblib.delayed(process_chunk)(chunk) for chunk in chunks_list
+            )
+
+            # Combine results
+            all_bins = []
+            for chunk_result in results:
+                all_bins.extend(chunk_result)
+                progress.update(task, advance=len(chunk_result))
+
+            return all_bins
 
 
 def chunks(iterable: Iterable, size: int) -> Iterator[Tuple]:
@@ -431,206 +468,6 @@ def chunks(iterable: Iterable, size: int) -> Iterator[Tuple]:
     """
     it = iter(iterable)
     return iter(lambda: tuple(islice(it, size)), ())
-
-
-def _process_chunk(
-    chunk_bins,
-    contig_to_kegg_counter,
-    contig_to_cds_count,
-    contig_to_aa_counter,
-    contig_to_aa_length,
-    contamination_weight,
-    threads,
-):
-    """
-    Worker function for processing a chunk of bins.
-    Each worker creates its own modelProcessor instance.
-
-    This function runs in a separate process, so we need to ensure all
-    objects can be properly pickled/unpickled.
-    """
-    # Initialize logging in subprocess to avoid sharing logging handlers
-    logging.basicConfig(level=logging.INFO)
-
-    try:
-        # We explicitly create our own postProcessor here rather than sharing
-        modelPostprocessing = get_modelPostprocessing()
-        local_postProcessor = modelPostprocessing.modelProcessor(threads)
-
-        # Process the bins
-        result = assess_bins_quality(
-            bins=chunk_bins,
-            contig_to_kegg_counter=contig_to_kegg_counter,
-            contig_to_cds_count=contig_to_cds_count,
-            contig_to_aa_counter=contig_to_aa_counter,
-            contig_to_aa_length=contig_to_aa_length,
-            contamination_weight=contamination_weight,
-            postProcessor=local_postProcessor,
-            threads=threads,
-        )
-
-        # Clean up to help with memory management
-        import gc
-
-        del local_postProcessor
-        gc.collect()
-
-        return result
-    except Exception as e:
-        logging.error(f"Error in worker process: {str(e)}")
-        # Return empty list if processing failed
-        return []
-
-
-def assess_bins_quality_by_chunk(
-    bins,
-    contig_to_kegg_counter,
-    contig_to_cds_count,
-    contig_to_aa_counter,
-    contig_to_aa_length,
-    contamination_weight,
-    postProcessor=None,
-    threads: int = 1,
-    chunk_size: int = 2500,
-    parallel_chunks: int = 1,
-    disable_progress_bar: bool = False,
-):
-    """
-    Assess bins quality in chunks, optionally using multiple processes.
-
-    This function can process chunks sequentially or in parallel using ProcessPoolExecutor.
-
-    :return: List of processed bin objects with quality metrics added.
-    """
-    bins = list(bins)
-    chunks_list = list(chunks(bins, chunk_size))
-
-    logging.info(
-        f"Assessing quality of {len(bins)} bins in {len(chunks_list)} chunks "
-        f"(parallel_chunks={parallel_chunks}, threads={threads})"
-    )
-
-    bins_scored = []
-
-    # Handle empty bins list
-    if not bins:
-        logging.warning("No bins to process")
-        return bins_scored
-
-    # Cap parallel_chunks to number of chunks
-    parallel_chunks = min(parallel_chunks, len(chunks_list))
-
-    with Progress(disable=disable_progress_bar) as progress:
-        task = progress.add_task("Assessing bin quality", total=len(bins))
-
-        if parallel_chunks > 1:
-            # Multiprocessing mode
-            try:
-                logging.debug(
-                    f"Starting multiprocessing with {parallel_chunks} workers"
-                )
-                with ProcessPoolExecutor(max_workers=parallel_chunks) as executor:
-                    # Submit all jobs first
-                    futures = []
-                    for chunk_bins in chunks_list:
-                        futures.append(
-                            executor.submit(
-                                _process_chunk,
-                                chunk_bins,
-                                contig_to_kegg_counter,
-                                contig_to_cds_count,
-                                contig_to_aa_counter,
-                                contig_to_aa_length,
-                                contamination_weight,
-                                threads,
-                            )
-                        )
-
-                    # Process results as they complete
-                    for future in as_completed(futures):
-                        try:
-                            chunk_bins_scored = future.result()
-                            bins_scored.extend(chunk_bins_scored)
-                            progress.update(task, advance=len(chunk_bins_scored))
-                        except Exception as e:
-                            logging.error(f"Error in worker process: {str(e)}")
-                            # Continue with other chunks if one fails
-                            continue
-            except Exception as e:
-                logging.error(
-                    f"Multiprocessing failed: {str(e)}. Falling back to sequential mode."
-                )
-                # Reset progress
-                progress.update(task, completed=0)
-                bins_scored = []
-                # Fall back to sequential mode
-                parallel_chunks = 0
-
-        # Either sequential mode was requested or multiprocessing failed
-        if parallel_chunks <= 1:
-            # Sequential mode
-            for i, chunk_bins in enumerate(chunks_list):
-                logging.debug(f"chunk {i}: assessing quality of {len(chunk_bins)} bins")
-                chunk_bins_scored = assess_bins_quality(
-                    bins=chunk_bins,
-                    contig_to_kegg_counter=contig_to_kegg_counter,
-                    contig_to_cds_count=contig_to_cds_count,
-                    contig_to_aa_counter=contig_to_aa_counter,
-                    contig_to_aa_length=contig_to_aa_length,
-                    contamination_weight=contamination_weight,
-                    postProcessor=postProcessor,
-                    threads=threads,
-                )
-                bins_scored.extend(chunk_bins_scored)
-                progress.update(task, advance=len(chunk_bins_scored))
-
-    return bins_scored
-
-
-def assess_bins_quality_by_chunk_old(
-    bins: Iterable[Bin],
-    contig_to_kegg_counter: Dict,
-    contig_to_cds_count: Dict,
-    contig_to_aa_counter: Dict,
-    contig_to_aa_length: Dict,
-    contamination_weight: float,
-    postProcessor=None,
-    threads: int = 1,
-    chunk_size: int = 2500,
-    disable_progress_bar=False,
-):
-    """
-    Assess the quality of bins in chunks.
-
-    This function assesses the quality of bins in chunks to improve processing efficiency.
-
-    :param bins: List of bin objects.
-    :param contig_to_kegg_counter: Dictionary mapping contig names to KEGG counters.
-    :param contig_to_cds_count: Dictionary mapping contig names to CDS counts.
-    :param contig_to_aa_counter: Dictionary mapping contig names to amino acid counters.
-    :param contig_to_aa_length: Dictionary mapping contig names to amino acid lengths.
-    :param contamination_weight: Weight for contamination assessment.
-    :param postProcessor: post-processor from checkm2
-    :param threads: Number of threads for parallel processing (default is 1).
-    :param chunk_size: The size of each chunk.
-    :param disable_progress_bar: Disable the progress bar if True.
-    """
-    with Progress(disable=disable_progress_bar) as progress:
-        task = progress.add_task("Assessing bin quality", total=len(bins))
-        for i, chunk_bins_iter in enumerate(chunks(bins, chunk_size)):
-            chunk_bins = list(chunk_bins_iter)
-            logging.debug(f"chunk {i}: assessing quality of {len(chunk_bins)} bins")
-            assess_bins_quality(
-                bins=chunk_bins,
-                contig_to_kegg_counter=contig_to_kegg_counter,
-                contig_to_cds_count=contig_to_cds_count,
-                contig_to_aa_counter=contig_to_aa_counter,
-                contig_to_aa_length=contig_to_aa_length,
-                contamination_weight=contamination_weight,
-                postProcessor=postProcessor,
-                threads=threads,
-            )
-            progress.update(task, advance=len(chunk_bins))
 
 
 def assess_bins_quality(
