@@ -30,8 +30,6 @@ def _initialize_keras_environment():
     """Initialize TensorFlow/Keras to ensure thread safety and memory management"""
     global _keras_initialized
     if not _keras_initialized:
-        # This helps avoid memory leaks and threading issues
-        import os
 
         os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"  # Suppress TF warnings
 
@@ -354,7 +352,7 @@ def add_bin_metrics(
     contig_info: Dict,
     contamination_weight: float,
     threads: int = 1,
-    checkm2_batch_size: int = 600,
+    checkm2_batch_size: int = 500,
     disable_progress_bar: bool = False,
 ):
     """
@@ -368,9 +366,8 @@ def add_bin_metrics(
                     If threads>1, processing is parallelized across multiple processes.
                     The number of parallel workers will be approximately equal to threads.
     :param checkm2_batch_size: Maximum number of bins to send to CheckM2 at once within each process
-                              to control memory usage (default is 600). This creates sub-batches
+                              to control memory usage. This creates sub-batches
                               within each worker to manage CheckM2's memory consumption.
-                              Can be overridden by BINETTE_CHECKM2_BATCH_SIZE env variable.
     :param disable_progress_bar: Disable the progress bar if True.
 
     :return: List of processed bin objects with quality metrics added.
@@ -379,20 +376,8 @@ def add_bin_metrics(
         logging.warning("No bins provided for quality assessment")
         return []
 
-    # Override checkm2_batch_size from environment variable if set
-    env_batch_size = os.environ.get("BINETTE_CHECKM2_BATCH_SIZE")
-    if env_batch_size:
-        try:
-            checkm2_batch_size = int(env_batch_size)
-            logging.info(
-                f"Using CheckM2 batch size from environment: {checkm2_batch_size}"
-            )
-        except ValueError:
-            logging.warning(
-                f"Invalid BINETTE_CHECKM2_BATCH_SIZE value: {env_batch_size}, using default: {checkm2_batch_size}"
-            )
-
     bins_list = list(bins)
+
     logging.info(
         f"Assessing bin quality for {len(bins_list)} bins using {threads} threads."
     )
@@ -419,45 +404,19 @@ def add_bin_metrics(
             checkm2_batch_size=checkm2_batch_size,
         )
 
-    # Use sequential processing if only 1 thread, few bins, or small dataset
-    # Use 2x batch size as threshold to avoid multiprocessing overhead for small datasets
-    sequential_threshold = checkm2_batch_size * 2
-    if threads == 1 or len(bins_list) <= sequential_threshold:
-        if len(bins_list) <= sequential_threshold:
+    min_bins_per_chunk = checkm2_batch_size * 6
+
+    if threads == 1 or len(bins_list) <= min_bins_per_chunk * 2:
+        if len(bins_list) <= min_bins_per_chunk:
             logging.info(
-                f"Only {len(bins_list)} bins (≤ {sequential_threshold}). Using sequential processing to avoid multiprocessing overhead."
+                f"Only {len(bins_list)} bins (≤ {min_bins_per_chunk}). Using sequential processing to avoid multiprocessing overhead."
             )
         return _process_sequential()
+
     # For parallel processing, use joblib
-
-    # Get chunk multiplier from environment variable for testing
-    env_chunk_multiplier = os.environ.get("BINETTE_CHUNK_MULTIPLIER")
-    if env_chunk_multiplier:
-        try:
-            chunk_multiplier = float(env_chunk_multiplier)
-            logging.info(f"Using chunk multiplier from environment: {chunk_multiplier}")
-        except ValueError:
-            logging.warning(
-                f"Invalid BINETTE_CHUNK_MULTIPLIER value: {env_chunk_multiplier}, using default logic"
-            )
-            chunk_multiplier = None
-    else:
-        chunk_multiplier = None
-
-    # Calculate number of chunks based on environment variable or default logic
-    if chunk_multiplier is not None:
-        # Use environment-specified multiplier for testing
-        n_chunks = max(1, int(threads * chunk_multiplier))
-        logging.info(
-            f"Using {chunk_multiplier}x chunk multiplier: {threads} threads → {n_chunks} chunks"
-        )
-    else:
-        # Use default logic (simple threshold-based)
-        n_chunks = threads if len(bins_list) < 50_000 else threads * 2
-        strategy = "static" if len(bins_list) < 50_000 else "2x load balancing"
-        logging.info(
-            f"Using default chunking strategy ({strategy}): {threads} threads → {n_chunks} chunks"
-        )
+    # Calculate number of chunks ensuring each chunk has sufficient work
+    max_possible_chunks = len(bins_list) // min_bins_per_chunk
+    n_chunks = max(1, min(threads * 2, max_possible_chunks))
 
     n_jobs = min(threads, n_chunks)
     # Use balanced chunking to distribute work evenly across available threads
@@ -506,8 +465,8 @@ def add_bin_metrics(
     with Progress(disable=disable_progress_bar) as progress:
         task = progress.add_task("Assessing bin quality", total=len(bins_list))
 
-        # Use joblib for parallelization - it handles many complexities automatically
-        results = joblib.Parallel(n_jobs=n_jobs, verbose=0)(
+        # Use joblib for parallelization
+        results = joblib.Parallel(n_jobs=n_jobs)(
             joblib.delayed(process_chunk)(chunk) for chunk in chunks_list
         )
 
@@ -588,7 +547,7 @@ def assess_bins_quality(
     :param contamination_weight: Weight for contamination assessment.
     :param postProcessor: A post-processor from checkm2
     :param threads: Number of threads for parallel processing (default is 1).
-    :param checkm2_batch_size: Maximum number of bins to process in a single CheckM2 call (default is 500).
+    :param checkm2_batch_size: Maximum number of bins to process in a single CheckM2 call.
     """
     if postProcessor is None:
         modelPostprocessing = get_modelPostprocessing()
