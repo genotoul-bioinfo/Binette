@@ -537,7 +537,14 @@ def run_binette(
     progress: Annotated[
         bool,
         typer.Option(
-            help="Show progress bar while fetching pangenomes (disable with --no_progress).",
+            help="Show progress bar while fetching pangenomes (disable with --no-progress).",
+            rich_help_panel="Output and Runtime Control",
+        ),
+    ] = True,
+    write_fasta_bins: Annotated[
+        bool,
+        typer.Option(
+            help="Write final selected bins as FASTA files (disable with --no-write-fasta-bins).",
             rich_help_panel="Output and Runtime Control",
         ),
     ] = True,
@@ -556,8 +563,6 @@ def run_binette(
     # High quality threshold used just to log number of high quality bins.
     hq_max_conta = 5
     hq_min_completeness = 90
-
-    write_final_fasta_bins = True
 
     # Temporary files #
     out_tmp_dir: Path = outdir / "temporary_files"
@@ -693,7 +698,7 @@ def run_binette(
     logging.info(f"Writing selected bins in {final_bin_report}")
     io.write_bin_info(selected_bins, output=final_bin_report)
 
-    if write_final_fasta_bins:
+    if write_fasta_bins:
         io.write_bins_fasta(
             selected_bins,
             contigs,
