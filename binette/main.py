@@ -600,8 +600,6 @@ def run_binette(
         with open(index_to_contig_file, "w") as flout:
             flout.write("\n".join((f"{i}\t{c}" for i, c in enumerate(contigs_in_bins))))
 
-    original_bins = list(contig_key_to_original_bin.values())
-
     if proteins and not resume:
         logging.info(f"Using the provided protein sequences file: {proteins}")
         use_existing_protein_file = True
@@ -639,13 +637,15 @@ def run_binette(
     contig_metadat["contig_to_length"] = contig_to_length
 
     logging.info("Add size and assess quality of input bins")
-    bin_quality.add_bin_metrics(
-        original_bins,
+    original_bins = bin_quality.add_bin_metrics(
+        list(contig_key_to_original_bin.values()),
         contig_metadat,
         contamination_weight,
         threads,
         disable_progress_bar=not progress,
     )
+    contig_key_to_original_bin = {b.contigs_key: b for b in original_bins}
+
     bin_quality.add_bin_size_and_N50(original_bins, contig_to_length)
 
     logging.info(
@@ -669,13 +669,14 @@ def run_binette(
 
     logging.info(f"Assess quality for {len(contig_key_to_new_bin)} intermediate bins.")
 
-    bin_quality.add_bin_metrics(
+    new_bins = bin_quality.add_bin_metrics(
         bins=contig_key_to_new_bin.values(),
         contig_info=contig_metadat,
         contamination_weight=contamination_weight,
         threads=threads,
         disable_progress_bar=not progress,
     )
+    contig_key_to_new_bin = {b.contigs_key: b for b in new_bins}
 
     contig_key_to_all_bin = contig_key_to_original_bin | contig_key_to_new_bin
 

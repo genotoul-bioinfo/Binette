@@ -7,12 +7,12 @@ import pandas as pd
 from unittest.mock import Mock, patch
 
 from unittest.mock import Mock, patch
+from binette.bin_manager import Bin
 from binette.bin_quality import (
-    Bin,
     add_bin_metrics,
-    assess_bins_quality_by_chunk,
     assess_bins_quality,
     chunks,
+    balanced_chunks,
     get_diamond_feature_per_bin_df,
     get_bins_metadata_df,
 )
@@ -191,3 +191,124 @@ def test_add_bin_size_and_N50():
     assert bins[0].N50 == 1500
     assert bins[1].length == 3500
     assert bins[1].N50 == 2000
+
+
+def test_balanced_chunks_normal_distribution():
+    """Test balanced_chunks with normal distribution scenarios."""
+
+    # Test case: 50 bins with 8 threads
+    bins_50 = list(range(50))
+    chunks_50_8 = list(balanced_chunks(bins_50, 8))
+
+    assert len(chunks_50_8) == 8
+    # 50 / 8 = 6 remainder 2, so first 2 chunks get 7 items, rest get 6
+    chunk_sizes = [len(chunk) for chunk in chunks_50_8]
+    assert chunk_sizes == [7, 7, 6, 6, 6, 6, 6, 6]
+    # Verify all items are included
+    all_items = [item for chunk in chunks_50_8 for item in chunk]
+    assert sorted(all_items) == bins_50
+
+
+def test_balanced_chunks_large_dataset():
+    """Test balanced_chunks with larger datasets."""
+
+    # Test case: 100 bins with 8 threads
+    bins_100 = list(range(100))
+    chunks_100_8 = list(balanced_chunks(bins_100, 8))
+
+    assert len(chunks_100_8) == 8
+    # 100 / 8 = 12 remainder 4, so first 4 chunks get 13 items, rest get 12
+    chunk_sizes = [len(chunk) for chunk in chunks_100_8]
+    assert chunk_sizes == [13, 13, 13, 13, 12, 12, 12, 12]
+    # Verify all items are included
+    all_items = [item for chunk in chunks_100_8 for item in chunk]
+    assert sorted(all_items) == bins_100
+
+
+def test_balanced_chunks_fewer_items_than_chunks():
+    """Test balanced_chunks when there are fewer items than requested chunks."""
+
+    bins_5 = list(range(5))
+    chunks_5_8 = list(balanced_chunks(bins_5, 8))
+
+    assert len(chunks_5_8) == 5  # Should only create 5 chunks
+    chunk_sizes = [len(chunk) for chunk in chunks_5_8]
+    assert chunk_sizes == [1, 1, 1, 1, 1]
+    # Verify all items are included
+    all_items = [item for chunk in chunks_5_8 for item in chunk]
+    assert sorted(all_items) == bins_5
+
+
+def test_balanced_chunks_empty_list():
+    """Test balanced_chunks with empty input."""
+
+    bins_empty = []
+    chunks_empty = list(balanced_chunks(bins_empty, 8))
+
+    assert chunks_empty == []
+
+
+def test_balanced_chunks_single_item():
+    """Test balanced_chunks with single item."""
+
+    bins_1 = [42]
+    chunks_1 = list(balanced_chunks(bins_1, 8))
+
+    assert len(chunks_1) == 1
+    assert chunks_1[0] == [42]
+
+
+def test_balanced_chunks_exact_division():
+    """Test balanced_chunks when items divide evenly into chunks."""
+
+    bins_16 = list(range(16))
+    chunks_16_4 = list(balanced_chunks(bins_16, 4))
+
+    assert len(chunks_16_4) == 4
+    chunk_sizes = [len(chunk) for chunk in chunks_16_4]
+    assert chunk_sizes == [4, 4, 4, 4]
+    # Verify all items are included
+    all_items = [item for chunk in chunks_16_4 for item in chunk]
+    assert sorted(all_items) == bins_16
+
+
+def test_balanced_chunks_string_items():
+    """Test balanced_chunks with non-numeric items."""
+
+    bins_strings = ["bin_a", "bin_b", "bin_c", "bin_d", "bin_e"]
+    chunks_strings = list(balanced_chunks(bins_strings, 3))
+
+    assert len(chunks_strings) == 3
+    # 5 / 3 = 1 remainder 2, so first 2 chunks get 2 items, last gets 1
+    chunk_sizes = [len(chunk) for chunk in chunks_strings]
+    assert chunk_sizes == [2, 2, 1]
+    # Verify all items are included
+    all_items = [item for chunk in chunks_strings for item in chunk]
+    assert sorted(all_items) == sorted(bins_strings)
+
+
+def test_balanced_chunks_single_thread():
+    """Test balanced_chunks with single thread (one chunk)."""
+
+    bins_3 = [1, 2, 3]
+    chunks_3_1 = list(balanced_chunks(bins_3, 1))
+
+    assert len(chunks_3_1) == 1
+    assert chunks_3_1[0] == [1, 2, 3]
+
+
+def test_balanced_chunks_distribution_properties():
+    """Test that balanced_chunks maintains balanced distribution properties."""
+
+    # Test the specific example from the conversation - 100 bins, 8 threads
+    # This should create 8 chunks instead of 9 to match the number of threads
+    bins_100_example = list(range(100))
+    chunks_100_example = list(balanced_chunks(bins_100_example, 8))
+
+    assert len(chunks_100_example) == 8
+    # Verify the distribution is balanced
+    chunk_sizes_example = [len(chunk) for chunk in chunks_100_example]
+    min_size = min(chunk_sizes_example)
+    max_size = max(chunk_sizes_example)
+    assert max_size - min_size <= 1  # Difference should be at most 1
+    assert sum(chunk_sizes_example) == 100  # All items included

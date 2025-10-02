@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import gc
 import logging
 import os
 from collections import Counter, defaultdict
@@ -8,12 +9,11 @@ from typing import Dict, Iterable, Tuple, Iterator, List
 import numpy as np
 import pandas as pd
 from binette.bin_manager import Bin
-from collections import defaultdict
 from rich.progress import Progress
 
 
-from binette.bin_manager import Bin
 from checkm2 import keggData
+import joblib
 
 # Suppress unnecessary TensorFlow warnings
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
@@ -23,12 +23,45 @@ logging.getLogger("tensorflow").setLevel(logging.FATAL)
 # These will only be imported when explicitly called
 _modelPostprocessing = None
 _modelProcessing = None
+_keras_initialized = False
+
+
+def _initialize_keras_environment():
+    """Initialize TensorFlow/Keras to ensure thread safety and memory management"""
+    global _keras_initialized
+    if not _keras_initialized:
+
+        os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"  # Suppress TF warnings
+
+        try:
+            # Only import keras-related modules when needed
+            import tensorflow as tf
+
+            # Set memory growth to avoid OOM errors
+            gpus = tf.config.experimental.list_physical_devices("GPU")
+            if gpus:
+                for gpu in gpus:
+                    tf.config.experimental.set_memory_growth(gpu, True)
+
+            # Use a single thread for predictions to avoid thread contention
+            tf.config.threading.set_intra_op_parallelism_threads(1)
+            tf.config.threading.set_inter_op_parallelism_threads(1)
+
+            _keras_initialized = True
+            logging.debug("TensorFlow/Keras environment initialized")
+        except Exception as e:
+            logging.warning(
+                f"Failed to fully initialize TensorFlow environment: {str(e)}"
+            )
 
 
 def get_modelPostprocessing():
     """Lazy load modelPostprocessing module only when needed"""
     global _modelPostprocessing
     if _modelPostprocessing is None:
+        # Initialize Keras environment
+        _initialize_keras_environment()
+
         # Only import keras when absolutely needed
         from checkm2 import modelPostprocessing
 
@@ -40,6 +73,9 @@ def get_modelProcessing():
     """Lazy load modelProcessing module only when needed"""
     global _modelProcessing
     if _modelProcessing is None:
+        # Initialize Keras environment
+        _initialize_keras_environment()
+
         # Only import keras when absolutely needed
         from checkm2 import modelProcessing
 
@@ -316,7 +352,7 @@ def add_bin_metrics(
     contig_info: Dict,
     contamination_weight: float,
     threads: int = 1,
-    chunk_size: int = 5000,
+    checkm2_batch_size: int = 500,
     disable_progress_bar: bool = False,
 ):
     """
@@ -326,35 +362,124 @@ def add_bin_metrics(
     :param contig_info: Dictionary containing contig information.
     :param contamination_weight: Weight for contamination assessment.
     :param threads: Number of threads for parallel processing (default is 1).
-    :param chunk_size: Number of bins to process in each chunk (default is 5000).
+                    If threads=1, all processing happens sequentially using one thread.
+                    If threads>1, processing is parallelized across multiple processes.
+                    The number of parallel workers will be approximately equal to threads.
+    :param checkm2_batch_size: Maximum number of bins to send to CheckM2 at once within each process
+                              to control memory usage. This creates sub-batches
+                              within each worker to manage CheckM2's memory consumption.
     :param disable_progress_bar: Disable the progress bar if True.
 
-    :return: List of processed bin objects.
+    :return: List of processed bin objects with quality metrics added.
     """
-    modelPostprocessing = get_modelPostprocessing()
-    postProcessor = modelPostprocessing.modelProcessor(threads)
+    if not bins:
+        logging.warning("No bins provided for quality assessment")
+        return []
 
+    bins_list = list(bins)
+
+    logging.info(
+        f"Assessing bin quality for {len(bins_list)} bins using {threads} threads."
+    )
+
+    # Extract data from contig_info
     contig_to_kegg_counter = contig_info["contig_to_kegg_counter"]
     contig_to_cds_count = contig_info["contig_to_cds_count"]
     contig_to_aa_counter = contig_info["contig_to_aa_counter"]
     contig_to_aa_length = contig_info["contig_to_aa_length"]
 
-    logging.info(f"Assessing bin quality for {len(bins)} bins.")
-    assess_bins_quality_by_chunk(
-        bins,
-        contig_to_kegg_counter,
-        contig_to_cds_count,
-        contig_to_aa_counter,
-        contig_to_aa_length,
-        contamination_weight,
-        postProcessor,
-        chunk_size=chunk_size,
-        disable_progress_bar=disable_progress_bar,
+    def _process_sequential():
+        """Helper function for sequential processing"""
+        modelPostprocessing = get_modelPostprocessing()
+        postProcessor = modelPostprocessing.modelProcessor(threads)
+        return assess_bins_quality(
+            bins=bins_list,
+            contig_to_kegg_counter=contig_to_kegg_counter,
+            contig_to_cds_count=contig_to_cds_count,
+            contig_to_aa_counter=contig_to_aa_counter,
+            contig_to_aa_length=contig_to_aa_length,
+            contamination_weight=contamination_weight,
+            postProcessor=postProcessor,
+            threads=threads,
+            checkm2_batch_size=checkm2_batch_size,
+        )
+
+    min_bins_per_chunk = checkm2_batch_size * 6
+
+    if threads == 1 or len(bins_list) <= min_bins_per_chunk * 2:
+        if len(bins_list) <= min_bins_per_chunk:
+            logging.info(
+                f"Only {len(bins_list)} bins (≤ {min_bins_per_chunk}). Using sequential processing to avoid multiprocessing overhead."
+            )
+        return _process_sequential()
+
+    # For parallel processing, use joblib
+    # Calculate number of chunks ensuring each chunk has sufficient work
+    max_possible_chunks = len(bins_list) // min_bins_per_chunk
+    n_chunks = max(1, min(threads * 2, max_possible_chunks))
+
+    n_jobs = min(threads, n_chunks)
+    # Use balanced chunking to distribute work evenly across available threads
+    chunks_list = balanced_chunks(bins_list, n_chunks)
+
+    logging.info(
+        f"Created {len(chunks_list)} balanced chunks for {n_jobs} parallel jobs"
     )
-    return bins
+    logging.info(
+        f"Configuration: {len(bins_list)} bins, {threads} threads, {n_chunks} chunks, batch_size={checkm2_batch_size}"
+    )
+    for idx, chunk in enumerate(chunks_list):
+        logging.debug(f"Chunk {idx + 1}/{len(chunks_list)} contains {len(chunk)} bins")
+
+    # Define a simple function to process a chunk
+    def process_chunk(chunk_bins):
+        # Initialize TensorFlow/Keras environment for this subprocess
+        _initialize_keras_environment()
+
+        # Determine optimal thread count for this worker
+        # For best efficiency, we allocate a portion of total threads to each worker
+        # Math.ceil(total_threads / n_jobs) would be most aggressive
+        # But we use 1 thread per worker as the default to avoid oversubscription
+        worker_threads = max(
+            1, threads // (2 * n_jobs)
+        )  # Conservative thread allocation
+
+        # Create local processor instance
+        modelPostprocessing = get_modelPostprocessing()
+        local_postProcessor = modelPostprocessing.modelProcessor(worker_threads)
+
+        # Process bins with nested chunking for memory management
+        return assess_bins_quality(
+            bins=chunk_bins,
+            contig_to_kegg_counter=contig_to_kegg_counter,
+            contig_to_cds_count=contig_to_cds_count,
+            contig_to_aa_counter=contig_to_aa_counter,
+            contig_to_aa_length=contig_to_aa_length,
+            contamination_weight=contamination_weight,
+            postProcessor=local_postProcessor,
+            threads=worker_threads,  # Use allocated threads in each worker
+            checkm2_batch_size=checkm2_batch_size,
+        )
+
+    # Process chunks in parallel using joblib
+    with Progress(disable=disable_progress_bar) as progress:
+        task = progress.add_task("Assessing bin quality", total=len(bins_list))
+
+        # Use joblib for parallelization
+        results = joblib.Parallel(n_jobs=n_jobs)(
+            joblib.delayed(process_chunk)(chunk) for chunk in chunks_list
+        )
+
+        # Combine results
+        all_bins = []
+        for chunk_result in results:
+            all_bins.extend(chunk_result)
+            progress.update(task, advance=len(chunk_result))
+
+        return all_bins
 
 
-def chunks(iterable: Iterable, size: int) -> Iterator[Tuple]:
+def chunks(iterable, size: int) -> Iterator[Tuple]:
     """
     Generate adjacent chunks of data from an iterable.
 
@@ -366,50 +491,35 @@ def chunks(iterable: Iterable, size: int) -> Iterator[Tuple]:
     return iter(lambda: tuple(islice(it, size)), ())
 
 
-def assess_bins_quality_by_chunk(
-    bins: Iterable[Bin],
-    contig_to_kegg_counter: Dict,
-    contig_to_cds_count: Dict,
-    contig_to_aa_counter: Dict,
-    contig_to_aa_length: Dict,
-    contamination_weight: float,
-    postProcessor=None,
-    threads: int = 1,
-    chunk_size: int = 2500,
-    disable_progress_bar=False,
-):
+def balanced_chunks(items: List, num_chunks: int) -> List[List]:
     """
-    Assess the quality of bins in chunks.
+    Distribute items into balanced chunks with more even size distribution.
 
-    This function assesses the quality of bins in chunks to improve processing efficiency.
-
-    :param bins: List of bin objects.
-    :param contig_to_kegg_counter: Dictionary mapping contig names to KEGG counters.
-    :param contig_to_cds_count: Dictionary mapping contig names to CDS counts.
-    :param contig_to_aa_counter: Dictionary mapping contig names to amino acid counters.
-    :param contig_to_aa_length: Dictionary mapping contig names to amino acid lengths.
-    :param contamination_weight: Weight for contamination assessment.
-    :param postProcessor: post-processor from checkm2
-    :param threads: Number of threads for parallel processing (default is 1).
-    :param chunk_size: The size of each chunk.
-    :param disable_progress_bar: Disable the progress bar if True.
+    :param items: List of items to chunk.
+    :param num_chunks: Number of chunks to create.
+    :return: List of chunks with balanced sizes.
     """
-    with Progress(disable=disable_progress_bar) as progress:
-        task = progress.add_task("Assessing bin quality", total=len(bins))
-        for i, chunk_bins_iter in enumerate(chunks(bins, chunk_size)):
-            chunk_bins = list(chunk_bins_iter)
-            logging.debug(f"chunk {i}: assessing quality of {len(chunk_bins)} bins")
-            assess_bins_quality(
-                bins=chunk_bins,
-                contig_to_kegg_counter=contig_to_kegg_counter,
-                contig_to_cds_count=contig_to_cds_count,
-                contig_to_aa_counter=contig_to_aa_counter,
-                contig_to_aa_length=contig_to_aa_length,
-                contamination_weight=contamination_weight,
-                postProcessor=postProcessor,
-                threads=threads,
-            )
-            progress.update(task, advance=len(chunk_bins))
+    if num_chunks <= 0:
+        return [items]
+    if num_chunks >= len(items):
+        return [[item] for item in items]
+
+    # Calculate base size and remainder
+    base_size = len(items) // num_chunks
+    remainder = len(items) % num_chunks
+
+    chunks_list = []
+    start_idx = 0
+
+    for i in range(num_chunks):
+        # Some chunks get an extra item to distribute the remainder
+        chunk_size = base_size + (1 if i < remainder else 0)
+        chunk = items[start_idx : start_idx + chunk_size]
+        if chunk:  # Only add non-empty chunks
+            chunks_list.append(chunk)
+        start_idx += chunk_size
+
+    return chunks_list
 
 
 def assess_bins_quality(
@@ -419,6 +529,7 @@ def assess_bins_quality(
     contig_to_aa_counter: Dict,
     contig_to_aa_length: Dict,
     contamination_weight: float,
+    checkm2_batch_size: int,
     postProcessor=None,
     threads: int = 1,
 ):
@@ -436,10 +547,76 @@ def assess_bins_quality(
     :param contamination_weight: Weight for contamination assessment.
     :param postProcessor: A post-processor from checkm2
     :param threads: Number of threads for parallel processing (default is 1).
+    :param checkm2_batch_size: Maximum number of bins to process in a single CheckM2 call.
     """
     if postProcessor is None:
         modelPostprocessing = get_modelPostprocessing()
         postProcessor = modelPostprocessing.modelProcessor(threads)
+
+    bins_list = list(bins)
+
+    # If we have fewer bins than the batch size, process them all at once
+    if len(bins_list) <= checkm2_batch_size:
+        return _assess_bins_quality_batch(
+            bins_list,
+            contig_to_kegg_counter,
+            contig_to_cds_count,
+            contig_to_aa_counter,
+            contig_to_aa_length,
+            contamination_weight,
+            postProcessor,
+            threads,
+        )
+
+    # Split bins into smaller batches for memory management
+    logging.debug(
+        f"Splitting {len(bins_list)} bins into batches of {checkm2_batch_size} for CheckM2 processing"
+    )
+
+    all_processed_bins = []
+    batch_chunks = list(chunks(bins_list, checkm2_batch_size))
+
+    for i, batch_bins in enumerate(batch_chunks):
+        logging.debug(
+            f"Processing CheckM2 batch {i+1}/{len(batch_chunks)} with {len(batch_bins)} bins"
+        )
+
+        # Process this batch
+        processed_batch = _assess_bins_quality_batch(
+            batch_bins,
+            contig_to_kegg_counter,
+            contig_to_cds_count,
+            contig_to_aa_counter,
+            contig_to_aa_length,
+            contamination_weight,
+            postProcessor,
+            threads,
+        )
+
+        all_processed_bins.extend(processed_batch)
+
+        # Force garbage collection between batches to free memory
+        gc.collect()
+
+    return all_processed_bins
+
+
+def _assess_bins_quality_batch(
+    bins: List[Bin],
+    contig_to_kegg_counter: Dict,
+    contig_to_cds_count: Dict,
+    contig_to_aa_counter: Dict,
+    contig_to_aa_length: Dict,
+    contamination_weight: float,
+    postProcessor,
+    threads: int,
+):
+    """
+    Assess the quality of a batch of bins (internal function).
+
+    This function processes a single batch of bins through CheckM2.
+    It's called by assess_bins_quality for each batch when memory management is needed.
+    """
 
     metadata_df = get_bins_metadata_df(
         bins, contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length
