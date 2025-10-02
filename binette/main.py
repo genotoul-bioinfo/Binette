@@ -369,7 +369,7 @@ def run_binette(
     bin_dirs: Annotated[
         Optional[List[Path]],
         typer.Option(
-            "--bin-dirs",
+            "--bin_dirs",
             "-d",
             help="List of bin folders containing each bin in a fasta file.",
             # callback=lambda x: [is_valid_file(str(p)) for p in x] if x else None,
@@ -380,7 +380,7 @@ def run_binette(
     contig2bin_tables: Annotated[
         Optional[List[Path]],
         typer.Option(
-            "--contig2bin-tables",
+            "--contig2bin_tables",
             "-b",
             help="List of contig2bin tables with two columns: contig, bin.",
             exists=True,
@@ -455,7 +455,7 @@ def run_binette(
     min_completeness: Annotated[
         int,
         typer.Option(
-            "--min-completeness",
+            "--min_completeness",
             help="Minimum completeness required for intermediate bin creation and final bin selection.",
             rich_help_panel="Bin Filtering and Scoring",
         ),
@@ -463,7 +463,7 @@ def run_binette(
     max_contamination: Annotated[
         int,
         typer.Option(
-            "--max-contamination",
+            "--max_contamination",
             help="Maximum contamination allowed for intermediate bin creation and final bin selection.",
             rich_help_panel="Bin Filtering and Scoring",
         ),
@@ -471,7 +471,7 @@ def run_binette(
     min_length: Annotated[
         int,
         typer.Option(
-            "--min-length",
+            "--min_length",
             help="Minimum length (bp) required for intermediate bin creation and final bin selection.",
             rich_help_panel="Bin Filtering and Scoring",
         ),
@@ -479,7 +479,7 @@ def run_binette(
     max_length: Annotated[
         int,
         typer.Option(
-            "--max-length",
+            "--max_length",
             help="Maximum length (bp) allowed for intermediate bin creation and final bin selection.",
             rich_help_panel="Bin Filtering and Scoring",
         ),
@@ -487,7 +487,7 @@ def run_binette(
     contamination_weight: Annotated[
         float,
         typer.Option(
-            "--contamination-weight",
+            "--contamination_weight",
             "-w",
             help="Bins are scored as: completeness - weight * contamination. A lower weight favors completeness over low contamination.",
             rich_help_panel="Bin Filtering and Scoring",
@@ -497,16 +497,16 @@ def run_binette(
     fasta_extensions: Annotated[
         List[str],
         typer.Option(
-            "--fasta-extensions",
+            "--fasta_extensions",
             "-e",
-            help="FASTA file extensions to search for in bin directories (used with --bin-dirs).",
+            help="FASTA file extensions to search for in bin directories (used with --bin_dirs).",
             rich_help_panel="Advanced Options",
         ),
     ] = [".fasta", ".fa", ".fna"],
     checkm2_db: Annotated[
         Optional[Path],
         typer.Option(
-            "--checkm2-db",
+            "--checkm2_db",
             help="Path to CheckM2 diamond database. By default the database set via <checkm2 database> is used.",
             rich_help_panel="Advanced Options",
         ),
@@ -514,7 +514,7 @@ def run_binette(
     low_mem: Annotated[
         bool,
         typer.Option(
-            "--low-mem",
+            "--low_mem",
             help="Enable low-memory mode for Diamond.",
             rich_help_panel="Advanced Options",
         ),
@@ -537,7 +537,7 @@ def run_binette(
     progress: Annotated[
         bool,
         typer.Option(
-            help="Show progress bar while fetching pangenomes (disable with --no-progress).",
+            help="Show progress bar while fetching pangenomes (disable with --no_progress).",
             rich_help_panel="Output and Runtime Control",
         ),
     ] = True,
