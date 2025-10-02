@@ -25,19 +25,19 @@ classifiers=[
 requires-python = ">=3.12"
 
 dependencies = [
-    "checkm2 @ git+https://github.com/chklovski/CheckM2.git@1.1.0",  # install CheckM2 v1.1.0 directly from GitHub because not properly packaged on PyPI
+    "checkm2 @ git+https://github.com/chklovski/CheckM2.git@1.1.0",
     "networkx>=3.0,<4.0",
     "numpy>1.24,<3.0",
     "pandas>=2,<3",
     "pyfastx>=2,<3",
     "pyrodigal>=2,<3",
-    "tqdm>=4,<5",
-    "pyroaring>=1.0.0,<2.0.0"
+    "pyroaring>=1.0.0,<2.0.0",
+    "typer>=0.9.0,<1.0.0",
+    "rich>=12.0.0,<14.0.0"
 ]
 
-license = {file="LICENSE"}
-
 [project.optional-dependencies]
+
 doc = [
     "sphinx==6.2.1",
     "sphinx_rtd_theme==1.2.2",

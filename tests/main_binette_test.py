@@ -4,11 +4,7 @@ from binette.main import (
     log_selected_bin_info,
     manage_protein_alignement,
     parse_input_files,
-    parse_arguments,
-    init_logging,
     main,
-    UniqueStore,
-    is_valid_file,
 )
 from binette.bin_manager import Bin
 from binette import diamond, contig_manager, cds
@@ -226,90 +222,6 @@ def test_parse_input_files_bin_dirs(create_temp_bin_directories, tmp_path):
     assert len(contig_id_to_length) == 5
 
 
-def test_argument_used_once():
-    # Test UniqueStore class
-    parser = ArgumentParser(description="Test parser")
-    parser.add_argument("--example", action=UniqueStore, help="Example argument")
-    args = parser.parse_args(["--example", "value"])
-    assert args.example == "value"
-
-
-def test_argument_used_multiple_times():
-    # Test UniqueStore class
-    parser = ArgumentParser(description="Test parser")
-    parser.add_argument("--example", action=UniqueStore, help="Example argument")
-    with pytest.raises(SystemExit):
-        parser.parse_args(["--example", "value", "--example", "value2"])
-
-
-def test_parse_arguments_required_arguments(test_environment):
-    """
-    Test parsing when only required arguments are provided.
-    Ensure that input arguments exist before parsing.
-    """
-    # Create temporary directories and files
-    folder1, folder2, contigs_file = test_environment
-
-    # Parse arguments with existing files and directories
-    args = parse_arguments(["-d", str(folder1), str(folder2), "-c", str(contigs_file)])
-
-    # Assert that the parsed arguments match the expected paths
-    assert args.bin_dirs == [folder1, folder2]
-    assert args.contigs == contigs_file
-
-
-def test_parse_arguments_optional_arguments(test_environment):
-    # Test when required and optional arguments are provided
-
-    # Create temporary directories and files
-    folder1, folder2, contigs_file = test_environment
-
-    # Parse arguments with existing files and directories
-    args = parse_arguments(
-        [
-            "-d",
-            str(folder1),
-            str(folder2),
-            "-c",
-            str(contigs_file),
-            "--threads",
-            "4",
-            "--outdir",
-            "output",
-        ]
-    )
-    assert args.bin_dirs == [folder1, folder2]
-    assert args.contigs == contigs_file
-    assert args.threads == 4
-    assert args.outdir == Path("output")
-
-
-def test_parse_arguments_invalid_arguments():
-    # Test when invalid arguments are provided
-    with pytest.raises(SystemExit):
-        # In this case, required arguments are missing
-        parse_arguments(["-t", "4"])
-
-
-def test_parse_arguments_help():
-    # Test the help message
-    with pytest.raises(SystemExit) as pytest_wrapped_e:
-        parse_arguments(["-h"])
-    assert pytest_wrapped_e.type == SystemExit
-    assert pytest_wrapped_e.value.code == 0
-
-
-def test_init_logging_command_line(caplog):
-
-    caplog.set_level(logging.INFO)
-
-    init_logging(verbose=True, debug=False)
-    expected_log_message = f'command line: {" ".join(sys.argv)}'
-    # Check if the log message is present in the log records
-
-    assert expected_log_message in caplog.text
-
-
 # @patch('diamond.run')
 def test_manage_protein_alignment_no_resume(tmp_path):
     # Set up the input parameters
@@ -387,26 +299,3 @@ def test_main_resume_when_not_possible(monkeypatch, test_environment):
     # Call the main function
     with pytest.raises(FileNotFoundError):
         main()
-
-
-def test_is_valid_file_existing_file(tmp_path: Path):
-    """Test is_valid_file with a file that exists."""
-    # Create a temporary file
-    test_file = tmp_path / "test_file.txt"
-    test_file.write_text("Sample content")
-
-    parser = ArgumentParser()
-
-    # Assert that the function correctly returns the file path
-    result = is_valid_file(parser, str(test_file))
-    assert result == test_file
-
-
-def test_is_valid_file_non_existing_file():
-    """Test is_valid_file with a file that does not exist."""
-    parser = ArgumentParser()
-    non_existing_file = "non_existing_file.txt"
-
-    # Expect the function to call parser.error, which will raise a SystemExit exception
-    with pytest.raises(SystemExit):
-        is_valid_file(parser, non_existing_file)
