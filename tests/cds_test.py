@@ -43,9 +43,9 @@ def orf_finder():
 
 
 # Predict open reading frames with Pyrodigal using 1 thread.
-def test_predict_orf_with_1_thread(contig1, contig2):
+def test_predict_orf_with_1_thread(contig1, contig2, tmp_path):
     contigs_iterator = [contig1, contig2]
-    outfaa = "output.fasta"
+    outfaa = tmp_path / "output.fasta"
     threads = 1
 
     result = cds.predict(contigs_iterator, outfaa, threads)

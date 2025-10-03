@@ -128,7 +128,7 @@ def test_check_tool_exists_tool_not_found(monkeypatch):
         diamond.check_tool_exists("non_existing_tool")
 
 
-def test_run_diamond_tool_found(monkeypatch):
+def test_run_diamond_tool_found(monkeypatch, tmp_path):
     monkeypatch.setattr(
         sys, "exit", lambda x: None
     )  # Patch sys.exit to avoid test interruption
@@ -149,12 +149,13 @@ def test_run_diamond_tool_found(monkeypatch):
     monkeypatch.setattr(subprocess, "run", mock_subprocess_run)
     monkeypatch.setattr(logging, "error", lambda x: None)  # Avoid logging during test
 
+    log_path = tmp_path / "log.txt"
     # Call the function
     diamond.run(
         "test.faa",
         "output.txt",
         "db",
-        "log.txt",
+        log_path.as_posix(),
         threads=1,
         query_cover=80,
         subject_cover=80,
