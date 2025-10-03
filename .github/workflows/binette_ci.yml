@@ -72,6 +72,12 @@ jobs:
         repository: genotoul-bioinfo/Binette_TestData
         path: test_data
 
+    - name: Functional Test with pytest
+      run: |
+        pytest --cov=binette  --cov-report=term  -v  --test-data-path="test_data/"
+
+
+
     - name: Run simple test case from bin2table
       run: |
         cd test_data
