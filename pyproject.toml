@@ -86,3 +86,8 @@ lint.ignore = ["E501", "E203"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["binette"]
+
+[tool.pytest.ini_options]
+markers = [
+    "requires_test_data: marks tests that require test dataset path to be provided",
+]

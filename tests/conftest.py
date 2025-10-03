@@ -84,3 +84,24 @@ def test_data_path(request):
     path_str = request.config.getoption("--test-data-path")
 
     return validate_test_data_path(path_str)
+
+
+def pytest_collection_modifyitems(config, items):
+    """Handle test collection: skip functional tests when no test data is available and reorder tests."""
+
+    # Get test data path from command line or environment
+    test_data_path_str = config.getoption("--test-data-path")
+    test_data_path_obj = validate_test_data_path(test_data_path_str)
+
+    # Skip tests that require test data if no valid test data path is available
+    if test_data_path_obj is None:
+        skip_functional = pytest.mark.skip(
+            reason="Test data not available. Clone https://github.com/genotoul-bioinfo/Binette_TestData and set --test-data-path or PANORAMA_TEST_DATA_PATH environment variable."
+        )
+
+        for item in items:
+            # Skip tests that specifically require test data
+            if "requires_test_data" in item.keywords:
+                item.add_marker(skip_functional)
+    else:
+        logger.info(f"Using test data path: '{test_data_path_obj}'")
