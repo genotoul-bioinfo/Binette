@@ -1,20 +1,14 @@
-import re
-import subprocess
+import logging
 import shutil
-import sys
-import logging
-
-from unittest.mock import patch, MagicMock
-
 import subprocess
 import sys
-import logging
+from collections import Counter
+from unittest.mock import patch
+
+import pandas as pd
 import pytest
 
 from binette import diamond
-
-import pandas as pd
-from collections import Counter
 
 
 class CompletedProcess:
@@ -39,14 +33,12 @@ def test_get_checkm2_db_no_checkm2(monkeypatch):
     with pytest.raises(SystemExit) as pytest_wrapped_e:
         diamond.get_checkm2_db()
 
-    assert pytest_wrapped_e.type == SystemExit
+    assert pytest_wrapped_e.type is SystemExit
     assert pytest_wrapped_e.value.code == 1
 
 
 def test_get_checkm2_db_with_success(monkeypatch):
-
     def mock_subprocess_run(*args, **kwargs):
-
         # Simulating the behavior of checkm2 command
         if (
             args[0][0] == "checkm2"
@@ -66,9 +58,7 @@ def test_get_checkm2_db_with_success(monkeypatch):
 
 
 def test_get_checkm2_db_checkm2_exit_error(monkeypatch):
-
     def mock_subprocess_run(*args, **kwargs):
-
         # Simulating the behavior of checkm2 command
         if (
             args[0][0] == "checkm2"
@@ -84,14 +74,12 @@ def test_get_checkm2_db_checkm2_exit_error(monkeypatch):
     with pytest.raises(SystemExit) as pytest_wrapped_e:
         diamond.get_checkm2_db()
 
-    assert pytest_wrapped_e.type == SystemExit
+    assert pytest_wrapped_e.type is SystemExit
     assert pytest_wrapped_e.value.code == 1
 
 
 def test_get_checkm2_db_wrong_path_format(monkeypatch):
-
     def mock_subprocess_run(*args, **kwargs):
-
         # Simulating the behavior of checkm2 command
         if (
             args[0][0] == "checkm2"
@@ -110,7 +98,7 @@ def test_get_checkm2_db_wrong_path_format(monkeypatch):
     with pytest.raises(SystemExit) as pytest_wrapped_e:
         diamond.get_checkm2_db()
 
-    assert pytest_wrapped_e.type == SystemExit
+    assert pytest_wrapped_e.type is SystemExit
     assert pytest_wrapped_e.value.code == 1
 
 
@@ -141,7 +129,6 @@ def test_check_tool_exists_tool_not_found(monkeypatch):
 
 
 def test_run_diamond_tool_found(monkeypatch):
-
     monkeypatch.setattr(
         sys, "exit", lambda x: None
     )  # Patch sys.exit to avoid test interruption
@@ -235,7 +222,6 @@ def test_get_contig_to_kegg_id():
         patch("pandas.read_csv", return_value=mocked_df),
         patch("checkm2.keggData.KeggCalculator", return_value=mocked_kegg_calculator),
     ):
-
         # Call the function
         result = diamond.get_contig_to_kegg_id(diamond_result_file)
 

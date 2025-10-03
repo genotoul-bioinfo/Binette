@@ -1,11 +1,10 @@
-from binette import cds
-import pytest
-import pyrodigal
-
-from pathlib import Path
-from unittest.mock import mock_open, patch
-
 import gzip
+from pathlib import Path
+
+import pyrodigal
+import pytest
+
+from binette import cds
 
 
 class MockContig:
@@ -45,7 +44,6 @@ def orf_finder():
 
 # Predict open reading frames with Pyrodigal using 1 thread.
 def test_predict_orf_with_1_thread(contig1, contig2):
-
     contigs_iterator = [contig1, contig2]
     outfaa = "output.fasta"
     threads = 1
@@ -65,7 +63,6 @@ def test_predict_orf_with_1_thread(contig1, contig2):
 
 
 def test_predict_orf_with_multiple_threads(contig1, contig2):
-
     contigs_iterator = [contig1, contig2]
     outfaa = "output.fasta"
     threads = 4
@@ -164,7 +161,6 @@ def test_parse_faa_file_raises_error_for_dna(tmp_path):
 
 
 def test_get_aa_composition():
-
     genes = ["AAAA", "CCCC", "TTTT", "GGGG"]
 
     result = cds.get_aa_composition(genes)
@@ -173,7 +169,6 @@ def test_get_aa_composition():
 
 
 def test_get_contig_cds_metadata_flat():
-
     contig_to_genes = {"c1": ["AAAA", "GGGG", "CCCC"], "c2": ["TTTT", "CCCC"]}
 
     contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length = (
@@ -189,7 +184,6 @@ def test_get_contig_cds_metadata_flat():
 
 
 def test_get_contig_cds_metadata():
-
     contig_to_genes = {"c1": ["AAAA", "GGGG", "CCCC"], "c2": ["TTTT", "CCCC"]}
 
     contig_metadata = cds.get_contig_cds_metadata(contig_to_genes, 1)
@@ -228,7 +222,7 @@ def test_filter_faa_file_basic(tmp_path):
     filtered_faa = tmp_path / "filtered.faa"
 
     input_faa.write_text(
-        ">contig1_gene1\nATGCGT\n" ">contig2_gene1\nATGCCG\n" ">contig3_gene1\nATGAAA\n"
+        ">contig1_gene1\nATGCGT\n>contig2_gene1\nATGCCG\n>contig3_gene1\nATGAAA\n"
     )
 
     # Contigs to keep
@@ -248,7 +242,7 @@ def test_filter_faa_file_gz_output(tmp_path):
     filtered_faa = tmp_path / "filtered.faa.gz"
 
     input_faa.write_text(
-        ">contig1_gene1\nATGCGT\n" ">contig2_gene1\nATGCCG\n" ">contig3_gene1\nATGAAA\n"
+        ">contig1_gene1\nATGCGT\n>contig2_gene1\nATGCCG\n>contig3_gene1\nATGAAA\n"
     )
 
     # Contigs to keep
@@ -270,7 +264,7 @@ def test_filter_faa_file_no_matching_contigs(tmp_path):
     filtered_faa = tmp_path / "filtered_no_match.faa"
 
     input_faa.write_text(
-        ">contig1_gene1\nATGCGT\n" ">contig2_gene1\nATGCCG\n" ">contig3_gene1\nATGAAA\n"
+        ">contig1_gene1\nATGCGT\n>contig2_gene1\nATGCCG\n>contig3_gene1\nATGAAA\n"
     )
 
     # Contigs to keep

@@ -1,22 +1,20 @@
-import pytest
 import logging
-from binette.main import (
-    log_selected_bin_info,
-    manage_protein_alignement,
-    parse_input_files,
-    main,
-)
-from binette.bin_manager import Bin
-from binette import diamond, contig_manager, cds
 import os
 import sys
-from unittest.mock import patch, MagicMock
-
 from collections import Counter
-from tests.bin_manager_test import create_temp_bin_directories, create_temp_bin_files
-from argparse import ArgumentParser
 from pathlib import Path
+from unittest.mock import patch
+
+import pytest
 from pyroaring import BitMap
+
+from binette.bin_manager import Bin
+from binette.main import (
+    log_selected_bin_info,
+    main,
+    manage_protein_alignement,
+    parse_input_files,
+)
 
 
 @pytest.fixture
@@ -49,7 +47,6 @@ def bins():
 
 
 def test_log_selected_bin_info(caplog, bins):
-
     caplog.set_level(logging.INFO)
 
     hq_min_completeness = 85
@@ -80,7 +77,6 @@ def test_manage_protein_alignement_resume(tmp_path):
     }
 
     with patch("binette.diamond.get_contig_to_kegg_id", return_value=contig_to_kegg_id):
-
         # Call the function
 
         # Run the function with test data
@@ -108,8 +104,6 @@ def test_manage_protein_alignement_not_resume(tmpdir, tmp_path):
     faa_file = tmp_path / "proteins.faa"
     faa_file_content = ">contig1_1\nMLKPACGT\n>contig2_1\nMMMKPTGCA\n>contig2_2\nMMMAAAA\n>contig3_1\nMLPALP\n"
 
-    contig_to_length = {"contig1": 40, "contig2": 80, "contig3": 20}
-
     faa_file.write_text(faa_file_content)
 
     contigs_fasta = os.path.join(str(tmpdir), "contigs.fasta")
@@ -124,7 +118,6 @@ def test_manage_protein_alignement_not_resume(tmpdir, tmp_path):
         patch("binette.diamond.get_contig_to_kegg_id", return_value=contig_to_kegg_id),
         patch("binette.diamond.run", return_value=None),
     ):
-
         # Call the function
 
         contig_to_kegg_counter, contig_to_genes = manage_protein_alignement(
@@ -146,7 +139,6 @@ def test_manage_protein_alignement_not_resume(tmpdir, tmp_path):
 
 
 def test_parse_input_files_with_contig2bin_tables(tmp_path):
-
     bin_set1 = tmp_path / "bin_set1.tsv"
     bin_set1.write_text("contig1\tbin1A\ncontig2\tbin1B\n")
     bin_set2 = tmp_path / "bin_set2.tsv"
@@ -175,7 +167,6 @@ def test_parse_input_files_with_contig2bin_tables(tmp_path):
 
 
 def test_parse_input_files_with_contig2bin_tables_with_unknown_contig(tmp_path):
-
     bin_set3 = tmp_path / "bin_set3.tsv"
     bin_set3.write_text("contig3\tbin3A\ncontig44\ttbin3B\n")
     fasta_file = tmp_path / "assembly.fasta"
@@ -187,7 +178,6 @@ def test_parse_input_files_with_contig2bin_tables_with_unknown_contig(tmp_path):
 
 
 def test_parse_input_files_bin_dirs(create_temp_bin_directories, tmp_path):
-
     bin_dirs = [Path(d) for d in create_temp_bin_directories.values()]
 
     contig2bin_tables = []
@@ -227,7 +217,6 @@ def test_manage_protein_alignment_no_resume(tmp_path):
     # Set up the input parameters
     faa_file = Path("test.faa")
     contigs_fasta = Path("test.fasta")
-    contig_to_length = {"contig1": [1000]}
     contigs_in_bins = {"bin1": ["contig1"]}
     diamond_result_file = Path("test_diamond_result.txt")
     checkm2_db = tmp_path / "checkm2_db"
@@ -241,13 +230,12 @@ def test_manage_protein_alignment_no_resume(tmp_path):
     with (
         patch("pyfastx.Fastx") as mock_pyfastx_Fastx,
         patch("binette.cds.predict") as mock_predict,
-        patch("binette.diamond.get_checkm2_db") as mock_get_checkm2_db,
+        patch("binette.diamond.get_checkm2_db"),
         patch("binette.diamond.run") as mock_diamond_run,
         patch(
             "binette.diamond.get_contig_to_kegg_id"
         ) as mock_diamond_get_contig_to_kegg_id,
     ):
-
         # Set the return value of the mocked functions
         mock_pyfastx_Fastx.return_value = [("contig1", "ATCG")]
         mock_predict.return_value = {"contig1": ["gene1"]}

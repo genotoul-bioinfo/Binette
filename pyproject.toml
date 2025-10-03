@@ -55,7 +55,7 @@ doc = [
 dev = [
     "pytest>=7.0.0",
     "pytest-cov",
-    "black==24.*"
+    "ruff>=0.1.0"
 ]
 #
 [project.urls]
@@ -73,3 +73,16 @@ packages = ["binette"]
 
 [tool.setuptools.dynamic]
 version = {attr = "binette.__version__"}
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+# Essential linting rules
+lint.select = ["E", "F", "I", "UP", "B"]
+
+# Ignore rules that conflict with scientific code conventions
+lint.ignore = ["E501", "E203"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["binette"]

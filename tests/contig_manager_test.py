@@ -1,6 +1,7 @@
-from binette import contig_manager
 import pyfastx
 import pytest
+
+from binette import contig_manager
 
 
 # Parses a valid FASTA file and returns a pyfastx.Fasta object.

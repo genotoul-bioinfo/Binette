@@ -3,14 +3,14 @@ Unit tests for binette.
 
 """
 
-import pytest
-
-from binette import bin_manager, bin_quality
-import networkx as nx
-
 import logging
 from pathlib import Path
+
+import networkx as nx
+import pytest
 from pyroaring import BitMap
+
+from binette import bin_manager, bin_quality
 
 
 def test_get_all_possible_combinations():
@@ -75,7 +75,6 @@ def test_add_n50_negative_integer():
 
 
 def test_add_quality():
-
     completeness = 10
     contamination = 6
     contamination_weight = 2
@@ -167,7 +166,6 @@ def test_bin_intersection():
 
 
 def test_select_best_bins_simple():
-
     b1 = bin_manager.Bin(contigs=BitMap({1, 2}), origin="", name="")
     b2 = bin_manager.Bin(contigs=BitMap({2}), origin="", name="")
     b3 = bin_manager.Bin(contigs=BitMap({3}), origin="", name="")
@@ -194,7 +192,6 @@ def test_select_best_bins_simple():
 
 
 def test_select_best_bins_with_same_score():
-
     b1 = bin_manager.Bin(contigs=BitMap({1, 2}), origin="", name="")
     b2 = bin_manager.Bin(contigs=BitMap({2}), origin="", name="")
     b3 = bin_manager.Bin(contigs=BitMap({3}), origin="", name="")
@@ -221,7 +218,6 @@ def test_select_best_bins_with_same_score():
 
 
 def test_select_best_bins_with_equality_based_on_original():
-
     b1 = bin_manager.Bin(contigs=BitMap({1, 2}), origin="", name="", is_original=False)
     b2 = bin_manager.Bin(contigs=BitMap({2}), origin="", name="", is_original=True)
     b3 = bin_manager.Bin(contigs=BitMap({3}), origin="", name="", is_original=False)
@@ -249,7 +245,6 @@ def test_select_best_bins_with_equality_based_on_original():
 
 
 def test_select_best_bins_with_equality():
-
     b1 = bin_manager.Bin(contigs=BitMap({1, 2}), origin="", name="", is_original=False)
     b2 = bin_manager.Bin(contigs=BitMap({2}), origin="", name="", is_original=False)
     b3 = bin_manager.Bin(contigs=BitMap({3}), origin="", name="", is_original=False)
@@ -328,7 +323,6 @@ def test_intersection_bins_created():
 
 
 def test_from_bins_to_bin_graph():
-
     bin1 = bin_manager.Bin(contigs=BitMap({1, 2}), origin="A", name="bin1")
     bin2 = bin_manager.Bin(contigs=BitMap({3, 4}), origin="A", name="bin2")
     bin3 = bin_manager.Bin(contigs=BitMap({5}), origin="A", name="bin3")
@@ -350,7 +344,6 @@ def test_from_bins_to_bin_graph():
 
 @pytest.fixture
 def simple_bin_graph():
-
     bin1 = bin_manager.Bin(contigs=BitMap({1, 2, 3}), origin="A", name="bin1")
     bin2 = bin_manager.Bin(contigs=BitMap({1, 2, 4}), origin="B", name="bin2")
 
