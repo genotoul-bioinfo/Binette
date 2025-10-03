@@ -271,10 +271,11 @@ def test_manage_protein_alignment_no_resume(tmp_path):
         )
 
 
-def test_main_resume_when_not_possible(monkeypatch, test_environment):
+def test_main_resume_when_not_possible(monkeypatch, test_environment, tmp_path):
     # Define or mock the necessary inputs/arguments
     folder1, folder2, contigs_file = test_environment
 
+    outdir = tmp_path / "results"
     # Mock sys.argv to use test_args
     test_args = [
         "-d",
@@ -285,6 +286,8 @@ def test_main_resume_when_not_possible(monkeypatch, test_environment):
         # ... more arguments as required ...
         "--debug",
         "--resume",
+        "-o",
+        outdir.as_posix(),
     ]
     monkeypatch.setattr(sys, "argv", ["your_script.py"] + test_args)
 
