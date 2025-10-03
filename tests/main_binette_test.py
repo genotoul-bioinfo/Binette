@@ -56,7 +56,7 @@ def test_log_selected_bin_info(caplog, bins):
     log_selected_bin_info(bins, hq_min_completeness, hq_max_conta)
 
     # Check if the logs contain expected messages
-    expected_logs = "2/3 selected bins have a high quality (completeness >= 85 and contamination <= 15)."
+    expected_logs = "binette.main:main.py:361 2/3 selected bins have high quality (completeness >= 85 and contamination <= 15)"
 
     assert expected_logs in caplog.text
 
