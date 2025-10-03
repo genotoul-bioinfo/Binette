@@ -7,7 +7,7 @@ from binette import contig_manager
 # Parses a valid FASTA file and returns a pyfastx.Fasta object.
 def test_valid_fasta_file(tmp_path):
     # Arrange
-    fasta_file = "tests/contigs.fasta"
+    fasta_file = "tests/unit_tests/contigs.fasta"
 
     index_file = tmp_path / "contigs.fasta.fxi"
     result = contig_manager.parse_fasta_file(fasta_file, str(index_file))
@@ -19,7 +19,7 @@ def test_valid_fasta_file(tmp_path):
 # Parses an invalid FASTA file and raises an exception.
 def test_invalid_fasta_file():
     #
-    fasta_file = "tests/contig_manager_test.py"
+    fasta_file = "tests/unit_tests/contig_manager_test.py"
 
     # Act and Assert
     with pytest.raises(RuntimeError):
