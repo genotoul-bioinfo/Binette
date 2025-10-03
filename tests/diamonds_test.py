@@ -142,14 +142,14 @@ def test_run_diamond_tool_found(monkeypatch, tmp_path):
         # Simulating successful run of diamond command
         if (
             args[0]
-            == "diamond blastp --outfmt 6 --max-target-seqs 1 --query test.faa -o output.txt --threads 1 --db db --compress 1 --query-cover 80 --subject-cover 80 --id 30 --evalue 1e-05 --block-size 2 2> log.txt"
+            == f"diamond blastp --outfmt 6 --max-target-seqs 1 --query test.faa -o output.txt --threads 1 --db db --compress 1 --query-cover 80 --subject-cover 80 --id 30 --evalue 1e-05 --block-size 2 2> {log_path.as_posix()}"
         ):
             return CompletedProcess(0)
 
+    log_path = tmp_path / "log.txt"
     monkeypatch.setattr(subprocess, "run", mock_subprocess_run)
     monkeypatch.setattr(logging, "error", lambda x: None)  # Avoid logging during test
 
-    log_path = tmp_path / "log.txt"
     # Call the function
     diamond.run(
         "test.faa",
