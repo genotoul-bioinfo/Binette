@@ -102,11 +102,11 @@ def test_extract_contig_name_from_cds_name():
     assert result == "contig1"
 
 
-def test_write_faa(contig1, orf_finder):
+def test_write_faa(contig1, orf_finder, tmp_path):
     name, seq = contig1
     predicted_genes = orf_finder.find_genes(seq)
     contig_name = "contig"
-    output_file = "tests/tmp_file.faa.gz"
+    output_file = tmp_path / "tmp_file.faa.gz"
 
     cds.write_faa(output_file, [(contig_name, predicted_genes)])
 
