@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 # Suppress unnecessary TensorFlow warnings
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
-logger.getLogger("tensorflow").setLevel(logging.FATAL)
+logging.getLogger("tensorflow").setLevel(logging.FATAL)
 
 # Lazy loaders for checkm2 components that import keras
 # These will only be imported when explicitly called
