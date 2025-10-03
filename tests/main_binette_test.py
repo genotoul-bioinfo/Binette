@@ -15,6 +15,10 @@ from binette.main import (
     manage_protein_alignement,
     parse_input_files,
 )
+from tests.bin_manager_test import (  # noqa: F401
+    create_temp_bin_directories,
+    create_temp_bin_files,
+)
 
 
 @pytest.fixture
