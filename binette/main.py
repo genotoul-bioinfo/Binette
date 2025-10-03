@@ -283,10 +283,10 @@ def manage_protein_alignement(
             low_mem=low_mem,
         )
 
-        logger.info("Parsing diamond results")
-        contig_to_kegg_counter = diamond.get_contig_to_kegg_id(
-            diamond_result_file.as_posix()
-        )
+    logger.info("Parsing diamond results")
+    contig_to_kegg_counter = diamond.get_contig_to_kegg_id(
+        diamond_result_file.as_posix()
+    )
 
     # Check contigs from diamond vs input assembly consistency
     io.check_contig_consistency(
