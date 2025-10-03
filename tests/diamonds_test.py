@@ -142,18 +142,19 @@ def test_run_diamond_tool_found(monkeypatch, tmp_path):
         # Simulating successful run of diamond command
         if (
             args[0]
-            == f"diamond blastp --outfmt 6 --max-target-seqs 1 --query test.faa -o output.txt --threads 1 --db db --compress 1 --query-cover 80 --subject-cover 80 --id 30 --evalue 1e-05 --block-size 2 2> {log_path.as_posix()}"
+            == f"diamond blastp --outfmt 6 --max-target-seqs 1 --query test.faa -o {output_file.as_posix()} --threads 1 --db db --compress 1 --query-cover 80 --subject-cover 80 --id 30 --evalue 1e-05 --block-size 2 2> {log_path.as_posix()}"
         ):
             return CompletedProcess(0)
 
     log_path = tmp_path / "log.txt"
+    output_file = tmp_path / "output.txt"
     monkeypatch.setattr(subprocess, "run", mock_subprocess_run)
     monkeypatch.setattr(logging, "error", lambda x: None)  # Avoid logging during test
 
     # Call the function
     diamond.run(
         "test.faa",
-        "output.txt",
+        output_file.as_posix(),
         "db",
         log_path.as_posix(),
         threads=1,
@@ -165,20 +166,22 @@ def test_run_diamond_tool_found(monkeypatch, tmp_path):
     )
 
 
-def test_run_diamond_tool_not_found(monkeypatch):
+def test_run_diamond_tool_not_found(monkeypatch, tmp_path):
     # Mocking check_tool_exists to simulate tool not found scenario
     def mock_check_tool_exists(*args, **kwargs):
         raise FileNotFoundError
 
     monkeypatch.setattr(logging, "error", lambda x: None)  # Avoid logging during test
 
+    log_file = tmp_path / "log.txt"
+    output_file = tmp_path / "output.txt"
     # Call the function and expect it to raise FileNotFoundError
     with patch("sys.exit") as mock_exit:
         diamond.run(
             "test.faa",
-            "output.txt",
+            output_file.as_posix(),
             "db",
-            "log.txt",
+            log_file.as_posix(),
             threads=1,
             query_cover=80,
             subject_cover=80,

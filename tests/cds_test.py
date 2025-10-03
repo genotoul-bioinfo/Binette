@@ -62,12 +62,12 @@ def test_predict_orf_with_1_thread(contig1, contig2, tmp_path):
     assert isinstance(result["contig2"][0], str)
 
 
-def test_predict_orf_with_multiple_threads(contig1, contig2):
+def test_predict_orf_with_multiple_threads(contig1, contig2, tmp_path):
     contigs_iterator = [contig1, contig2]
-    outfaa = "output.fasta"
+    outfaa = tmp_path / "output.fasta"
     threads = 4
 
-    result = cds.predict(contigs_iterator, outfaa, threads)
+    result = cds.predict(contigs_iterator, outfaa.as_posix(), threads)
 
     assert isinstance(result, dict)
     assert len(result) == 2
