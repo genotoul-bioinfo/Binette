@@ -19,7 +19,7 @@ import typer
 from rich.console import Console
 from rich.logging import RichHandler
 
-import binette
+import binette as binette_init
 from binette import (
     bin_manager,
     bin_quality,
@@ -44,7 +44,7 @@ def version_callback(
         return
 
     if value:
-        typer.echo(f"Binette {binette.__version__}")
+        typer.echo(f"Binette {binette_init.__version__}")
         raise typer.Exit()
 
 
@@ -115,7 +115,7 @@ def preprocess_args():
 # Create the Typer app with no args help enabled and rich formatting
 app = typer.Typer(
     name="binette",
-    help=f"Binette: binning refinement tool to constructs high quality MAGs. Version: {binette.__version__}",
+    help=f"Binette: binning refinement tool to constructs high quality MAGs. Version: {binette_init.__version__}",
     add_completion=False,
     context_settings={"help_option_names": ["-h", "--help"]},
     rich_markup_mode="rich",
@@ -364,10 +364,10 @@ def log_selected_bin_info(
 
 
 @app.command(
-    help=f"Binette {binette.__version__}: fast and accurate binning refinement tool to constructs high quality MAGs from the output of multiple binning tools.",
+    help=f"Binette {binette_init.__version__}: fast and accurate binning refinement tool to constructs high quality MAGs from the output of multiple binning tools.",
     no_args_is_help=True,
 )
-def run_binette(
+def binette(
     # Input arguments - Mutually exclusive group (handled in code)
     bin_dirs: Annotated[
         list[Path] | None,
@@ -559,9 +559,13 @@ def run_binette(
     """Orchestrate the execution of the program"""
 
     # Validate that exactly one of bin_dirs or contig2bin_tables is provided
-    if (bin_dirs is None and contig2bin_tables is None) or (
-        bin_dirs is not None and contig2bin_tables is not None
-    ):
+    if bin_dirs is None and contig2bin_tables is None:
+        typer.echo(
+            "Error: Either --bin-dirs or --contig2bin-tables must be provided. None were given."
+        )
+        raise typer.Exit(code=1)
+
+    if bin_dirs is not None and contig2bin_tables is not None:
         typer.echo(
             "Error: Either --bin-dirs or --contig2bin-tables must be provided, but not both."
         )
