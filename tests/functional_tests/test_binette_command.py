@@ -8,6 +8,7 @@ from pathlib import Path
 runner = CliRunner()
 logger = logging.getLogger(__name__)
 
+
 def test_help_app():
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
@@ -59,12 +60,51 @@ def test_bin_dir_input(test_data_path: Path, tmp_path):
         test_data_path / "checkm2_tiny_db/checkm2_tiny_db.dmnd",
         "-o",
         tmp_path / "test_results_from_dirs",
+        "-v"
     ]
     cmd_args = [arg.as_posix() if isinstance(arg, Path) else arg for arg in cmd_args]
-    logger.info("binette " + " ".join(cmd_args))
-    print("binette " + " ".join(cmd_args))
+    
     result = runner.invoke(app, cmd_args)
-    print("binette " + " ".join(cmd_args))
     print(result.output)
     print(result.stderr)
     assert result.exit_code == 0
+
+
+
+
+@pytest.mark.requires_test_data
+def test_bin_tables_input(test_data_path: Path, tmp_path):
+
+    binning_results_dir = test_data_path / "binning_results"
+
+    cmd_args = [
+        "-b",
+        binning_results_dir / "A.binning",
+        "-b",
+        binning_results_dir / "B.binning",
+        "-b",
+        binning_results_dir / "C.binning",
+        "--contigs",
+        test_data_path / "all_contigs.fna",
+        "--checkm2_db",
+        test_data_path / "checkm2_tiny_db/checkm2_tiny_db.dmnd",
+        "-o",
+        tmp_path / "test_results_from_dirs",
+        "-v"
+    ]
+    cmd_args = [arg.as_posix() if isinstance(arg, Path) else arg for arg in cmd_args]
+    
+    result = runner.invoke(app, cmd_args)
+    print(result.output)
+    print(result.stderr)
+
+    assert result.exit_code == 0
+
+    result_table = tmp_path / "test_results_from_dirs" / "final_bins_quality_reports.tsv"
+    expected_table = Path("tests/expected_results/final_bins_quality_reports.tsv")
+    content_actual = result_table.read_text()
+    content_expected = expected_table.read_text()
+    print(content_actual)
+    assert content_actual == content_expected, (
+    f"Content mismatch for {content_actual}. "
+    )
