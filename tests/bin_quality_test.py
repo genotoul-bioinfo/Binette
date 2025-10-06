@@ -1,25 +1,13 @@
-from calendar import c
-from itertools import islice
-from binette import bin_quality
-
 from collections import Counter
-import pandas as pd
-from unittest.mock import Mock, patch
 
-from unittest.mock import Mock, patch
+from pyroaring import BitMap
+
+from binette import bin_quality
 from binette.bin_manager import Bin
 from binette.bin_quality import (
-    add_bin_metrics,
-    assess_bins_quality,
-    chunks,
     balanced_chunks,
-    get_diamond_feature_per_bin_df,
-    get_bins_metadata_df,
+    chunks,
 )
-from pyroaring import BitMap
-from checkm2 import keggData, modelPostprocessing, modelProcessing
-
-from unittest.mock import Mock, patch, MagicMock
 
 
 def test_compute_N50():
@@ -76,11 +64,7 @@ class BinOLD:
     def add_N50(self, N50):
         self.N50 = N50
 
-    def add_N50(self, N50):
-        self.N50 = N50
-
     def add_quality(self, comp, cont, weight):
-
         self.completeness = comp
         self.contamination = cont
         self.score = comp - weight * cont

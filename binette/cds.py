@@ -1,14 +1,16 @@
 import concurrent.futures as cf
-import multiprocessing.pool
+import gzip
 import logging
+import multiprocessing.pool
 from collections import Counter, defaultdict
-from typing import Dict, List, Iterator, Tuple, Any, Union
+from collections.abc import Iterator
+from pathlib import Path
+from typing import Any
 
 import pyfastx
 import pyrodigal
 
-from pathlib import Path
-import gzip
+logger = logging.getLogger(__name__)
 
 
 def get_contig_from_cds_name(cds_name: str) -> str:
@@ -25,7 +27,7 @@ def get_contig_from_cds_name(cds_name: str) -> str:
 
 def predict(
     contigs_iterator: Iterator, outfaa: str, threads: int = 1
-) -> Dict[str, List[str]]:
+) -> dict[str, list[str]]:
     """
     Predict open reading frames with Pyrodigal.
 
@@ -41,7 +43,7 @@ def predict(
     except AttributeError:
         orf_finder = pyrodigal.OrfFinder(meta="meta")  # type: ignore
 
-    logging.info(f"Predicting cds sequences with Pyrodigal using {threads} threads.")
+    logger.info(f"Predicting CDS sequences with Pyrodigal using {threads} threads")
 
     with multiprocessing.pool.ThreadPool(processes=threads) as pool:
         contig_and_genes = pool.starmap(
@@ -59,12 +61,11 @@ def predict(
     return contig_to_genes
 
 
-def predict_genes(find_genes, name, seq) -> Tuple[str, pyrodigal.Genes]:
-
+def predict_genes(find_genes, name, seq) -> tuple[str, pyrodigal.Genes]:
     return (name, find_genes(seq))
 
 
-def write_faa(outfaa: str, contig_to_genes: List[Tuple[str, pyrodigal.Genes]]) -> None:
+def write_faa(outfaa: str, contig_to_genes: list[tuple[str, pyrodigal.Genes]]) -> None:
     """
     Write predicted protein sequences to a FASTA file.
 
@@ -72,7 +73,7 @@ def write_faa(outfaa: str, contig_to_genes: List[Tuple[str, pyrodigal.Genes]]) -
     :param contig_to_genes: A dictionary mapping contig names to predicted genes.
 
     """
-    logging.info("Writing predicted protein sequences.")
+    logger.info("Writing predicted protein sequences")
     with gzip.open(outfaa, "wt") as fl:
         for contig_id, genes in contig_to_genes:
             genes.write_translations(fl, contig_id)
@@ -96,7 +97,7 @@ def is_nucleic_acid(sequence: str) -> bool:
     return False
 
 
-def parse_faa_file(faa_file: str) -> Dict[str, List[str]]:
+def parse_faa_file(faa_file: str) -> dict[str, list[str]]:
     """
     Parse a FASTA file containing protein sequences and organize them by contig.
 
@@ -129,7 +130,7 @@ def parse_faa_file(faa_file: str) -> Dict[str, List[str]]:
     return dict(contig_to_genes)
 
 
-def get_aa_composition(genes: List[str]) -> Counter:
+def get_aa_composition(genes: list[str]) -> Counter:
     """
     Calculate the amino acid composition of a list of protein sequences.
 
@@ -144,8 +145,8 @@ def get_aa_composition(genes: List[str]) -> Counter:
 
 
 def get_contig_cds_metadata_flat(
-    contig_to_genes: Dict[str, List[str]]
-) -> Tuple[Dict[str, int], Dict[str, Counter], Dict[str, int]]:
+    contig_to_genes: dict[str, list[str]],
+) -> tuple[dict[str, int], dict[str, Counter], dict[str, int]]:
     """
     Calculate metadata for contigs, including CDS count, amino acid composition, and total amino acid length.
 
@@ -159,20 +160,20 @@ def get_contig_cds_metadata_flat(
     contig_to_aa_counter = {
         contig: get_aa_composition(genes) for contig, genes in contig_to_genes.items()
     }
-    logging.info("Calculating amino acid composition.")
+    logger.info("Calculating amino acid composition")
 
     contig_to_aa_length = {
         contig: sum(counter.values())
         for contig, counter in contig_to_aa_counter.items()
     }
-    logging.info("Calculating total amino acid length.")
+    logger.info("Calculating total amino acid length")
 
     return contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length
 
 
 def get_contig_cds_metadata(
-    contig_to_genes: Dict[int, Union[Any, List[Any]]], threads: int
-) -> Dict[str, Dict]:
+    contig_to_genes: dict[int, Any | list[Any]], threads: int
+) -> dict[str, dict]:
     """
     Calculate metadata for contigs in parallel, including CDS count, amino acid composition, and total amino acid length.
 
@@ -185,7 +186,7 @@ def get_contig_cds_metadata(
     }
 
     contig_to_future = {}
-    logging.info(f"Collecting contig amino acid composition using {threads} threads.")
+    logger.info(f"Collecting contig amino acid composition using {threads} threads")
     with cf.ProcessPoolExecutor(max_workers=threads) as tpe:
         for contig, genes in contig_to_genes.items():
             contig_to_future[contig] = tpe.submit(get_aa_composition, genes)
@@ -193,13 +194,13 @@ def get_contig_cds_metadata(
     contig_to_aa_counter = {
         contig: future.result() for contig, future in contig_to_future.items()
     }
-    logging.info("Calculating amino acid composition in parallel.")
+    logger.info("Calculating amino acid composition in parallel")
 
     contig_to_aa_length = {
         contig: sum(counter.values())
         for contig, counter in contig_to_aa_counter.items()
     }
-    logging.info("Calculating total amino acid length in parallel.")
+    logger.info("Calculating total amino acid length in parallel")
 
     contig_info = {
         "contig_to_cds_count": contig_to_cds_count,
@@ -211,7 +212,7 @@ def get_contig_cds_metadata(
 
 
 def filter_faa_file(
-    contigs_to_keep: List[str],
+    contigs_to_keep: list[str],
     input_faa_file: Path,
     filtered_faa_file: Path,
 ):
@@ -250,13 +251,13 @@ def filter_faa_file(
     contigs_not_in_keep_list = len(contigs_parsed - set(contigs_to_keep))
 
     # Log the computed metrics
-    logging.info(f"Processing protein sequences from '{input_faa_file}'.")
-    logging.info(
-        f"Filtered {input_faa_file} to retain genes from {total_contigs} contigs that are included in the input bins."
+    logger.info(f"Processing protein sequences from '{input_faa_file}'")
+    logger.info(
+        f"Filtered '{input_faa_file}' to retain genes from {total_contigs} contigs that are included in the input bins"
     )
-    logging.debug(
-        f"Found {contigs_with_no_genes}/{total_contigs}  contigs ({contigs_with_no_genes / total_contigs:.2%}) with no genes."
+    logger.debug(
+        f"Found {contigs_with_no_genes}/{total_contigs} contigs ({contigs_with_no_genes / total_contigs:.2%}) with no genes"
     )
-    logging.debug(
-        f"{contigs_not_in_keep_list} contigs from the input FASTA file are not in the keep list."
+    logger.debug(
+        f"{contigs_not_in_keep_list} contigs from the input FASTA file are not in the keep list"
     )

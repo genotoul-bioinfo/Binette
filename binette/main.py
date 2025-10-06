@@ -8,28 +8,28 @@ Maintainer  : Jean Mainguy
 Portability : POSIX
 """
 
-import sys
 import logging
 import os
-import typer
-from typing import List, Dict, Optional, Set, Tuple, Annotated
+import sys
 from pathlib import Path
+from typing import Annotated
+
 import pyfastx
-
-from rich.logging import RichHandler
+import typer
 from rich.console import Console
-
+from rich.logging import RichHandler
 
 import binette
 from binette import (
-    contig_manager,
-    cds,
-    diamond,
-    bin_quality,
     bin_manager,
+    bin_quality,
+    cds,
+    contig_manager,
+    diamond,
+)
+from binette import (
     io_manager as io,
 )
-
 
 logger = logging.getLogger(__name__)
 err_console = Console(stderr=True)
@@ -64,10 +64,8 @@ def verbose_callback(
         datefmt="[%X]",
         handlers=[RichHandler(console=err_console)],
     )
-    logging.info("Program started")
-    logging.info(
-        f'command line: {" ".join(sys.argv)}',
-    )
+    logger.info("Program started")
+    logger.info(f"Command line: {' '.join(sys.argv)}")
 
 
 def preprocess_args():
@@ -75,7 +73,8 @@ def preprocess_args():
     Typer doesn't support whitespace-separated multi-value options.
 
     We preprocess the sysargv so that:
-    - python3 app.py some_command --filters filter1 filter2 filter3 --environments env1 env2 env3
+    - python3 app.py some_command --filters filter1 filter2 filter3 \
+      --environments env1 env2 env3
 
     becomes:
     - python3 app.py some_command --filters filter1 --filters filter2 --filters filter3 --environments env1 --environments env2 --environments env3
@@ -86,7 +85,7 @@ def preprocess_args():
 
     # get main cmd
     final_cmd = []
-    for idx, arg in enumerate(sys.argv):
+    for _, arg in enumerate(sys.argv):
         if any(arg.startswith(_) for _ in ["-", "--"]):
             break
         else:
@@ -124,10 +123,10 @@ app = typer.Typer(
 
 
 def parse_input_files(
-    bin_dirs: List[Path],
-    contig2bin_tables: List[Path],
+    bin_dirs: list[Path],
+    contig2bin_tables: list[Path],
     contigs_fasta: Path,
-    fasta_extensions: Set[str] = {".fasta", ".fna", ".fa"},
+    fasta_extensions: set[str] | None = None,
 ):
     """
     Parses input files to retrieve information related to bins and contigs.
@@ -143,15 +142,17 @@ def parse_input_files(
         - Dictionary mapping bins to lists of contigs.
         - Dictionary mapping contig names to their lengths.
     """
+    if fasta_extensions is None:
+        fasta_extensions = {".fasta", ".fa", ".fna"}
 
     if bin_dirs:
-        logging.info("Parsing bin directories.")
+        logger.info("Parsing bin directories")
         bin_name_to_bin_dir = io.infer_bin_set_names_from_input_paths(bin_dirs)
         bin_set_name_to_bins_info = bin_manager.parse_bin_directories(
             bin_name_to_bin_dir, fasta_extensions
         )
     else:
-        logging.info("Parsing bin2contig files.")
+        logger.info("Parsing bin2contig files")
         bin_name_to_bin_table = io.infer_bin_set_names_from_input_paths(
             contig2bin_tables
         )
@@ -159,12 +160,12 @@ def parse_input_files(
             bin_name_to_bin_table
         )
 
-    logging.info(f"Processing {len(bin_set_name_to_bins_info)} bin sets.")
+    logger.info(f"Processing {len(bin_set_name_to_bins_info)} bin sets")
     for bin_set_id, bins_info in bin_set_name_to_bins_info.items():
-        logging.info(f" {bin_set_id} - {len(bins_info)} bins")
+        logger.info(f"  {bin_set_id} - {len(bins_info)} bins")
 
     contigs_in_bins = bin_manager.get_contigs_in_bin_sets(bin_set_name_to_bins_info)
-    logging.info(f"Found {len(contigs_in_bins)} contigs in input bins")
+    logger.info(f"Found {len(contigs_in_bins)} contigs in input bins")
 
     contig_to_index = contig_manager.make_contig_index(contigs_in_bins)
 
@@ -174,8 +175,8 @@ def parse_input_files(
 
     # original_bins = bin_manager.dereplicate_bin_sets(bin_set_name_to_bins.values())
 
-    logging.info(
-        f"Parsing contig fasta file to retrieve lengths of contigs: {contigs_fasta}"
+    logger.info(
+        f"Parsing contig fasta file '{contigs_fasta}' to retrieve contig lengths"
     )
 
     contigs_in_bins_set = set(contigs_in_bins)
@@ -185,7 +186,7 @@ def parse_input_files(
         if name in contigs_in_bins_set
     }
 
-    logging.debug("Parsing contig fasta is done")
+    logger.debug("Finished parsing contig fasta file")
     # check if all contigs from input bins are present in contigs file
     unexpected_contigs = {
         contig for contig in contigs_in_bins if contig not in contig_to_length
@@ -193,10 +194,13 @@ def parse_input_files(
 
     if len(unexpected_contigs):
         raise ValueError(
-            f"{len(unexpected_contigs)} contigs from the input bins were not found in the contigs file '{contigs_fasta}'. "
-            f"The missing contigs are: {', '.join(unexpected_contigs)}. Please ensure all contigs from input bins are present in contig file."
+            f"{len(unexpected_contigs)} contigs from the input bins were not "
+            f"found in the contigs file '{contigs_fasta}'. "
+            f"The missing contigs are: {', '.join(unexpected_contigs)}. "
+            f"Please ensure all contigs from input bins are present in "
+            f"contig file."
         )
-    logging.debug("No unexpected contigs found.")
+    logger.debug("No unexpected contigs found")
 
     contig_id_to_length = {
         contig_to_index[name]: length for name, length in contig_to_length.items()
@@ -213,14 +217,14 @@ def parse_input_files(
 def manage_protein_alignement(
     faa_file: Path,
     contigs_fasta: Path,
-    contigs_in_bins: Set[str],
+    contigs_in_bins: set[str],
     diamond_result_file: Path,
-    checkm2_db: Optional[Path],
+    checkm2_db: Path | None,
     threads: int,
     use_existing_protein_file: bool,
     resume_diamond: bool,
     low_mem: bool,
-) -> Tuple[Dict[str, int], Dict[str, List[str]]]:
+) -> tuple[dict[str, int], dict[str, list[str]]]:
     """
     Predicts or reuses proteins prediction and runs diamond on them.
 
@@ -239,7 +243,7 @@ def manage_protein_alignement(
 
     # Predict or reuse proteins prediction and run diamond on them
     if use_existing_protein_file:
-        logging.info(f"Parsing faa file: {faa_file}.")
+        logger.info(f"Parsing protein sequences from '{faa_file}'")
         contig_to_genes = cds.parse_faa_file(faa_file.as_posix())
         io.check_contig_consistency(
             contigs_in_bins,
@@ -279,7 +283,7 @@ def manage_protein_alignement(
             low_mem=low_mem,
         )
 
-    logging.info("Parsing diamond results.")
+    logger.info("Parsing diamond results")
     contig_to_kegg_counter = diamond.get_contig_to_kegg_id(
         diamond_result_file.as_posix()
     )
@@ -296,12 +300,11 @@ def manage_protein_alignement(
 
 
 def write_bins_fasta(
-    selected_bins: List[bin_manager.Bin],
+    selected_bins: list[bin_manager.Bin],
     contigs_fasta: Path,
     contigs_in_bins: dict,
     outdir: Path,
 ):
-
     for b in selected_bins:
         b.contigs = {contigs_in_bins[c_index] for c_index in b.contigs}
 
@@ -315,7 +318,7 @@ def write_bins_fasta(
 
 
 def log_selected_bin_info(
-    selected_bins: List[bin_manager.Bin],
+    selected_bins: list[bin_manager.Bin],
     hq_min_completeness: float,
     hq_max_conta: float,
 ):
@@ -331,13 +334,13 @@ def log_selected_bin_info(
     """
 
     # Log completeness and contamination in debug log
-    logging.debug("High quality bins:")
+    logger.debug("High quality bins:")
     for sb in selected_bins:
         if sb.is_high_quality(
             min_completeness=hq_min_completeness, max_contamination=hq_max_conta
         ):
-            logging.debug(
-                f"> {sb} completeness={sb.completeness}, contamination={sb.contamination}"
+            logger.debug(
+                f"  {sb} completeness={sb.completeness}, contamination={sb.contamination}"
             )
 
     # Count high-quality bins and single-contig high-quality bins
@@ -355,8 +358,8 @@ def log_selected_bin_info(
     thresholds = (
         f"(completeness >= {hq_min_completeness} and contamination <= {hq_max_conta})"
     )
-    logging.info(
-        f"{hq_bins}/{len(selected_bins)} selected bins have a high quality {thresholds}."
+    logger.info(
+        f"{hq_bins}/{len(selected_bins)} selected bins have high quality {thresholds}"
     )
 
 
@@ -367,7 +370,7 @@ def log_selected_bin_info(
 def run_binette(
     # Input arguments - Mutually exclusive group (handled in code)
     bin_dirs: Annotated[
-        Optional[List[Path]],
+        list[Path] | None,
         typer.Option(
             "--bin_dirs",
             "-d",
@@ -378,7 +381,7 @@ def run_binette(
         ),
     ] = None,
     contig2bin_tables: Annotated[
-        Optional[List[Path]],
+        list[Path] | None,
         typer.Option(
             "--contig2bin_tables",
             "-b",
@@ -398,7 +401,7 @@ def run_binette(
         ),
     ] = ...,  # Required
     proteins: Annotated[
-        Optional[Path],
+        Path | None,
         typer.Option(
             "--proteins",
             "-p",
@@ -495,16 +498,20 @@ def run_binette(
     ] = 2.0,
     # Advanced options
     fasta_extensions: Annotated[
-        List[str],
+        list[str],
         typer.Option(
             "--fasta_extensions",
             "-e",
             help="FASTA file extensions to search for in bin directories (used with --bin_dirs).",
             rich_help_panel="Advanced Options",
         ),
-    ] = [".fasta", ".fa", ".fna"],
+    ] = [  # noqa: B006
+        ".fasta",
+        ".fa",
+        ".fna",
+    ],
     checkm2_db: Annotated[
-        Optional[Path],
+        Path | None,
         typer.Option(
             "--checkm2_db",
             help="Path to CheckM2 diamond database. By default the database set via <checkm2 database> is used.",
@@ -596,12 +603,12 @@ def run_binette(
 
     if debug:
         index_to_contig_file = outdir / "index_to_contig.tsv"
-        logging.info(f"Writing index to contig mapping in {index_to_contig_file}")
+        logger.info(f"Writing index to contig mapping to '{index_to_contig_file}'")
         with open(index_to_contig_file, "w") as flout:
             flout.write("\n".join((f"{i}\t{c}" for i, c in enumerate(contigs_in_bins))))
 
     if proteins and not resume:
-        logging.info(f"Using the provided protein sequences file: {proteins}")
+        logger.info(f"Using the provided protein sequences file '{proteins}'")
         use_existing_protein_file = True
 
         cds.filter_faa_file(
@@ -630,13 +637,13 @@ def run_binette(
     )
 
     # Extract cds metadata ##
-    logging.info("Compute cds metadata.")
+    logger.info("Computing CDS metadata")
     contig_metadat = cds.get_contig_cds_metadata(contig_to_genes, threads)
 
     contig_metadat["contig_to_kegg_counter"] = contig_to_kegg_counter
     contig_metadat["contig_to_length"] = contig_to_length
 
-    logging.info("Add size and assess quality of input bins")
+    logger.info("Adding size and assessing quality of input bins")
     original_bins = bin_quality.add_bin_metrics(
         list(contig_key_to_original_bin.values()),
         contig_metadat,
@@ -648,12 +655,12 @@ def run_binette(
 
     bin_quality.add_bin_size_and_N50(original_bins, contig_to_length)
 
-    logging.info(
-        f"Writting original input bin metrics to directory: {original_bin_report_dir}"
+    logger.info(
+        f"Writing original input bin metrics to directory '{original_bin_report_dir}'"
     )
     io.write_original_bin_metrics(original_bins, original_bin_report_dir)
 
-    logging.info("Create intermediate bins:")
+    logger.info("Creating intermediate bins")
 
     contig_lengths = bin_quality.prepare_contig_sizes(contig_to_length)
 
@@ -667,7 +674,7 @@ def run_binette(
         disable_progress_bar=not progress,
     )
 
-    logging.info(f"Assess quality for {len(contig_key_to_new_bin)} intermediate bins.")
+    logger.info(f"Assessing quality for {len(contig_key_to_new_bin)} intermediate bins")
 
     new_bins = bin_quality.add_bin_metrics(
         bins=contig_key_to_new_bin.values(),
@@ -684,7 +691,7 @@ def run_binette(
 
     if debug:
         all_bin_compo_file = outdir / "all_bins_quality_reports.tsv"
-        logging.info(f"Writing all bins in {all_bin_compo_file}")
+        logger.info(f"Writing all bins to '{all_bin_compo_file}'")
         io.write_bin_info(
             contig_key_to_all_bin.values(), all_bin_compo_file, add_contigs=True
         )
@@ -696,7 +703,7 @@ def run_binette(
         prefix=prefix,
     )
 
-    logging.info(f"Writing selected bins in {final_bin_report}")
+    logger.info(f"Writing selected bins to '{final_bin_report}'")
     io.write_bin_info(selected_bins, output=final_bin_report)
 
     if write_fasta_bins:

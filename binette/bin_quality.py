@@ -3,17 +3,18 @@ import gc
 import logging
 import os
 from collections import Counter, defaultdict
+from collections.abc import Iterable, Iterator
 from itertools import islice
-from typing import Dict, Iterable, Tuple, Iterator, List
 
+import joblib
 import numpy as np
 import pandas as pd
-from binette.bin_manager import Bin
+from checkm2 import keggData
 from rich.progress import Progress
 
+from binette.bin_manager import Bin
 
-from checkm2 import keggData
-import joblib
+logger = logging.getLogger(__name__)
 
 # Suppress unnecessary TensorFlow warnings
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
@@ -30,7 +31,6 @@ def _initialize_keras_environment():
     """Initialize TensorFlow/Keras to ensure thread safety and memory management"""
     global _keras_initialized
     if not _keras_initialized:
-
         os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"  # Suppress TF warnings
 
         try:
@@ -48,11 +48,9 @@ def _initialize_keras_environment():
             tf.config.threading.set_inter_op_parallelism_threads(1)
 
             _keras_initialized = True
-            logging.debug("TensorFlow/Keras environment initialized")
+            logger.debug("TensorFlow/Keras environment initialized")
         except Exception as e:
-            logging.warning(
-                f"Failed to fully initialize TensorFlow environment: {str(e)}"
-            )
+            logger.warning(f"Failed to fully initialize TensorFlow environment: {e!s}")
 
 
 def get_modelPostprocessing():
@@ -85,10 +83,10 @@ def get_modelProcessing():
 
 
 def get_bins_metadata_df(
-    bins: List[Bin],
-    contig_to_cds_count: Dict[str, int],
-    contig_to_aa_counter: Dict[str, Counter],
-    contig_to_aa_length: Dict[str, int],
+    bins: list[Bin],
+    contig_to_cds_count: dict[str, int],
+    contig_to_aa_counter: dict[str, Counter],
+    contig_to_aa_length: dict[str, int],
 ) -> pd.DataFrame:
     """
     Optimized: Generate a DataFrame containing metadata for a list of bins.
@@ -143,15 +141,15 @@ def get_bins_metadata_df(
         if col not in metadata_df.columns:
             metadata_df[col] = 0
 
-    metadata_df = metadata_df[all_cols].astype({col: int for col in metadata_order})
+    metadata_df = metadata_df[all_cols].astype(dict.fromkeys(metadata_order, int))
     metadata_df = metadata_df.set_index("Name", drop=False)
 
     return metadata_df
 
 
 def get_diamond_feature_per_bin_df(
-    bins: List[Bin], contig_to_kegg_counter: Dict[str, Counter]
-) -> Tuple[pd.DataFrame, int]:
+    bins: list[Bin], contig_to_kegg_counter: dict[str, Counter]
+) -> tuple[pd.DataFrame, int]:
     """
     Optimized: Generate a DataFrame containing Diamond feature counts per bin,
     including KEGG KO counts and completeness information for pathways, categories, and modules.
@@ -194,7 +192,7 @@ def get_diamond_feature_per_bin_df(
     ko_count_per_bin_df["Name"] = ko_count_per_bin_df.index
 
     # --- Calculate higher-level completeness ---
-    logging.debug("Calculating completeness of pathways, categories, and modules.")
+    logger.debug("Calculating completeness of pathways, categories, and modules")
     KO_pathways = calculate_KO_group(KeggCalc, "KO_Pathways", ko_count_per_bin_df)
     KO_categories = calculate_KO_group(KeggCalc, "KO_Categories", ko_count_per_bin_df)
 
@@ -296,7 +294,7 @@ def calculate_module_completeness(
     return pd.DataFrame(result, columns=modules, index=KO_gene_data.index)
 
 
-def prepare_contig_sizes(contig_to_size: Dict[int, int]) -> np.ndarray:
+def prepare_contig_sizes(contig_to_size: dict[int, int]) -> np.ndarray:
     """
     Prepare a numpy array of contig sizes for fast access.
 
@@ -326,7 +324,7 @@ def compute_N50(lengths: np.ndarray) -> int:
     return arr[np.searchsorted(csum, half)]
 
 
-def add_bin_size_and_N50(bins: Iterable[Bin], contig_to_size: Dict[int, int]):
+def add_bin_size_and_N50(bins: Iterable[Bin], contig_to_size: dict[int, int]):
     """
     Add bin size and N50 metrics to a list of bin objects.
 
@@ -348,8 +346,8 @@ def add_bin_size_and_N50(bins: Iterable[Bin], contig_to_size: Dict[int, int]):
 
 
 def add_bin_metrics(
-    bins: List[Bin],
-    contig_info: Dict,
+    bins: list[Bin],
+    contig_info: dict,
     contamination_weight: float,
     threads: int = 1,
     checkm2_batch_size: int = 500,
@@ -373,13 +371,13 @@ def add_bin_metrics(
     :return: List of processed bin objects with quality metrics added.
     """
     if not bins:
-        logging.warning("No bins provided for quality assessment")
+        logger.warning("No bins provided for quality assessment")
         return []
 
     bins_list = list(bins)
 
-    logging.info(
-        f"Assessing bin quality for {len(bins_list)} bins using {threads} threads."
+    logger.info(
+        f"Assessing bin quality for {len(bins_list)} bins using {threads} threads"
     )
 
     # Extract data from contig_info
@@ -408,7 +406,7 @@ def add_bin_metrics(
 
     if threads == 1 or len(bins_list) <= min_bins_per_chunk * 2:
         if len(bins_list) <= min_bins_per_chunk:
-            logging.info(
+            logger.info(
                 f"Only {len(bins_list)} bins (≤ {min_bins_per_chunk}). Using sequential processing to avoid multiprocessing overhead."
             )
         return _process_sequential()
@@ -422,14 +420,14 @@ def add_bin_metrics(
     # Use balanced chunking to distribute work evenly across available threads
     chunks_list = balanced_chunks(bins_list, n_chunks)
 
-    logging.info(
+    logger.info(
         f"Created {len(chunks_list)} balanced chunks for {n_jobs} parallel jobs"
     )
-    logging.info(
+    logger.info(
         f"Configuration: {len(bins_list)} bins, {threads} threads, {n_chunks} chunks, batch_size={checkm2_batch_size}"
     )
     for idx, chunk in enumerate(chunks_list):
-        logging.debug(f"Chunk {idx + 1}/{len(chunks_list)} contains {len(chunk)} bins")
+        logger.debug(f"Chunk {idx + 1}/{len(chunks_list)} contains {len(chunk)} bins")
 
     # Define a simple function to process a chunk
     def process_chunk(chunk_bins):
@@ -479,7 +477,7 @@ def add_bin_metrics(
         return all_bins
 
 
-def chunks(iterable, size: int) -> Iterator[Tuple]:
+def chunks(iterable, size: int) -> Iterator[tuple]:
     """
     Generate adjacent chunks of data from an iterable.
 
@@ -491,7 +489,7 @@ def chunks(iterable, size: int) -> Iterator[Tuple]:
     return iter(lambda: tuple(islice(it, size)), ())
 
 
-def balanced_chunks(items: List, num_chunks: int) -> List[List]:
+def balanced_chunks(items: list, num_chunks: int) -> list[list]:
     """
     Distribute items into balanced chunks with more even size distribution.
 
@@ -524,10 +522,10 @@ def balanced_chunks(items: List, num_chunks: int) -> List[List]:
 
 def assess_bins_quality(
     bins: Iterable[Bin],
-    contig_to_kegg_counter: Dict,
-    contig_to_cds_count: Dict,
-    contig_to_aa_counter: Dict,
-    contig_to_aa_length: Dict,
+    contig_to_kegg_counter: dict,
+    contig_to_cds_count: dict,
+    contig_to_aa_counter: dict,
+    contig_to_aa_length: dict,
     contamination_weight: float,
     checkm2_batch_size: int,
     postProcessor=None,
@@ -569,7 +567,7 @@ def assess_bins_quality(
         )
 
     # Split bins into smaller batches for memory management
-    logging.debug(
+    logger.debug(
         f"Splitting {len(bins_list)} bins into batches of {checkm2_batch_size} for CheckM2 processing"
     )
 
@@ -577,8 +575,8 @@ def assess_bins_quality(
     batch_chunks = list(chunks(bins_list, checkm2_batch_size))
 
     for i, batch_bins in enumerate(batch_chunks):
-        logging.debug(
-            f"Processing CheckM2 batch {i+1}/{len(batch_chunks)} with {len(batch_bins)} bins"
+        logger.debug(
+            f"Processing CheckM2 batch {i + 1}/{len(batch_chunks)} with {len(batch_bins)} bins"
         )
 
         # Process this batch
@@ -602,11 +600,11 @@ def assess_bins_quality(
 
 
 def _assess_bins_quality_batch(
-    bins: List[Bin],
-    contig_to_kegg_counter: Dict,
-    contig_to_cds_count: Dict,
-    contig_to_aa_counter: Dict,
-    contig_to_aa_length: Dict,
+    bins: list[Bin],
+    contig_to_kegg_counter: dict,
+    contig_to_cds_count: dict,
+    contig_to_aa_counter: dict,
+    contig_to_aa_length: dict,
     contamination_weight: float,
     postProcessor,
     threads: int,
@@ -636,12 +634,12 @@ def _assess_bins_quality_batch(
 
     vector_array = feature_vectors.iloc[:, 1:].values.astype(float)
 
-    logging.debug("Predicting completeness and contamination using the general model.")
+    logger.debug("Predicting completeness and contamination using the general model")
     general_results_comp, general_results_cont = modelProc.run_prediction_general(
         vector_array
     )
 
-    logging.debug("Predicting completeness using the specific model.")
+    logger.debug("Predicting completeness using the specific model")
     specific_model_vector_len = (ko_list_length + len(metadata_df.columns)) - 1
 
     # also retrieve scaled data for CSM calculations
@@ -649,7 +647,7 @@ def _assess_bins_quality_batch(
         vector_array, specific_model_vector_len
     )
 
-    logging.debug(
+    logger.debug(
         "Using cosine similarity to reference data to select an appropriate predictor model."
     )
 

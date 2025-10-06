@@ -70,3 +70,5 @@ test_data/
 .pytest_cache/
 
 Binette_TestData/
+
+.coverage

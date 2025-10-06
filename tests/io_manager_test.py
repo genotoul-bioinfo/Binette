@@ -1,9 +1,10 @@
-import pytest
-from binette import io_manager
 from pathlib import Path
-from unittest.mock import patch
-from binette.bin_manager import Bin
+
+import pytest
 from pyroaring import BitMap
+
+from binette import io_manager
+from binette.bin_manager import Bin
 
 
 @pytest.fixture
@@ -245,10 +246,10 @@ def test_write_bins_fasta(tmp_path, bin1, bin2):
     assert (outdir / "bin_1.fa").exists()
     assert (outdir / "bin_2.fa").exists()
 
-    with open(outdir / "bin_1.fa", "r") as bin1_file:
+    with open(outdir / "bin_1.fa") as bin1_file:
         assert bin1_file.read() == ">contig1\nACGT\n>contig3\nAAAA\n"
 
-    with open(outdir / "bin_2.fa", "r") as bin2_file:
+    with open(outdir / "bin_2.fa") as bin2_file:
         assert bin2_file.read() == ">contig2\nTGCA\n>contig4\nCCCC\n"
 
 
@@ -332,9 +333,9 @@ def test_write_original_bin_metrics(bin1, bin2, tmp_path):
         temp_directory / "input_bins_2.test2.tsv",
     ]
 
-    assert (
-        temp_directory.exists()
-    ), f"Expected temp_directory {temp_directory} was not created."
+    assert temp_directory.exists(), (
+        f"Expected temp_directory {temp_directory} was not created."
+    )
 
     for file in expected_files:
         assert file.exists(), f"Expected file {file} was not created."

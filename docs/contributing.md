@@ -44,20 +44,24 @@ For minor changes like fixing typos or making small edits, create a new Pull Req
 
    Installing in editable mode allows you to modify the codebase and experiment with new features directly.  
 
-5. **Apply Code Formatting with Black:**  
-   To maintain consistent code styling, we use [Black](https://github.com/psf/black) as our code formatter.  
-   - Code changes are automatically checked for formatting as part of our CI pipeline via a GitHub Action.  
-   - **Ensure your code is formatted with Black before committing.**  
+5. **Code Quality and Formatting with Ruff:**  
+   To maintain consistent code styling and quality, we use [Ruff](https://docs.astral.sh/ruff/) as our linter and formatter.  
+   - Code changes are automatically checked for linting and formatting as part of our CI pipeline via a GitHub Action.  
+   - **Ensure your code passes Ruff checks before committing.**  
 
-   To format your code:  
-   1. Install Black (e.g., `pip install black`).  
-   2. Run Black from the root of the Binette repository:  
+   To check and format your code:  
+   1. Install Ruff (e.g., `pip install ruff`).  
+   2. Run Ruff linter and formatter from the root of the Binette repository:  
       ```bash
-      black .
+      # Check for linting issues (with auto-fix)
+      ruff check --fix binette/
+      
+      # Format code
+      ruff format binette/
       ```  
 
    ```{tip}
-   Configure your IDE to integrate Black for automatic code formatting as you work.
+   Configure your IDE to integrate Ruff for automatic code linting and formatting as you work.
    ```  
 
 ### Making Your Changes

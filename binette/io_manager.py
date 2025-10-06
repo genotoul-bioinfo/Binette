@@ -1,17 +1,19 @@
-from collections import defaultdict
 import logging
-from typing import Iterable, List, Dict, Tuple
+from collections import defaultdict
+from collections.abc import Iterable
+from pathlib import Path
+
 import pandas as pd
+import pyfastx
 
 from binette.bin_manager import Bin
 
-from pathlib import Path
-import pyfastx
+logger = logging.getLogger(__name__)
 
 
 def get_paths_common_prefix_suffix(
-    paths: List[Path],
-) -> Tuple[List[str], List[str], List[str]]:
+    paths: list[Path],
+) -> tuple[list[str], list[str], list[str]]:
     """
     Determine the common prefix parts, suffix parts, and common extensions of the last part of a list of pathlib.Path objects.
 
@@ -73,7 +75,7 @@ def get_paths_common_prefix_suffix(
     return common_prefix, common_suffix, common_extensions
 
 
-def infer_bin_set_names_from_input_paths(input_bins: List[Path]) -> Dict[str, Path]:
+def infer_bin_set_names_from_input_paths(input_bins: list[Path]) -> dict[str, Path]:
     """
     Infer bin set names from a list of bin input directories or files.
 
@@ -87,7 +89,6 @@ def infer_bin_set_names_from_input_paths(input_bins: List[Path]) -> Dict[str, Pa
     )
 
     for path in input_bins:
-
         specific_parts = path.parts[
             len(common_prefix) : len(path.parts) - len(common_suffix)
         ]
@@ -104,11 +105,11 @@ def infer_bin_set_names_from_input_paths(input_bins: List[Path]) -> Dict[str, Pa
 
         bin_name_to_bin_dir[bin_set_name] = path
 
-    logging.debug(f"Input bins: {' '.join([path.as_posix() for path in input_bins])}")
-    logging.debug(f"Common prefix to remove: {common_prefix}")
-    logging.debug(f"Common suffix to remove: {common_suffix}")
-    logging.debug(f"Common extension to remove: {common_suffix}")
-    logging.debug(f"bin_name_to_bin_dir: {bin_name_to_bin_dir}")
+    logger.debug(f"Input bins: {' '.join([path.as_posix() for path in input_bins])}")
+    logger.debug(f"Common prefix to remove: {common_prefix}")
+    logger.debug(f"Common suffix to remove: {common_suffix}")
+    logger.debug(f"Common extension to remove: {common_suffix}")
+    logger.debug(f"bin_name_to_bin_dir: {bin_name_to_bin_dir}")
 
     return bin_name_to_bin_dir
 
@@ -170,10 +171,10 @@ def write_bin_info(bins: Iterable[Bin], output: Path, add_contigs: bool = False)
 
 
 def write_bins_fasta(
-    selected_bins: List[Bin],
+    selected_bins: list[Bin],
     contigs_fasta: Path,
     outdir: Path,
-    contigs_names: List[str],
+    contigs_names: list[str],
     max_buffer_size: int = 50_000_000,
 ):
     """
@@ -200,9 +201,9 @@ def write_bins_fasta(
             contig_name = contigs_names[contig_id]
             contig_to_bins[contig_name] = sbin.name
 
-    assert len(contig_to_bins) == sum(
-        len(sbin.contigs) for sbin in selected_bins
-    ), "Some contigs are present in multiple bins but should be unique."
+    assert len(contig_to_bins) == sum(len(sbin.contigs) for sbin in selected_bins), (
+        "Some contigs are present in multiple bins but should be unique."
+    )
 
     buffer = defaultdict(list)
     buffer_size = 0
@@ -248,7 +249,7 @@ def check_contig_consistency(
     :param elsewhere_file: Path to the file from an external source.
     :raises AssertionError: If inconsistencies in contig names are found.
     """
-    logging.debug("check_contig_consistency.")
+    logger.debug("Checking contig consistency")
     are_contigs_consistent = len(
         set(contigs_from_elsewhere) | set(contigs_from_assembly)
     ) <= len(set(contigs_from_assembly))
@@ -278,16 +279,16 @@ def check_resume_file(faa_file: Path, diamond_result_file: Path) -> None:
         error_msg = (
             f"Protein file '{faa_file}' does not exist. Resuming is not possible."
         )
-        logging.error(error_msg)
+        logger.error(error_msg)
         raise FileNotFoundError(error_msg)
 
     if not diamond_result_file.exists():
         error_msg = f"Diamond result file '{diamond_result_file}' does not exist. Resuming is not possible."
-        logging.error(error_msg)
+        logger.error(error_msg)
         raise FileNotFoundError(error_msg)
 
 
-def write_original_bin_metrics(original_bins: List[Bin], original_bin_report_dir: Path):
+def write_original_bin_metrics(original_bins: list[Bin], original_bin_report_dir: Path):
     """
     Write metrics of original input bins to a specified directory.
 
@@ -311,9 +312,9 @@ def write_original_bin_metrics(original_bins: List[Bin], original_bin_report_dir
             / f"input_bins_{i + 1}.{set_name.replace('/', '_')}.tsv"
         )
 
-        logging.debug(
-            f"Writing metrics for bin set '{set_name}' to file: {bins_metric_file}"
+        logger.debug(
+            f"Writing metrics for bin set '{set_name}' to file '{bins_metric_file}'"
         )
         write_bin_info(bins, bins_metric_file)
 
-    logging.debug("Completed writing all original input bin metrics.")
+    logger.debug("Completed writing all original input bin metrics")
