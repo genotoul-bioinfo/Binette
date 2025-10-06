@@ -39,46 +39,46 @@ Test coverage is updated by a github workflow in the Action Tab. The test covera
 
 ## Functional Tests
 
-
-A functional test has been implemented in the CI github workflow. It performs an execution of binette on a toy dataset consisting of 4 small genomes. The test uses a checkm2 database that has been shrunk to the minimum to make diamond run faster. Finally, the results are compared with the expected results.
+Functional tests are included in the pytest test suite and verify that Binette works correctly with real data. When you run `pytest`, both unit and functional tests execute automatically using a toy dataset of 4 small genomes with a minimal CheckM2 database.
 
 The test dataset is stored in this github repository: [Binette TestData](https://github.com/genotoul-bioinfo/Binette_TestData).
 
-You can replicate this test locally by following the next steps:
+You can run the functional tests locally:
 
-
-1. **Install Binette**:
-
-   Make sure you have Binette installed on your system. You can refer to the [installation](./installation.md) instructions.
-
-
-2. **Clone the test dataset repository:
-
-   Clone the dataset repository using Git:
+1. **Clone the test dataset repository:**
 
 ```bash
-
 git clone https://github.com/genotoul-bioinfo/Binette_TestData.git
-
-cd Binette_TestData
-
 ```
 
-3. **Run Binette**:
-
-Run Binette on the test data with the following command
+2. **Run functional tests with pytest:**
 
 ```bash
-binette -b binning_results/* --contigs all_contigs.fna --checkm2_db checkm2_tiny_db/checkm2_tiny_db.dmnd -v -o test_results
+# Run only functional tests
+pytest tests/functional_tests/ --test-data-path Binette_TestData/ -v
 
+# Or run all tests (unit + functional)
+pytest --test-data-path Binette_TestData/
+
+# Alternatively, set environment variable
+export BINETTE_TEST_DATA_PATH=Binette_TestData/
+pytest tests/functional_tests/ -v
+```
+
+3. **Manual execution (alternative):**
+
+You can also run Binette manually on the test data:
+
+```bash
+cd Binette_TestData/
+binette -b binning_results/* --contigs all_contigs.fna --checkm2_db checkm2_tiny_db/checkm2_tiny_db.dmnd -v -o test_results
 ```
 
 This should complete in a few seconds.
 
-
 4. **Compare Results**: 
 
-After running Binette, you can compare the generated `final_bins_quality_reports.tsv` with the expected results stored in the `expected_results` folder. Some variation in the completeness, contamination, and score columns is expected due to Checkm2's slight variability.
+After running Binette, you can compare the generated `final_bins_quality_reports.tsv` with the expected results stored in the `expected_results` folder. 
 
 You can perform the comparison manually by using the head command:
 
