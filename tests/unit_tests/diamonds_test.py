@@ -241,4 +241,16 @@ def test_get_contig_to_kegg_id():
     assert result == expected_result
 
 
-# Additional tests can be added to cover more edge cases and scenarios.
+def test_get_contig_to_kegg_id_empty_file():
+    """Test that get_contig_to_kegg_id exits with code 3 when DIAMOND result file is empty."""
+    diamond_result_file = "empty_diamond_results.txt"
+
+    # Mock empty dataframe
+    empty_df = pd.DataFrame()
+
+    with patch("pandas.read_csv", return_value=empty_df):
+        with pytest.raises(SystemExit) as pytest_wrapped_e:
+            diamond.get_contig_to_kegg_id(diamond_result_file)
+
+    assert pytest_wrapped_e.type is SystemExit
+    assert pytest_wrapped_e.value.code == 3
