@@ -237,7 +237,7 @@ def get_bins_from_directory(
     )
 
     for bin_fasta_path in bin_fasta_files:
-        bin_name = bin_fasta_path.with_suffix('').name
+        bin_name = bin_fasta_path.with_suffix("").name
 
         contigs = {name for name, _ in pyfastx.Fastx(str(bin_fasta_path))}
 
