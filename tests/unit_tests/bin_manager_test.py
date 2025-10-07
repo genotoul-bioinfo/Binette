@@ -490,8 +490,8 @@ def test_get_bins_from_directory(create_temp_bin_files):
     assert bins[0]["contigs"] in [{"contig1", "contig2"}, {"contig3", "contig4"}]
     assert bins[0]["set_name"] == set_name
     assert bins[1]["set_name"] == set_name
-    assert bins[1]["bin_name"] in ["bin2.fasta", "bin1.fasta"]
-    assert bins[0]["bin_name"] in ["bin2.fasta", "bin1.fasta"]
+    assert bins[1]["bin_name"] in ["bin2", "bin1"]
+    assert bins[0]["bin_name"] in ["bin2", "bin1"]
 
 
 def test_get_bins_from_directory_no_files(tmpdir):
