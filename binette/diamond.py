@@ -120,25 +120,33 @@ def get_contig_to_kegg_id(diamond_result_file: str) -> dict:
     :param diamond_result_file: Path to the Diamond result file.
     :return: A dictionary mapping contig IDs to KEGG annotations.
     """
-    diamon_results_df = pd.read_csv(
+    diamond_results_df = pd.read_csv(
         diamond_result_file, sep="\t", usecols=[0, 1], names=["ProteinID", "annotation"]
     )
-    diamon_results_df[["Ref100_hit", "Kegg_annotation"]] = diamon_results_df[
+
+    if diamond_results_df.empty:
+        logger.error(
+            f"DIAMOND result file '{diamond_result_file}' is empty. "
+            "This can happen with low-quality assemblies where DIAMOND produces no hits."
+        )
+        sys.exit(3)
+
+    diamond_results_df[["Ref100_hit", "Kegg_annotation"]] = diamond_results_df[
         "annotation"
     ].str.split("~", n=1, expand=True)
 
     KeggCalc = keggData.KeggCalculator()
     defaultKOs = KeggCalc.return_default_values_from_category("KO_Genes")
 
-    diamon_results_df = diamon_results_df.loc[
-        diamon_results_df["Kegg_annotation"].isin(defaultKOs.keys())
+    diamond_results_df = diamond_results_df.loc[
+        diamond_results_df["Kegg_annotation"].isin(defaultKOs.keys())
     ]
-    diamon_results_df["contig"] = (
-        diamon_results_df["ProteinID"].str.split("_", n=-1).str[:-1].str.join("_")
+    diamond_results_df["contig"] = (
+        diamond_results_df["ProteinID"].str.split("_", n=-1).str[:-1].str.join("_")
     )
 
     contig_to_kegg_counter = (
-        diamon_results_df.groupby("contig")
+        diamond_results_df.groupby("contig")
         .agg({"Kegg_annotation": Counter})
         .reset_index()
     )
