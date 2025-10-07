@@ -56,6 +56,7 @@ class Bin:
         self.completeness = None
         self.contamination = None
         self.score = None
+        self.coding_density = None
         self.original_name = None
         self._checkm2_model_index = None
 
@@ -206,6 +207,25 @@ class Bin:
             self.completeness >= min_completeness
             and self.contamination <= max_contamination
         )
+
+    def add_coding_density(
+        self, contig_to_coding_length: dict[int, int]
+    ) -> float | None:
+        """
+        Calculate the coding density of the bin.
+
+        :param contig_to_coding_length: A dictionary mapping contig IDs to their total coding lengths.
+
+        :return: The coding density of the bin, or None if the length is not set or is zero.
+        """
+        if self.length is None or self.length == 0:
+            return None
+
+        total_coding = sum(
+            contig_to_coding_length.get(contig_id, 0) for contig_id in self.contigs
+        )
+
+        self.coding_density = total_coding / self.length
 
 
 def make_bins_from_bins_info(

@@ -84,7 +84,7 @@ def test_manage_protein_alignement_resume(tmp_path):
         # Call the function
 
         # Run the function with test data
-        contig_to_kegg_counter, contig_to_genes = manage_protein_alignement(
+        contig_to_kegg_counter, contig_to_genes, _ = manage_protein_alignement(
             faa_file=Path(faa_file),
             contigs_fasta=Path("contigs_fasta"),
             contigs_in_bins=set(("contig1", "contig2", "contig3")),
@@ -124,7 +124,7 @@ def test_manage_protein_alignement_not_resume(tmpdir, tmp_path):
     ):
         # Call the function
 
-        contig_to_kegg_counter, contig_to_genes = manage_protein_alignement(
+        contig_to_kegg_counter, contig_to_genes, _ = manage_protein_alignement(
             faa_file=Path(faa_file),
             contigs_fasta=Path(contigs_fasta),
             contigs_in_bins=set(("contig1", "contig2", "contig3")),
@@ -245,7 +245,7 @@ def test_manage_protein_alignment_no_resume(tmp_path):
         mock_predict.return_value = {"contig1": ["gene1"]}
 
         # Call the function
-        contig_to_kegg_counter, contig_to_genes = manage_protein_alignement(
+        contig_to_kegg_counter, contig_to_genes, _ = manage_protein_alignement(
             faa_file,
             contigs_fasta,
             contigs_in_bins,
