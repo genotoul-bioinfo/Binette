@@ -5,7 +5,6 @@ import os
 from collections import Counter, defaultdict
 from collections.abc import Iterable, Iterator
 from itertools import islice
-from pyexpat import model
 
 import joblib
 import numpy as np
