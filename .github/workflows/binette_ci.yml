@@ -44,6 +44,7 @@ jobs:
 
     # Install requirements 
     - uses: conda-incubator/setup-miniconda@v3
+      if: steps.cache-conda.outputs.cache-hit != 'true'
       with:
         # mamba-version: "*"
         python-version: ${{ matrix.python-version }}
