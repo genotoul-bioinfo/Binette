@@ -34,6 +34,7 @@ jobs:
         channels: conda-forge,bioconda
         environment-file: binette.yaml
         activate-environment: binette
+        conda-remove-defaults: true
   
     - name: Install binette
       run: |
