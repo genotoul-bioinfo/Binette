@@ -33,10 +33,10 @@ jobs:
       id: cache-conda
       with:
         path: |
-          /usr/share/miniconda/envs/panorama
-          ~/.conda/envs/panorama
-          ~/miniconda3/envs/panorama
-          /Users/runner/miniconda3/envs/panorama
+          /usr/share/miniconda/envs/binette
+          ~/.conda/envs/binette
+          ~/miniconda3/envs/binette
+          /Users/runner/miniconda3/envs/binette
         key: conda-${{ runner.os }}-python${{ matrix.python-version }}-${{ hashFiles('binette.yml', 'pyproject.toml') }}-v1
         restore-keys: |
           conda-${{ runner.os }}-python${{ matrix.python-version }}-
