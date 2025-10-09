@@ -26,6 +26,28 @@ jobs:
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
     - uses: actions/checkout@v4
 
+    # Cache conda packages and environment
+    - name: Cache conda environment
+      id: cache-conda
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/conda_pkgs_dir
+          /usr/share/miniconda/envs/binette
+        key: conda-${{ runner.os }}-python${{ matrix.python-version }}-${{ hashFiles('binette.yaml') }}
+        restore-keys: |
+          conda-${{ runner.os }}-python${{ matrix.python-version }}-
+          conda-${{ runner.os }}-
+
+    # Check cache status
+    - name: Check conda cache status
+      run: |
+        if [ "${{ steps.cache-conda.outputs.cache-hit }}" = "true" ]; then
+          echo "✅ Conda environment restored from cache"
+        else
+          echo "⚠️  Conda environment cache miss - will create fresh environment"
+        fi
+
     # Install requirements 
     - uses: conda-incubator/setup-miniconda@v3
       with:
@@ -35,6 +57,8 @@ jobs:
         environment-file: binette.yaml
         activate-environment: binette
         conda-remove-defaults: true
+        use-only-tar-bz2: true
+        show-channel-urls: true
   
     - name: Install binette
       run: |
