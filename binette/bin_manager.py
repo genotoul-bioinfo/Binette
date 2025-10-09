@@ -16,6 +16,11 @@ logger = logging.getLogger(__name__)
 
 
 class Bin:
+    CHECKM2_MODELS = (
+        "Neural Network (Specific Model)",
+        "Gradient Boost (General Model)",
+    )
+
     def __init__(
         self,
         contigs: BitMap,
@@ -52,6 +57,7 @@ class Bin:
         self.contamination = None
         self.score = None
         self.original_name = None
+        self._checkm2_model_index = None
 
     @cached_property
     def contigs_key(self):
@@ -127,6 +133,31 @@ class Bin:
         self.completeness = completeness
         self.contamination = contamination
         self.score = completeness - contamination_weight * contamination
+
+    def add_model(self, model: str) -> None:
+        """
+        Add a CheckM2 model to the bin.
+
+        :param model: The model name to add.
+        :raises ValueError: If the model name is not recognized.
+        """
+
+        try:
+            self._checkm2_model_index = self.CHECKM2_MODELS.index(model)
+        except ValueError as exc:
+            raise ValueError(
+                f"Unknown model '{model}' attempted to be added to bin '{self.name}'. "
+                f"Valid models are: {', '.join(self.CHECKM2_MODELS)}"
+            ) from exc
+
+    @cached_property
+    def checkm2_model(self):
+        """
+        Get the CheckM2 model for the bin.
+        """
+        if self._checkm2_model_index is not None:
+            return self.CHECKM2_MODELS[self._checkm2_model_index]
+        return None
 
     def contig_intersection(self, *others: "Bin") -> BitMap:
         """

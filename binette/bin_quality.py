@@ -628,6 +628,9 @@ def _assess_bins_quality_batch(
     feature_vectors = pd.concat([metadata_df, diamond_complete_results], axis=1)
     feature_vectors = feature_vectors.sort_values(by="Name")
 
+    # Create mapping from bin name to bin object for easy lookup
+    bin_name_to_bin = {bin_obj.contigs_key: bin_obj for bin_obj in bins}
+
     # 4: Call general model & specific models and derive predictions"""
     modelProcessing = get_modelProcessing()
     modelProc = modelProcessing.modelProcessor(threads)
@@ -661,14 +664,16 @@ def _assess_bins_quality_batch(
         )
     )
 
-    final_results = feature_vectors[["Name"]].copy()
-    final_results["Completeness"] = np.round(final_comp, 2)
-    final_results["Contamination"] = np.round(final_cont, 2)
-
-    for bin_obj in bins:
-        completeness = final_results.at[bin_obj.contigs_key, "Completeness"]
-        contamination = final_results.at[bin_obj.contigs_key, "Contamination"]
-
+    # Directly iterate through results arrays and lookup corresponding bins
+    for bin_name, completeness, contamination, chosen_model in zip(
+        feature_vectors["Name"],
+        np.round(final_comp, 2),
+        np.round(final_cont, 2),
+        models_chosen,
+        strict=True,
+    ):
+        bin_obj = bin_name_to_bin[bin_name]
         bin_obj.add_quality(completeness, contamination, contamination_weight)
+        bin_obj.add_model(chosen_model)
 
     return bins
