@@ -60,7 +60,6 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
         activate-environment: binette
-        auto-activate-base: false
 
     # Show cache status for debugging
     - name: Cache status
