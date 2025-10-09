@@ -42,8 +42,8 @@ jobs:
           conda-${{ runner.os }}-python${{ matrix.python-version }}-
             conda-${{ runner.os }}-
 
-    # Install requirements 
-    - uses: conda-incubator/setup-miniconda@v3
+    - name: Create conda environment
+      uses: conda-incubator/setup-miniconda@v3
       if: steps.cache-conda.outputs.cache-hit != 'true'
       with:
         # mamba-version: "*"
@@ -54,7 +54,8 @@ jobs:
         conda-remove-defaults: true
 
         # If cache hit, just activate the cached environment
-    - uses: conda-incubator/setup-miniconda@v3
+    - name: Activate cached conda environment
+      uses: conda-incubator/setup-miniconda@v3
       if: steps.cache-conda.outputs.cache-hit == 'true'
       with:
         python-version: ${{ matrix.python-version }}
@@ -72,6 +73,7 @@ jobs:
   
     - name: Install binette
       run: |
+        conda list
         pip install .
         binette -h
 
