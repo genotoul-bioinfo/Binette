@@ -13,7 +13,7 @@ dependencies:
   - packaging>=23,<24
   - networkx>=3.0,<4.0
   - pyfastx>=2,<4
-  - pyrodigal
+  - pyrodigal>=3,<4
   - pyroaring>=1.0,<2.0
   - typer>=0.9.0
   - rich>=12.0.0
