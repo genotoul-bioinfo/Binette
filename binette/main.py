@@ -252,6 +252,9 @@ def manage_protein_alignement(
             faa_file.as_posix(),
         )
         contig_to_coding_len = None
+        logger.info(
+            "Coding density will not be computed (using provided protein sequences)"
+        )
 
     else:
         contigs_iterator = (
@@ -262,6 +265,7 @@ def manage_protein_alignement(
         contig_to_genes, contig_to_coding_len = cds.predict(
             contigs_iterator, faa_file.as_posix(), threads
         )
+        logger.info("Coding density will be computed from freshly identified genes")
 
     if not resume_diamond:
         if checkm2_db is None:
