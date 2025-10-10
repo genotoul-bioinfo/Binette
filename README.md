@@ -181,10 +181,11 @@ The `final_bins_quality_reports.tsv` file contains the following columns:
 | **original\_name** | The name of the original bin from which this bin was derived.                                                                                  |
 | **completeness**   | The completeness of the bin, determined by CheckM2.                                                                                            |
 | **contamination**  | The contamination of the bin, determined by CheckM2.                                                                                           |
-| **checkm2\_model** | The CheckM2 model used for quality prediction: `general` (gradient boost) or `specific` (neural network). CheckM2 automatically selects the most appropriate model for each bin. |
+| **checkm2\_model** | The CheckM2 model used for quality prediction: `Gradient Boost (General Model)` or `Neural Network (Specific Model)`.|
 | **score**          | Computed score: `completeness - contamination * weight`. The contamination weight can be customized using the `--contamination_weight` option. |
 | **size**           | Total size of the bin in nucleotides.                                                                                                          |
 | **N50**            | The N50 of the bin, representing the length for which 50% of the total nucleotides are in contigs of that length or longer.                    |
+| **coding\_density** | The percentage of the bin that codes for proteins (genes length / total bin length × 100). Only computed when genes are freshly identified. Empty when using `--proteins` or `--resume` options. |
 | **contig\_count**  | Number of contigs contained within the bin.                                                                                                    |
    
 
