@@ -73,6 +73,8 @@ def get_contig_coding_len(
     :param contig_length: The length of the contig in base pairs.
     :return: The coding length as a float, or None if contig_length is zero.
     """
+    if contig_length == 0:
+        return None
     conding_base_mask = np.zeros(contig_length)
     for g in genes:
         conding_base_mask[g.begin - 1 : g.end] = 1
