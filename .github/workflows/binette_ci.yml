@@ -56,7 +56,6 @@ jobs:
         environment-file: binette.yaml
         activate-environment: binette
         conda-remove-defaults: true
-        use-only-tar-bz2: true
   
     - name: Install binette
       run: |
