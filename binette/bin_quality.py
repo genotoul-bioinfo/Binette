@@ -344,6 +344,7 @@ def add_bin_size_and_N50(bins: Iterable[Bin], contig_to_size: dict[int, int]):
         bin_obj.add_length(int(total_len))
         bin_obj.add_N50(int(n50))
 
+
 def add_bin_coding_density(
     bins: list[Bin], contig_to_coding_length: dict[int, int]
 ) -> float | None:
