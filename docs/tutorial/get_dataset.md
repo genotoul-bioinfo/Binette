@@ -14,27 +14,9 @@ The tool called `uscdc-datasets-sars-cov-2` on bioconda is part of the Conda env
 
 Once the tool is installed, you can download the "Kickstart" dataset with the following steps:
 
-1. **Download the coal-metagenomics table** from the GitHub repository:
-   
-   ```{code-block} bash
-   wget https://raw.githubusercontent.com/ncezid-biome/datasets/master/datasets/coal-metagenomics.tsv
-   ```
-
-2. **Select the relevant line** corresponding to the "Kickstart" dataset (SRR5058924) by extracting the header and the specific entry:
-
-   ```{code-block} bash
-   # Select the header of the table
-   head -n8 coal-metagenomics.tsv > coal-metagenomics_Kickstart_only.tsv
-   
-   # Append the relevant line for the Kickstart dataset
-   grep SRR5058924 coal-metagenomics.tsv >> coal-metagenomics_Kickstart_only.tsv
-   ```
-
-3. **Run the dataset download** using the `GenFSGopher.pl` script:
-
-   ```{code-block} bash
-   GenFSGopher.pl --numcpus 12 --compressed --outdir coal-metagenomics coal-metagenomics_Kickstart_only.tsv
-   ```
+```{include} snippets/01_download_dataset.sh
+:code: bash
+```
 
 
    :::{admonition} ⌛ Expected Time

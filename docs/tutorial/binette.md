@@ -5,10 +5,8 @@ Binette will use the previously computed bins to refine and improve them, genera
 
 To run Binette, use the following command:
 
-```bash
-binette --bin_dirs maxbin2/ metabat2/ semibin2/output_bins/ concoct/bins/ \
-        -c Kickstart.megahit/R1.contigs.fa \
-        --verbose -t 12 -o binette_results
+```{include} snippets/05_binette.sh
+:code: bash
 ```
 
 ```{admonition} ⌛ Expected Time
