@@ -37,11 +37,8 @@ def predict(
 
     :return: A dictionary mapping contig names to predicted genes.
     """
-    try:
-        # for version >=3 of pyrodigal
-        orf_finder = pyrodigal.GeneFinder(meta="meta")  # type: ignore
-    except AttributeError:
-        orf_finder = pyrodigal.OrfFinder(meta="meta")  # type: ignore
+
+    orf_finder = pyrodigal.GeneFinder(meta="meta")
 
     logger.info(f"Predicting CDS sequences with Pyrodigal using {threads} threads")
 

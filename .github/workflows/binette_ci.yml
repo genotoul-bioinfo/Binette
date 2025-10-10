@@ -19,22 +19,32 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ['ubuntu-latest', 'macos-13']
+        os: ['ubuntu-latest', 'macos-latest']
         python-version: [3.12] #["3.8", "3.9", "3.10"]
 
     steps:
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
     - uses: actions/checkout@v4
 
-    # Install requirements 
-    - uses: conda-incubator/setup-miniconda@v3
+
+    # # Always create the environment (but use cached packages when available)
+    # - name: Setup conda environment
+    #   uses: conda-incubator/setup-miniconda@v3
+    #   with:
+    #     python-version: ${{ matrix.python-version }}
+    #     channels: conda-forge,bioconda
+    #     environment-file: binette.yaml
+    #     activate-environment: binette
+    #     conda-remove-defaults: true
+
+    - name : Setup micromamba environment
+      uses: mamba-org/setup-micromamba@v2
       with:
-        # mamba-version: "*"
-        python-version: ${{ matrix.python-version }}
-        channels: conda-forge,bioconda
         environment-file: binette.yaml
-        activate-environment: binette
-  
+        create-args: python=${{ matrix.python-version }}
+        cache-environment: true
+
+
     - name: Install binette
       run: |
         pip install .
