@@ -6,6 +6,7 @@ from collections import Counter, defaultdict
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
+
 import numpy as np
 import pyfastx
 import pyrodigal
