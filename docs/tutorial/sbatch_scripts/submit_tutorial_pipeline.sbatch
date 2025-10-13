@@ -47,9 +47,13 @@ echo "Job 4 (Binning): $JOB4"
 JOB5=$(sbatch --parsable --dependency=afterok:$JOB4 sbatch_scripts/05_binette.sbatch)
 echo "Job 5 (Binette): $JOB5"
 
+# Step 6: Analysis (depends on step 5)
+JOB6=$(sbatch --parsable --dependency=afterok:$JOB5 sbatch_scripts/06_analysis.sbatch)
+echo "Job 6 (Analysis): $JOB6"
+
 echo ""
 echo "=== Pipeline Submitted Successfully ==="
-echo "Job dependency chain: $JOB1 -> $JOB2 -> $JOB3 -> $JOB4 -> $JOB5"
+echo "Job dependency chain: $JOB1 -> $JOB2 -> $JOB3 -> $JOB4 -> $JOB5 -> $JOB6"
 echo ""
 echo "Monitor progress with:"
 echo "  squeue -u \$USER"
@@ -59,6 +63,6 @@ echo "Check job logs in logs/ directory:"
 echo "  ls -la logs/"
 echo ""
 echo "Cancel entire pipeline if needed:"
-echo "  scancel $JOB1 $JOB2 $JOB3 $JOB4 $JOB5"
+echo "  scancel $JOB1 $JOB2 $JOB3 $JOB4 $JOB5 $JOB6"
 
 echo "Master script completed at: $(date)"

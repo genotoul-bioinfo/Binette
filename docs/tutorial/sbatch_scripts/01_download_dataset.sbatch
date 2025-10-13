@@ -6,13 +6,9 @@
 #SBATCH --output=logs/tutorial_01_download_%j.out
 #SBATCH --error=logs/tutorial_01_download_%j.err
 
-# Load conda environment
-source ~/miniconda3/bin/activate
-conda activate binette_tutorial
-
 # Set working directory and create logs
 cd $SLURM_SUBMIT_DIR
 mkdir -p logs
 
-# Run the download script (downloads coal-metagenomics dataset)
-bash snippets/01_download_dataset.sh
+# Run the download script
+${ENV_CMD:-source ~/miniconda3/bin/activate && conda activate binette_tutorial &&} bash snippets/01_download_dataset.sh
