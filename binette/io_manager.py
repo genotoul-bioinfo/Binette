@@ -307,17 +307,17 @@ def write_contig2bin_table(
     :param contigs_names: List of contig names where index corresponds to contig ID.
     """
     logger.info(f"Writing contig2bin table to '{output_file}'")
-    
+
     # Ensure output directory exists
     output_file.parent.mkdir(parents=True, exist_ok=True)
-    
+
     with open(output_file, "w") as f:
         # Write contig to bin mappings
         for bin_obj in selected_bins:
             for contig_index in bin_obj.contigs:
                 contig_name = contigs_names[contig_index]
                 f.write(f"{contig_name}\t{bin_obj.name}\n")
-    
+
     total_entries = sum(len(bin_obj.contigs) for bin_obj in selected_bins)
     logger.debug(f"Successfully wrote contig2bin table with {total_entries} entries")
 
