@@ -4,7 +4,6 @@
 #SBATCH --mem=16GB
 #SBATCH --time=01:00:00
 #SBATCH --output=logs/tutorial_03_read_alignment_%j.out
-#SBATCH --error=logs/tutorial_03_read_alignment_%j.err
 
 cd $SLURM_SUBMIT_DIR
 

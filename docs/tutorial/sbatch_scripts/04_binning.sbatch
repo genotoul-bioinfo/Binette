@@ -4,7 +4,6 @@
 #SBATCH --mem=64GB
 #SBATCH --time=04:00:00
 #SBATCH --output=logs/tutorial_04_binning_%j.out
-#SBATCH --error=logs/tutorial_04_binning_%j.err
 
 cd $SLURM_SUBMIT_DIR
 

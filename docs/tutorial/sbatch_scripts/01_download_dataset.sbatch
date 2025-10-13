@@ -4,7 +4,6 @@
 #SBATCH --mem=16GB
 #SBATCH --time=00:30:00
 #SBATCH --output=logs/tutorial_01_download_%j.out
-#SBATCH --error=logs/tutorial_01_download_%j.err
 
 # Set working directory and create logs
 cd $SLURM_SUBMIT_DIR

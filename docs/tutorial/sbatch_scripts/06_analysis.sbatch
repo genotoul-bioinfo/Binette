@@ -4,7 +4,6 @@
 #SBATCH --mem=8GB
 #SBATCH --time=00:30:00
 #SBATCH --output=logs/tutorial_06_analysis_%j.out
-#SBATCH --error=logs/tutorial_06_analysis_%j.err
 
 cd $SLURM_SUBMIT_DIR
 

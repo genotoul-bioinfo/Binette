@@ -4,7 +4,6 @@
 #SBATCH --mem=32GB
 #SBATCH --time=02:00:00
 #SBATCH --output=logs/tutorial_02_assembly_%j.out
-#SBATCH --error=logs/tutorial_02_assembly_%j.err
 
 cd $SLURM_SUBMIT_DIR
 
