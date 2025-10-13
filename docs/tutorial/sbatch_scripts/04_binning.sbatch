@@ -9,7 +9,7 @@ cd $SLURM_SUBMIT_DIR
 
 # Run all four binning tools sequentially
 # Run binning tools
-eval "${ENV_CMD} bash snippets/04_binning.sh"
-${ENV_CMD} bash snippets/04b_binning_maxbin2.sh
-${ENV_CMD} bash snippets/04c_binning_concoct.sh
-${ENV_CMD} bash snippets/04d_binning_semibin2.sh
+eval "${ENV_CMD} bash snippets/04a_binning_metabat2.sh"
+eval "${ENV_CMD} bash snippets/04b_binning_maxbin2.sh"
+eval "${ENV_CMD} bash snippets/04c_binning_concoct.sh"
+eval "${ENV_CMD} bash snippets/04d_binning_semibin2.sh"
