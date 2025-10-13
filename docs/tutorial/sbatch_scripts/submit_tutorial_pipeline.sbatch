@@ -4,7 +4,6 @@
 #SBATCH --mem=4GB
 #SBATCH --time=00:10:00
 #SBATCH --output=logs/master_tutorial_%j.out
-#SBATCH --error=logs/master_tutorial_%j.err
 
 # Master submission script for Binette tutorial pipeline
 # This script submits all tutorial steps as dependent jobs
