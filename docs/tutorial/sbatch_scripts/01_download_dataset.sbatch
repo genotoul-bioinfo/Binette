@@ -10,4 +10,4 @@ cd $SLURM_SUBMIT_DIR
 mkdir -p logs
 
 # Run the download script
-${ENV_CMD:-source ~/miniconda3/bin/activate && conda activate binette_tutorial &&} bash snippets/01_download_dataset.sh
+eval "${ENV_CMD} bash snippets/01_download_dataset.sh"

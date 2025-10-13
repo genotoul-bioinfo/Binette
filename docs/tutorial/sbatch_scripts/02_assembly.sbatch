@@ -8,4 +8,4 @@
 cd $SLURM_SUBMIT_DIR
 
 # Run MEGAHIT assembly
-${ENV_CMD:-source ~/miniconda3/bin/activate && conda activate binette_tutorial &&} bash snippets/02_assembly.sh
+eval "${ENV_CMD} bash snippets/02_assembly.sh"

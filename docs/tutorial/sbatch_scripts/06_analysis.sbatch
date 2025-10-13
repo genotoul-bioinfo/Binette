@@ -8,4 +8,4 @@
 cd $SLURM_SUBMIT_DIR
 
 # Execute the analysis notebook and convert to HTML
-${ENV_CMD:-source ~/miniconda3/bin/activate && conda activate binette_tutorial &&} jupyter nbconvert --to notebook --execute --inplace analyse_binette_result.ipynb
+eval "${ENV_CMD} jupyter nbconvert --to notebook --execute --inplace analyse_binette_result.ipynb"

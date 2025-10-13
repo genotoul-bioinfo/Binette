@@ -8,4 +8,4 @@
 cd $SLURM_SUBMIT_DIR
 
 # Run BWA-MEM2 read alignment
-${ENV_CMD:-source ~/miniconda3/bin/activate && conda activate binette_tutorial &&} bash snippets/03_read_alignment.sh
+eval "${ENV_CMD} bash snippets/03_read_alignment.sh"
