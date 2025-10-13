@@ -3,7 +3,7 @@ channels:
   - conda-forge
   - bioconda
 dependencies:
-  - uscdc-datasets-sars-cov-2 # Dataset downloader to get the tutorial initial data
+  - sra-tools              # To get the tutorial initial data
   - fastqc                 # Quality control for high-throughput sequencing data
   - samtools=1             # Tools for manipulating sequencing data in SAM format
   - bedtools=2             # Suite of tools for genome arithmetic

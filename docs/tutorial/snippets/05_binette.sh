@@ -1,5 +1,5 @@
 #!/bin/bash
 # Run Binette to refine and improve bins
-binette --bin_dirs maxbin2/ metabat2/ semibin2/output_bins/ concoct/bins/ \
+binette --bin_dirs maxbin2_bins/ metabat2_bins/ semibin2_output/output_bins/ concoct_bins/ \
         -c Kickstart.megahit/R1.contigs.fa \
-        --verbose -t 12 -o binette_results
+        --verbose -t 12 -o binette_output

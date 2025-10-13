@@ -10,7 +10,7 @@ cut_up_fasta.py Kickstart.megahit/R1.contigs.fa --chunk_size 10000 \
                 --bedfile concoct/contigs_10K.bed > concoct/contigs_10K.fa
 
 # Generate the coverage table from the BAM file
-concoct_coverage_table.py concoct/contigs_10K.bed alignments_bwa/Kickstart.bam > concoct/coverage_table.tsv
+concoct_coverage_table.py concoct/contigs_10K.bed Kickstart.bam > concoct/coverage_table.tsv
 
 # Run CONCOCT with the composition and coverage files
 concoct --composition_file concoct/contigs_10K.fa \
@@ -20,6 +20,6 @@ concoct --composition_file concoct/contigs_10K.fa \
 # Merge the clustering results and extract bins
 merge_cutup_clustering.py concoct/bins_clustering_gt1000.csv > concoct/clustering_merge.csv
 
-mkdir -p concoct/bins
+mkdir -p concoct_bins
 
-extract_fasta_bins.py Kickstart.megahit/R1.contigs.fa concoct/clustering_merge.csv --output_path concoct/bins
+extract_fasta_bins.py Kickstart.megahit/R1.contigs.fa concoct/clustering_merge.csv --output_path concoct_bins

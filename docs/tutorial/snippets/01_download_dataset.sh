@@ -1,15 +1,9 @@
 #!/bin/bash
-# Download the coal-metagenomics table from GitHub
-wget https://raw.githubusercontent.com/ncezid-biome/datasets/master/datasets/coal-metagenomics.tsv
+# Download the Kickstart dataset using SRA toolkit
+prefetch SRR5058924
 
-# Select the header of the table
-head -n8 coal-metagenomics.tsv > coal-metagenomics_Kickstart_only.tsv
-
-# Append the relevant line for the Kickstart dataset
-grep SRR5058924 coal-metagenomics.tsv >> coal-metagenomics_Kickstart_only.tsv
-
-# Run the dataset download using the GenFSGopher.pl script
-GenFSGopher.pl --numcpus 12 --compressed --outdir coal-metagenomics coal-metagenomics_Kickstart_only.tsv
+# Convert SRA to paired FASTQ files with gzip compression
+fastq-dump --defline-seq '@$ac_$sn/$ri' --defline-qual '+' --split-3 -O . --gzip SRR5058924/SRR5058924.sra
 
 # Optional cleanup: remove the SRA file as it's no longer needed
-rm -f coal-metagenomics/SRR5058924/SRR5058924.sra
+rm -f SRR5058924/SRR5058924.sra
