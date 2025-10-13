@@ -722,12 +722,20 @@ def binette(
         prefix=prefix,
     )
 
-    logger.info(f"Writing selected bins to '{final_bin_report}'")
     if contig_to_coding_length:
         bin_quality.add_bin_coding_density(selected_bins, contig_to_coding_length)
+
+    logger.info(f"Writing selected bins information to '{final_bin_report}'")
     io.write_bin_info(selected_bins, output=final_bin_report)
 
+    io.write_contig2bin_table(
+        selected_bins,
+        outdir / "final_contig2bin.tsv",
+        contigs_in_bins,
+    )
+
     if write_fasta_bins:
+        logger.info(f"Writing selected bins FASTA files to '{outdir / 'final_bins'}'")
         io.write_bins_fasta(
             selected_bins,
             contigs,
