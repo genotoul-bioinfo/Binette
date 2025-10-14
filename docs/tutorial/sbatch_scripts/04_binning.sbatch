@@ -2,7 +2,7 @@
 #SBATCH --job-name=tutorial_04_binning
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=64GB
-#SBATCH --time=04:00:00
+#SBATCH --time=12:00:00
 #SBATCH --output=logs/tutorial_04_binning_%j.out
 
 cd $SLURM_SUBMIT_DIR
