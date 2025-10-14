@@ -38,10 +38,6 @@ dependencies = [
 
 [project.optional-dependencies]
 
-checkm2 = [
-    "checkm2 @ git+https://github.com/chklovski/CheckM2.git@1.1.0"
-]
-
 doc = [
     "sphinx==6.2.1",
     "sphinx_rtd_theme==1.2.2",
