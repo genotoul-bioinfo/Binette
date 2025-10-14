@@ -20,16 +20,8 @@ from rich.console import Console
 from rich.logging import RichHandler
 
 import binette as binette_init
-from binette import (
-    bin_manager,
-    bin_quality,
-    cds,
-    contig_manager,
-    diamond,
-)
-from binette import (
-    io_manager as io,
-)
+from binette import bin_manager, bin_quality, cds, contig_manager, diamond
+from binette import io_manager as io
 
 logger = logging.getLogger(__name__)
 err_console = Console(stderr=True)
@@ -730,7 +722,7 @@ def binette(
 
     io.write_contig2bin_table(
         selected_bins,
-        outdir / "final_contig2bin.tsv",
+        outdir / "final_contig_to_bin.tsv",
         contigs_in_bins,
     )
 
