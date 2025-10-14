@@ -68,8 +68,14 @@ Binette is available on [PyPI](https://pypi.org/project/Binette/) and can be ins
 pip install binette
 ```
 
-In addition to Python dependencies, Binette requires [Diamond](https://github.com/bbuchfink/diamond) to be installed and executable.
+In addition to Python dependencies, Binette requires a few external tools:
 
+* **[DIAMOND](https://github.com/bbuchfink/diamond)** must be installed and available in your system’s `PATH`.
+* **[CheckM2](https://github.com/chklovski/CheckM2)** (version `1.1.0`) is also required but not distributed on PyPI. You can install it directly from GitHub:
+
+```bash
+pip install git+https://github.com/chklovski/CheckM2.git@1.1.0
+```
 
 ## Downloading the CheckM2 database
 
