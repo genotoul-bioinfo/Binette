@@ -1,0 +1,15 @@
+name	origin	is_original	original_name	completeness	contamination	score	checkm2_model	size	N50	coding_density	contig_count
+metabat2.5	metabat2_bins	True	metabat2.5	99.94	0.24	99.46	Neural Network (Specific Model)	2799572	41151	0.8881	99
+metabat2.4	metabat2_bins	True	metabat2.4	93.17	0.17	92.83	Gradient Boost (General Model)	2119954	12258	0.9004	220
+metabat2.6	metabat2_bins	True	metabat2.6	93.58	0.96	91.66	Neural Network (Specific Model)	4269732	39217	0.9024	158
+metabat2.2	metabat2_bins	True	metabat2.2	85.01	1.83	81.35	Neural Network (Specific Model)	1902761	11352	0.8827	218
+metabat2.9	metabat2_bins	True	metabat2.9	85.86	2.76	80.34	Gradient Boost (General Model)	3015034	6834	0.8531	509
+metabat2.3	metabat2_bins	True	metabat2.3	84.18	3.72	76.74	Neural Network (Specific Model)	1840680	7880	0.8662	279
+metabat2.10	metabat2_bins	True	metabat2.10	76.64	0.13	76.38	Neural Network (Specific Model)	3477636	82084	0.8789	71
+metabat2.7	metabat2_bins	True	metabat2.7	70.81	5.63	59.55	Gradient Boost (General Model)	1401920	4919	0.8932	297
+metabat2.1	metabat2_bins	True	metabat2.1	51.2	0.43	50.34	Neural Network (Specific Model)	1673426	4913	0.9127	357
+metabat2.8	metabat2_bins	True	metabat2.8	44.85	0.79	43.27	Gradient Boost (General Model)	987990	4743	0.903	220
+metabat2.14	metabat2_bins	True	metabat2.14	44.38	0.58	43.22	Neural Network (Specific Model)	1745116	4265	0.9238	420
+metabat2.13	metabat2_bins	True	metabat2.13	25.47	0.03	25.41	Neural Network (Specific Model)	1077467	91995	0.8843	14
+metabat2.11	metabat2_bins	True	metabat2.11	94.21	37.06	20.09	Gradient Boost (General Model)	8631886	4347	0.9063	1994
+metabat2.12	metabat2_bins	True	metabat2.12	7.06	0.03	7.0	Neural Network (Specific Model)	252404	64012	0.8772	6

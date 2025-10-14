@@ -1,0 +1,46 @@
+name: Tutorial Environment Test
+
+# Test the tutorial conda environment monthly to ensure it remains buildable
+on:
+  # Run on the 1st of every month at 9:00 AM UTC
+  schedule:
+    - cron: '0 9 1 * *'
+  
+  # Allow manual trigger from Actions tab
+  workflow_dispatch:
+  
+  # Also run on changes to the environment file
+  push:
+    paths:
+      - 'docs/tutorial/binette_tutorial_env.yaml'
+
+jobs:
+  test_tutorial_environment:
+    name: Test tutorial environment
+    runs-on: ubuntu-latest
+        
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name : Setup micromamba environment
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-file: docs/tutorial/binette_tutorial_env.yaml
+          create-args: python=3.12
+
+      - name: Test key tools
+        shell: bash -l {0}
+        run: |
+          echo "Testing tutorial environment..."
+          
+          # Test main tools
+          binette --version
+          megahit --version
+          samtools --version
+          metabat2 --help > /dev/null
+          
+          # Test Python packages
+          python -c "import pandas, plotly; print('Python packages OK')"
+          
+          echo "✅ Tutorial environment is working!"
