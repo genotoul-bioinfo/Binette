@@ -482,3 +482,15 @@ def test_add_bin_metrics_sequential_path():
                 )
                 assert bin_obj.completeness == 85.0, "Completeness should be 85.0"
                 assert bin_obj.contamination == 3.0, "Contamination should be 3.0"
+
+def test_add_bin_metrics_empty_bins():
+    result_bins = bin_quality.add_bin_metrics(
+        bins=[],
+        contig_info=[],
+        contamination_weight=2,
+        threads=1,  # Single thread
+        checkm2_batch_size=500,
+        disable_progress_bar=True,
+    )
+
+    assert result_bins == [], "Result should be an empty list when input bins are empty"

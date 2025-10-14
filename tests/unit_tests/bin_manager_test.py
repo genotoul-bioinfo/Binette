@@ -88,6 +88,38 @@ def test_add_quality():
 
     assert bin_obj.score == completeness - contamination * contamination_weight
 
+def test_add_model():
+    bin_obj = bin_manager.Bin(contigs=BitMap({1, 2, 3}), origin="test1", name="bin1")
+
+    bin_obj.add_model("Neural Network (Specific Model)")
+
+    assert bin_obj.checkm2_model == "Neural Network (Specific Model)"
+
+
+def test_add_model_error():
+    bin_obj = bin_manager.Bin(contigs=BitMap({1, 2, 3}), origin="test1", name="bin1")
+
+    with pytest.raises(ValueError):
+        bin_obj.add_model("Not a valid model name")
+
+
+def test_is_high_quality():
+    completeness = 90
+    contamination = 1
+    contamination_weight = 2
+
+    bin_obj = bin_manager.Bin(contigs=BitMap({1, 2, 3}), origin="test1", name="bin1")
+
+    bin_obj.add_quality(completeness, contamination, contamination_weight)
+
+    assert bin_obj.is_high_quality(min_completeness=80, max_contamination=5) is True
+
+
+def test_is_high_quality_no_quality():
+    bin_obj = bin_manager.Bin(contigs=BitMap({1, 2, 3}), origin="test1", name="bin1")
+
+    with pytest.raises(ValueError):
+        bin_obj.is_high_quality(min_completeness=80, max_contamination=5)
 
 def test_multiple_bins_intersection():
     bin1 = bin_manager.Bin(contigs=BitMap({1, 2, 3, 987}), origin="test1", name="bin1")
@@ -139,6 +171,11 @@ def test_bin_union2():
     expected_contigs = BitMap({1, 2, 3, 4, 5})
 
     assert union_bin == expected_contigs
+
+
+def test_no_bitmap():
+    with pytest.raises(TypeError):
+        bin_manager.Bin({1, 2}, "origin1", "bin1")
 
 
 def test_bin_difference():

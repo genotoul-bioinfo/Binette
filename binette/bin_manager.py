@@ -74,10 +74,6 @@ class Bin:
         :param other: The object to compare with.
         :return: True if the objects are equal, False otherwise.
         """
-
-        if not isinstance(other, Bin):
-            return NotImplemented
-
         return self.contigs_key == other.contigs_key
 
     def __str__(self) -> str:
@@ -199,7 +195,7 @@ class Bin:
         """
         if self.completeness is None or self.contamination is None:
             raise ValueError(
-                f"The bin '{self.name}' with ID '{self.id}' has not been evaluated for completeness or contamination, "
+                f"The bin '{self.name}' with ID '{self.name}' has not been evaluated for completeness or contamination, "
                 "and therefore cannot be assessed for high quality."
             )
 
@@ -578,18 +574,6 @@ def get_contigs_in_bin_sets(bin_set_name_to_bins: dict[str, set[Bin]]) -> list[s
         )
 
     return list(all_contigs_in_bins)
-
-
-def get_contigs_in_bins(bins: Iterable[Bin]) -> list[str]:
-    """
-    Retrieves all contigs present in the given list of bins.
-
-    :param bins: A list of Bin objects.
-
-    :return: A list of contigs present in the bins.
-    """
-    return [contig for b in bins for contig in b.contigs]
-
 
 def sum_contig_lengths(
     bm_contigs: BitMap,
