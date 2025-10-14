@@ -88,6 +88,7 @@ def test_add_quality():
 
     assert bin_obj.score == completeness - contamination * contamination_weight
 
+
 def test_add_model():
     bin_obj = bin_manager.Bin(contigs=BitMap({1, 2, 3}), origin="test1", name="bin1")
 
@@ -120,6 +121,7 @@ def test_is_high_quality_no_quality():
 
     with pytest.raises(ValueError):
         bin_obj.is_high_quality(min_completeness=80, max_contamination=5)
+
 
 def test_multiple_bins_intersection():
     bin1 = bin_manager.Bin(contigs=BitMap({1, 2, 3, 987}), origin="test1", name="bin1")

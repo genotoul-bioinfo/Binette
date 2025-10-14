@@ -483,6 +483,7 @@ def test_add_bin_metrics_sequential_path():
                 assert bin_obj.completeness == 85.0, "Completeness should be 85.0"
                 assert bin_obj.contamination == 3.0, "Contamination should be 3.0"
 
+
 def test_add_bin_metrics_empty_bins():
     result_bins = bin_quality.add_bin_metrics(
         bins=[],

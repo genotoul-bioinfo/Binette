@@ -575,6 +575,7 @@ def get_contigs_in_bin_sets(bin_set_name_to_bins: dict[str, set[Bin]]) -> list[s
 
     return list(all_contigs_in_bins)
 
+
 def sum_contig_lengths(
     bm_contigs: BitMap,
     contig_lengths: np.ndarray,
