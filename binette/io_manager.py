@@ -135,6 +135,7 @@ def write_bin_info(bins: Iterable[Bin], output: Path, add_contigs: bool = False)
         "checkm2_model",
         "size",
         "N50",
+        "coding_density",
         "contig_count",
     ]
     if add_contigs:
@@ -159,6 +160,9 @@ def write_bin_info(bins: Iterable[Bin], output: Path, add_contigs: bool = False)
             "checkm2_model": bin_obj.checkm2_model,
             "size": bin_obj.length,
             "N50": bin_obj.N50,
+            "coding_density": round(bin_obj.coding_density, 4)
+            if bin_obj.coding_density is not None
+            else None,
             "contig_count": len(bin_obj.contigs),
         }
 

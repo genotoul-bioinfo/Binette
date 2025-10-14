@@ -224,7 +224,7 @@ def manage_protein_alignement(
     use_existing_protein_file: bool,
     resume_diamond: bool,
     low_mem: bool,
-) -> tuple[dict[str, int], dict[str, list[str]]]:
+) -> tuple[dict[str, int], dict[str, list[str]], dict[str, int | None] | None]:
     """
     Predicts or reuses proteins prediction and runs diamond on them.
 
@@ -238,7 +238,7 @@ def manage_protein_alignement(
     :param resume_diamond: Boolean indicating whether to resume diamond alignement.
     :param low_mem: Boolean indicating whether to use low memory mode.
 
-    :return: A tuple containing dictionaries - contig_to_kegg_counter and contig_to_genes.
+    :return: A tuple containing dictionaries - contig_to_kegg_counter, contig_to_genes, and contig_to_coding_len.
     """
 
     # Predict or reuse proteins prediction and run diamond on them
@@ -251,6 +251,10 @@ def manage_protein_alignement(
             contigs_fasta.as_posix(),
             faa_file.as_posix(),
         )
+        contig_to_coding_len = None
+        logger.info(
+            "Coding density will not be computed (using provided protein sequences)"
+        )
 
     else:
         contigs_iterator = (
@@ -258,7 +262,10 @@ def manage_protein_alignement(
             for name, seq in pyfastx.Fastx(contigs_fasta.as_posix())
             if name in contigs_in_bins
         )
-        contig_to_genes = cds.predict(contigs_iterator, faa_file.as_posix(), threads)
+        contig_to_genes, contig_to_coding_len = cds.predict(
+            contigs_iterator, faa_file.as_posix(), threads
+        )
+        logger.info("Coding density will be computed from freshly identified genes")
 
     if not resume_diamond:
         if checkm2_db is None:
@@ -296,7 +303,7 @@ def manage_protein_alignement(
         diamond_result_file.as_posix(),
     )
 
-    return contig_to_kegg_counter, contig_to_genes
+    return contig_to_kegg_counter, contig_to_genes, contig_to_coding_len
 
 
 def write_bins_fasta(
@@ -621,16 +628,18 @@ def binette(
             filtered_faa_file=faa_file,
         )
 
-    contig_name_to_kegg_counter, contig_name_to_genes = manage_protein_alignement(
-        faa_file=faa_file,
-        contigs_fasta=contigs,
-        contigs_in_bins=contigs_in_bins,
-        diamond_result_file=diamond_result_file,
-        checkm2_db=checkm2_db,
-        threads=threads,
-        use_existing_protein_file=use_existing_protein_file,
-        resume_diamond=resume,
-        low_mem=low_mem,
+    contig_name_to_kegg_counter, contig_name_to_genes, contig_to_coding_length = (
+        manage_protein_alignement(
+            faa_file=faa_file,
+            contigs_fasta=contigs,
+            contigs_in_bins=contigs_in_bins,
+            diamond_result_file=diamond_result_file,
+            checkm2_db=checkm2_db,
+            threads=threads,
+            use_existing_protein_file=use_existing_protein_file,
+            resume_diamond=resume,
+            low_mem=low_mem,
+        )
     )
 
     contig_to_kegg_counter = contig_manager.apply_contig_index(
@@ -639,7 +648,10 @@ def binette(
     contig_to_genes = contig_manager.apply_contig_index(
         contig_to_index, contig_name_to_genes
     )
-
+    if contig_to_coding_length:
+        contig_to_coding_length = contig_manager.apply_contig_index(
+            contig_to_index, contig_to_coding_length
+        )
     # Extract cds metadata ##
     logger.info("Computing CDS metadata")
     contig_metadat = cds.get_contig_cds_metadata(contig_to_genes, threads)
@@ -658,6 +670,9 @@ def binette(
     contig_key_to_original_bin = {b.contigs_key: b for b in original_bins}
 
     bin_quality.add_bin_size_and_N50(original_bins, contig_to_length)
+
+    if contig_to_coding_length:
+        bin_quality.add_bin_coding_density(original_bins, contig_to_coding_length)
 
     logger.info(
         f"Writing original input bin metrics to directory '{original_bin_report_dir}'"
@@ -708,6 +723,8 @@ def binette(
     )
 
     logger.info(f"Writing selected bins to '{final_bin_report}'")
+    if contig_to_coding_length:
+        bin_quality.add_bin_coding_density(selected_bins, contig_to_coding_length)
     io.write_bin_info(selected_bins, output=final_bin_report)
 
     if write_fasta_bins:

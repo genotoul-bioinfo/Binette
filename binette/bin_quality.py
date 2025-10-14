@@ -345,6 +345,20 @@ def add_bin_size_and_N50(bins: Iterable[Bin], contig_to_size: dict[int, int]):
         bin_obj.add_N50(int(n50))
 
 
+def add_bin_coding_density(
+    bins: list[Bin], contig_to_coding_length: dict[int, int]
+) -> float | None:
+    """
+    Calculate the coding density of the given bins.
+
+    :param contig_to_coding_length: A dictionary mapping contig IDs to their total coding lengths.
+
+    :return: The coding density of the bin, or None if the length is not set or is zero.
+    """
+    for bin_obj in bins:
+        bin_obj.add_coding_density(contig_to_coding_length)
+
+
 def add_bin_metrics(
     bins: list[Bin],
     contig_info: dict,

@@ -66,6 +66,10 @@ You can provide protein sequences in FASTA format to Binette using the `--protei
 
 By using this option, the gene prediction step is skipped.  
 
+```{note}
+When using precomputed protein sequences, the `coding_density` column in the output reports will be empty, as this metric requires gene coordinates that are only available when genes are freshly predicted.
+```
+
 #### Example  
 If your contig is named `contig_A`, the gene identifiers should follow this pattern:  
 - `contig_A_1`  
@@ -97,6 +101,7 @@ The `final_bins_quality_reports.tsv` file contains the following columns:
 | **score**          | Computed score: `completeness - contamination * weight`. The contamination weight can be customized using the `--contamination_weight` option. |
 | **size**           | Total size of the bin in nucleotides.                                                                                                          |
 | **N50**            | The N50 of the bin, representing the length for which 50% of the total nucleotides are in contigs of that length or longer.                    |
+| **coding\_density** | The percentage of the bin that codes for proteins (genes length / total bin length × 100). Only computed when genes are freshly identified. Empty when using `--proteins` or `--resume` options. |
 | **contig\_count**  | Number of contigs contained within the bin.                                                                                                    |
    
 

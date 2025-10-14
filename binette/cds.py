@@ -7,6 +7,7 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pyfastx
 import pyrodigal
 
@@ -27,7 +28,7 @@ def get_contig_from_cds_name(cds_name: str) -> str:
 
 def predict(
     contigs_iterator: Iterator, outfaa: str, threads: int = 1
-) -> dict[str, list[str]]:
+) -> tuple[dict[str, list[str]], dict[str, int | None]]:
     """
     Predict open reading frames with Pyrodigal.
 
@@ -35,7 +36,7 @@ def predict(
     :param outfaa: The output file path for predicted protein sequences (in FASTA format).
     :param threads: Number of CPU threads to use (default is 1).
 
-    :return: A dictionary mapping contig names to predicted genes.
+    :return: A dictionary mapping contig names to predicted genes and a dictionary mapping contig names to coding lengths.
     """
 
     orf_finder = pyrodigal.GeneFinder(meta="meta")
@@ -55,7 +56,30 @@ def predict(
         for contig_id, pyrodigal_genes in contig_and_genes
     }
 
-    return contig_to_genes
+    contig_to_coding_length = {
+        contig_id: get_contig_coding_len(pyrodigal_genes, len(pyrodigal_genes.sequence))
+        for contig_id, pyrodigal_genes in contig_and_genes
+    }
+
+    return contig_to_genes, contig_to_coding_length
+
+
+def get_contig_coding_len(
+    genes: list[pyrodigal.Gene], contig_length: int
+) -> int | None:
+    """
+    Compute the coding length of a contig. Use a mask to account for overlapping genes.
+
+    :param genes: A list of gene annotations for the contig.
+    :param contig_length: The length of the contig in base pairs.
+    :return: The coding length as a float, or None if contig_length is zero.
+    """
+    if contig_length == 0:
+        return None
+    conding_base_mask = np.zeros(contig_length)
+    for g in genes:
+        conding_base_mask[g.begin - 1 : g.end] = 1
+    return np.sum(conding_base_mask)
 
 
 def predict_genes(find_genes, name, seq) -> tuple[str, pyrodigal.Genes]:
@@ -137,7 +161,8 @@ def get_aa_composition(genes: list[str]) -> Counter:
     aa_counter = Counter()
     for gene in genes:
         aa_counter += Counter(gene)
-
+    # remove * from Counter
+    aa_counter.pop("*", None)
     return aa_counter
 
 

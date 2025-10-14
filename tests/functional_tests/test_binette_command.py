@@ -120,8 +120,11 @@ def test_bin_tables_input_and_resume(test_data_path: Path, tmp_path):
     print(result.output)
     print(result.stderr)
     assert result.exit_code == 0
-    
 
+    expected_table = Path(
+        "tests/expected_results/final_bins_quality_reports_from_proteins_input.tsv"
+    )
+    compare_results(result_table, expected_table)
 
 
 @pytest.mark.requires_test_data
@@ -155,5 +158,7 @@ def test_bin_tables_input_and_protein_input(test_data_path: Path, tmp_path):
     assert result.exit_code == 0
 
     result_table = tmp_path / "test_results_from_dirs" / "final_bins_quality_reports.tsv"
-    expected_table = Path("tests/expected_results/final_bins_quality_reports.tsv")
+    expected_table = Path(
+        "tests/expected_results/final_bins_quality_reports_from_proteins_input.tsv"
+    )
     compare_results(result_table, expected_table)    

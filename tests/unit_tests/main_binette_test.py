@@ -60,7 +60,7 @@ def test_log_selected_bin_info(caplog, bins):
     log_selected_bin_info(bins, hq_min_completeness, hq_max_conta)
 
     # Check if the logs contain expected messages
-    expected_logs = "binette.main:main.py:361 2/3 selected bins have high quality (completeness >= 85 and contamination <= 15)"
+    expected_logs = "2/3 selected bins have high quality (completeness >= 85 and contamination <= 15)"
 
     assert expected_logs in caplog.text
 
@@ -84,7 +84,7 @@ def test_manage_protein_alignement_resume(tmp_path):
         # Call the function
 
         # Run the function with test data
-        contig_to_kegg_counter, contig_to_genes = manage_protein_alignement(
+        contig_to_kegg_counter, contig_to_genes, _ = manage_protein_alignement(
             faa_file=Path(faa_file),
             contigs_fasta=Path("contigs_fasta"),
             contigs_in_bins=set(("contig1", "contig2", "contig3")),
@@ -124,7 +124,7 @@ def test_manage_protein_alignement_not_resume(tmpdir, tmp_path):
     ):
         # Call the function
 
-        contig_to_kegg_counter, contig_to_genes = manage_protein_alignement(
+        contig_to_kegg_counter, contig_to_genes, _ = manage_protein_alignement(
             faa_file=Path(faa_file),
             contigs_fasta=Path(contigs_fasta),
             contigs_in_bins=set(("contig1", "contig2", "contig3")),
@@ -242,10 +242,15 @@ def test_manage_protein_alignment_no_resume(tmp_path):
     ):
         # Set the return value of the mocked functions
         mock_pyfastx_Fastx.return_value = [("contig1", "ATCG")]
-        mock_predict.return_value = {"contig1": ["gene1"]}
+        mock_predict.return_value = (
+            {
+                "contig1": ["gene1"],
+            },
+            {"contig1": 50},
+        )
 
         # Call the function
-        contig_to_kegg_counter, contig_to_genes = manage_protein_alignement(
+        contig_to_kegg_counter, contig_to_genes, _ = manage_protein_alignement(
             faa_file,
             contigs_fasta,
             contigs_in_bins,
