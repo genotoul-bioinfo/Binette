@@ -26,7 +26,7 @@ def test_no_bin_input(tmp_path):
     input.write_text("This is not a fasta file")
     result = runner.invoke(app, ["-c", input])
 
-    assert result.exit_code == 1
+    assert result.exit_code == 2
 
 
 def test_wrong_input(tmp_path):
@@ -41,6 +41,41 @@ def test_wrong_input(tmp_path):
         result.exception
     )
     assert result.exit_code == 1
+
+
+def test_wrong_input_both_input_types(tmp_path):
+    input = tmp_path / "file.txt"
+    input.write_text("This is not a fasta file")
+    result = runner.invoke(
+        app,
+        [
+            "-c",
+            input,
+            "--bin_dirs",
+            tmp_path,
+            "--contig2bin_tables",
+            tmp_path,
+        ],
+    )
+
+    print("STDOUT:", result.output)
+    print("STDERR:", result.stderr)
+
+    print("EXCEPTION:", result.exception)
+
+    assert result.exit_code == 2
+
+
+def test_quiet_and_verbose_flag(tmp_path):
+    input = tmp_path / "contig.fna"
+    input.write_text(">contig1\nATGC\n>contig2\nATGC")
+    result = runner.invoke(app, ["-c", input, "--bin_dirs", tmp_path, "-q", "-v"])
+
+    print("STDOUT:", result.output)
+    print("STDERR:", result.stderr)
+
+    print("EXCEPTION:", result.exception)
+    assert result.exit_code == 2
 
 
 def compare_results(result_file: Path, expected_file: Path):
@@ -69,7 +104,6 @@ def test_bin_dir_input(test_data_path: Path, tmp_path):
         test_data_path / "checkm2_tiny_db/checkm2_tiny_db.dmnd",
         "-o",
         tmp_path / "test_results_from_dirs",
-        "-v",
     ]
     cmd_args = [arg.as_posix() if isinstance(arg, Path) else arg for arg in cmd_args]
 
@@ -102,7 +136,7 @@ def test_bin_tables_input_and_resume(test_data_path: Path, tmp_path):
         test_data_path / "checkm2_tiny_db/checkm2_tiny_db.dmnd",
         "-o",
         tmp_path / "test_results_from_dirs",
-        "-v",
+        "-q",
     ]
     cmd_args = [arg.as_posix() if isinstance(arg, Path) else arg for arg in cmd_args]
 
@@ -150,6 +184,7 @@ def test_bin_tables_input_and_protein_input(test_data_path: Path, tmp_path):
         "-o",
         tmp_path / "test_results_from_dirs",
         "-v",
+        "--debug",
     ]
     cmd_args = [arg.as_posix() if isinstance(arg, Path) else arg for arg in cmd_args]
 

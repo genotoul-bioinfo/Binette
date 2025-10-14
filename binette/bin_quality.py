@@ -37,12 +37,6 @@ def _initialize_keras_environment():
             # Only import keras-related modules when needed
             import tensorflow as tf
 
-            # Set memory growth to avoid OOM errors
-            gpus = tf.config.experimental.list_physical_devices("GPU")
-            if gpus:
-                for gpu in gpus:
-                    tf.config.experimental.set_memory_growth(gpu, True)
-
             # Use a single thread for predictions to avoid thread contention
             tf.config.threading.set_intra_op_parallelism_threads(1)
             tf.config.threading.set_inter_op_parallelism_threads(1)
