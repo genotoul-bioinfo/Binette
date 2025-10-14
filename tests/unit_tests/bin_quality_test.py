@@ -4,10 +4,7 @@ from pyroaring import BitMap
 
 from binette import bin_quality
 from binette.bin_manager import Bin
-from binette.bin_quality import (
-    balanced_chunks,
-    chunks,
-)
+from binette.bin_quality import balanced_chunks, chunks
 
 
 def test_compute_N50():

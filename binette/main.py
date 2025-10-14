@@ -48,14 +48,17 @@ def version_callback(
         raise typer.Exit()
 
 
-def verbose_callback(
-    verbose: bool,
-):
-    """Sets the logging level to DEBUG if --verbose is passed."""
-    lvl = logging.INFO
+def setup_logging(verbose: bool = False, quiet: bool = False):
+    """Sets up logging configuration based on verbosity flags."""
+    if quiet and verbose:
+        raise typer.BadParameter("Cannot specify both --verbose and --quiet")
 
-    if verbose:
+    if quiet:
+        lvl = logging.WARNING
+    elif verbose:
         lvl = logging.DEBUG
+    else:
+        lvl = logging.INFO
 
     # Set up logging
     logging.basicConfig(
@@ -64,8 +67,27 @@ def verbose_callback(
         datefmt="[%X]",
         handlers=[RichHandler(console=err_console)],
     )
-    logger.info("Program started")
-    logger.info(f"Command line: {' '.join(sys.argv)}")
+
+    # Only log startup messages if not in quiet mode
+    if not quiet:
+        logger.info("Program started")
+        logger.info(f"Command line: {' '.join(sys.argv)}")
+
+
+def verbose_callback(
+    verbose: bool,
+):
+    """Sets the logging level to DEBUG if --verbose is passed."""
+    # This is a placeholder - actual setup happens in the main function
+    return verbose
+
+
+def quiet_callback(
+    quiet: bool,
+):
+    """Sets the logging level to WARNING if --quiet is passed."""
+    # This is a placeholder - actual setup happens in the main function
+    return quiet
 
 
 def preprocess_args():
@@ -449,8 +471,18 @@ def binette(
         typer.Option(
             "--verbose",
             "-v",
-            help="Enable verbose logging.",
+            help="Enable verbose mode (show detailed debug information).",
             callback=verbose_callback,
+            rich_help_panel="Output and Runtime Control",
+        ),
+    ] = False,
+    quiet: Annotated[
+        bool,
+        typer.Option(
+            "--quiet",
+            "-q",
+            help="Enable quiet mode (only show warnings and errors).",
+            callback=quiet_callback,
             rich_help_panel="Output and Runtime Control",
         ),
     ] = False,
@@ -565,6 +597,9 @@ def binette(
 ) -> int:
     """Orchestrate the execution of the program"""
 
+    # Set up logging based on verbosity flags
+    setup_logging(verbose=verbose, quiet=quiet)
+
     # Validate that exactly one of bin_dirs or contig2bin_tables is provided
     if bin_dirs is None and contig2bin_tables is None:
         typer.echo(
@@ -665,7 +700,7 @@ def binette(
         contig_metadat,
         contamination_weight,
         threads,
-        disable_progress_bar=not progress,
+        disable_progress_bar=not progress or quiet,
     )
     contig_key_to_original_bin = {b.contigs_key: b for b in original_bins}
 
@@ -690,7 +725,7 @@ def binette(
         max_conta=max_contamination,
         min_len=min_length,
         max_len=max_length,
-        disable_progress_bar=not progress,
+        disable_progress_bar=not progress or quiet,
     )
 
     logger.info(f"Assessing quality for {len(contig_key_to_new_bin)} intermediate bins")
@@ -700,7 +735,7 @@ def binette(
         contig_info=contig_metadat,
         contamination_weight=contamination_weight,
         threads=threads,
-        disable_progress_bar=not progress,
+        disable_progress_bar=not progress or quiet,
     )
     contig_key_to_new_bin = {b.contigs_key: b for b in new_bins}
 
