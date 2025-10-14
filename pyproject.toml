@@ -23,18 +23,21 @@ classifiers=[
     "Programming Language :: Python :: 3",
     "Topic :: Scientific/Engineering :: Bio-Informatics"]
 requires-python = ">=3.12"
-license = {file="LICENSE"}
 
-[project.optional-dependencies]
-main_deps = [
-    # "checkm2==1.1", # not yet on Pypi
+dependencies = [
+    "checkm2 @ git+https://github.com/chklovski/CheckM2.git@1.1.0",
+    "joblib>=1.0,<2.0",
     "networkx>=3.0,<4.0",
     "numpy>1.24,<3.0",
     "pandas>=2,<3",
     "pyfastx>=2,<3",
-    "pyrodigal>=2,<3",
-    "tqdm>=4,<5",
+    "pyrodigal>=3,<4",
+    "pyroaring>=1.0.0,<2.0.0",
+    "typer>=0.9.0,<1.0.0",
+    "rich>=12.0.0,<14.0.0"
 ]
+
+[project.optional-dependencies]
 
 doc = [
     "sphinx==6.2.1",
@@ -53,7 +56,7 @@ doc = [
 dev = [
     "pytest>=7.0.0",
     "pytest-cov",
-    "black==24.*"
+    "ruff>=0.1.0"
 ]
 #
 [project.urls]
@@ -71,3 +74,21 @@ packages = ["binette"]
 
 [tool.setuptools.dynamic]
 version = {attr = "binette.__version__"}
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+# Essential linting rules
+lint.select = ["E", "F", "I", "UP", "B"]
+
+# Ignore rules that conflict with scientific code conventions
+lint.ignore = ["E501", "E203"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["binette"]
+
+[tool.pytest.ini_options]
+markers = [
+    "requires_test_data: marks tests that require test dataset path to be provided",
+]

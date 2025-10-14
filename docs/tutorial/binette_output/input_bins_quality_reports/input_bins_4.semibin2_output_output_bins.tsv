@@ -1,0 +1,27 @@
+name	origin	is_original	original_name	completeness	contamination	score	checkm2_model	size	N50	coding_density	contig_count
+SemiBin_30.fa	semibin2_output/output_bins	True	SemiBin_30.fa	100.0	0.11	99.78	Neural Network (Specific Model)	4665754	82084	0.8803	93
+SemiBin_36.fa	semibin2_output/output_bins	True	SemiBin_36.fa	99.96	0.28	99.4	Neural Network (Specific Model)	2912918	37523	0.8881	113
+SemiBin_13.fa	semibin2_output/output_bins	True	SemiBin_13.fa	92.66	0.04	92.58	Neural Network (Specific Model)	4107840	41016	0.9046	129
+SemiBin_12.fa	semibin2_output/output_bins	True	SemiBin_12.fa	91.98	0.18	91.62	Gradient Boost (General Model)	2110164	13910	0.9002	203
+SemiBin_23.fa	semibin2_output/output_bins	True	SemiBin_23.fa	84.06	1.66	80.74	Neural Network (Specific Model)	1689331	8389	0.8678	246
+SemiBin_31.fa	semibin2_output/output_bins	True	SemiBin_31.fa	82.15	0.98	80.19	Neural Network (Specific Model)	1791548	11962	0.8837	199
+SemiBin_3.fa	semibin2_output/output_bins	True	SemiBin_3.fa	83.73	2.21	79.31	Gradient Boost (General Model)	2995112	6876	0.8565	503
+SemiBin_5.fa	semibin2_output/output_bins	True	SemiBin_5.fa	74.0	2.22	69.56	Gradient Boost (General Model)	1260287	5017	0.8945	258
+SemiBin_6.fa	semibin2_output/output_bins	True	SemiBin_6.fa	51.84	0.32	51.2	Neural Network (Specific Model)	1640979	4929	0.9111	350
+SemiBin_2.fa	semibin2_output/output_bins	True	SemiBin_2.fa	51.87	1.21	49.45	Neural Network (Specific Model)	2532101	5489	0.9093	486
+SemiBin_20.fa	semibin2_output/output_bins	True	SemiBin_20.fa	44.82	0.15	44.52	Gradient Boost (General Model)	978913	4743	0.9013	219
+SemiBin_1.fa	semibin2_output/output_bins	True	SemiBin_1.fa	36.97	0.34	36.29	Neural Network (Specific Model)	1528708	4259	0.9196	367
+SemiBin_14.fa	semibin2_output/output_bins	True	SemiBin_14.fa	45.26	6.4	32.46	Neural Network (Specific Model)	2229295	4457	0.9264	511
+SemiBin_19.fa	semibin2_output/output_bins	True	SemiBin_19.fa	14.34	0.17	14.0	Neural Network (Specific Model)	574575	4075	0.8805	139
+SemiBin_9.fa	semibin2_output/output_bins	True	SemiBin_9.fa	10.73	0.0	10.73	Neural Network (Specific Model)	344167	4428	0.9253	84
+SemiBin_11.fa	semibin2_output/output_bins	True	SemiBin_11.fa	10.93	0.21	10.51	Neural Network (Specific Model)	884088	3763	0.8773	229
+SemiBin_40.fa	semibin2_output/output_bins	True	SemiBin_40.fa	8.98	0.0	8.98	Neural Network (Specific Model)	221029	3357	0.8816	65
+SemiBin_22.fa	semibin2_output/output_bins	True	SemiBin_22.fa	9.95	0.58	8.79	Neural Network (Specific Model)	334379	6115	0.8774	61
+SemiBin_15.fa	semibin2_output/output_bins	True	SemiBin_15.fa	8.25	0.0	8.25	Neural Network (Specific Model)	346613	3427	0.9474	100
+SemiBin_41.fa	semibin2_output/output_bins	True	SemiBin_41.fa	8.0	0.0	8.0	Neural Network (Specific Model)	425947	3937	0.8794	107
+SemiBin_25.fa	semibin2_output/output_bins	True	SemiBin_25.fa	5.99	0.01	5.97	Neural Network (Specific Model)	346400	8930	0.8775	44
+SemiBin_67.fa	semibin2_output/output_bins	True	SemiBin_67.fa	6.02	0.13	5.76	Neural Network (Specific Model)	220633	4747	0.8905	47
+SemiBin_53.fa	semibin2_output/output_bins	True	SemiBin_53.fa	5.29	0.01	5.27	Neural Network (Specific Model)	207387	4868	0.8487	46
+SemiBin_16.fa	semibin2_output/output_bins	True	SemiBin_16.fa	5.14	0.01	5.12	Neural Network (Specific Model)	248021	5881	0.8889	45
+SemiBin_0.fa	semibin2_output/output_bins	True	SemiBin_0.fa	4.65	0.0	4.65	Neural Network (Specific Model)	277958	3425	0.951	78
+SemiBin_21.fa	semibin2_output/output_bins	True	SemiBin_21.fa	3.46	0.0	3.46	Neural Network (Specific Model)	227306	4015	0.9437	58

@@ -1,17 +1,19 @@
-from collections import defaultdict
 import logging
-from typing import Iterable, List, Dict, Tuple, Set
-import csv
+from collections import defaultdict
+from collections.abc import Iterable
+from pathlib import Path
+
+import pandas as pd
+import pyfastx
 
 from binette.bin_manager import Bin
 
-from pathlib import Path
-import pyfastx
+logger = logging.getLogger(__name__)
 
 
 def get_paths_common_prefix_suffix(
-    paths: List[Path],
-) -> Tuple[List[str], List[str], List[str]]:
+    paths: list[Path],
+) -> tuple[list[str], list[str], list[str]]:
     """
     Determine the common prefix parts, suffix parts, and common extensions of the last part of a list of pathlib.Path objects.
 
@@ -73,7 +75,7 @@ def get_paths_common_prefix_suffix(
     return common_prefix, common_suffix, common_extensions
 
 
-def infer_bin_set_names_from_input_paths(input_bins: List[Path]) -> Dict[str, Path]:
+def infer_bin_set_names_from_input_paths(input_bins: list[Path]) -> dict[str, Path]:
     """
     Infer bin set names from a list of bin input directories or files.
 
@@ -87,7 +89,6 @@ def infer_bin_set_names_from_input_paths(input_bins: List[Path]) -> Dict[str, Pa
     )
 
     for path in input_bins:
-
         specific_parts = path.parts[
             len(common_prefix) : len(path.parts) - len(common_suffix)
         ]
@@ -104,11 +105,11 @@ def infer_bin_set_names_from_input_paths(input_bins: List[Path]) -> Dict[str, Pa
 
         bin_name_to_bin_dir[bin_set_name] = path
 
-    logging.debug(f"Input bins: {' '.join([path.as_posix() for path in input_bins])}")
-    logging.debug(f"Common prefix to remove: {common_prefix}")
-    logging.debug(f"Common suffix to remove: {common_suffix}")
-    logging.debug(f"Common extension to remove: {common_suffix}")
-    logging.debug(f"bin_name_to_bin_dir: {bin_name_to_bin_dir}")
+    logger.debug(f"Input bins: {' '.join([path.as_posix() for path in input_bins])}")
+    logger.debug(f"Common prefix to remove: {common_prefix}")
+    logger.debug(f"Common suffix to remove: {common_suffix}")
+    logger.debug(f"Common extension to remove: {common_suffix}")
+    logger.debug(f"bin_name_to_bin_dir: {bin_name_to_bin_dir}")
 
     return bin_name_to_bin_dir
 
@@ -122,50 +123,64 @@ def write_bin_info(bins: Iterable[Bin], output: Path, add_contigs: bool = False)
     :param add_contigs: Flag indicating whether to include contig information.
     """
 
-    header = [
-        "bin_id",
-        "origin",
+    # Define columns for the DataFrame
+    columns = [
         "name",
+        "origin",
+        "is_original",
+        "original_name",
         "completeness",
         "contamination",
         "score",
+        "checkm2_model",
         "size",
         "N50",
+        "coding_density",
         "contig_count",
     ]
     if add_contigs:
-        header.append("contigs")
+        columns.append("contigs")
 
-    bin_infos = []
-    for bin_obj in sorted(bins, key=lambda x: (x.score, x.N50, -x.id), reverse=True):
-        bin_info = [
-            bin_obj.id,
-            ";".join(bin_obj.origin),
-            bin_obj.name,
-            bin_obj.completeness,
-            bin_obj.contamination,
-            bin_obj.score,
-            bin_obj.length,
-            bin_obj.N50,
-            len(bin_obj.contigs),
-        ]
+    # Create a list of dictionaries to build the DataFrame
+    data = []
+    for bin_obj in sorted(
+        bins, key=lambda x: (-x.score, -x.N50, -x.is_original, x.contigs_key)
+    ):
+        original_name = bin_obj.original_name if bin_obj.original_name else bin_obj.name
+        origins = bin_obj.origin if bin_obj.is_original else {"binette"}
+
+        bin_info = {
+            "name": bin_obj.name,
+            "origin": ";".join(origins),
+            "is_original": bin_obj.is_original,
+            "original_name": original_name,
+            "completeness": bin_obj.completeness,
+            "contamination": bin_obj.contamination,
+            "score": round(bin_obj.score, 2),
+            "checkm2_model": bin_obj.checkm2_model,
+            "size": bin_obj.length,
+            "N50": bin_obj.N50,
+            "coding_density": round(bin_obj.coding_density, 4)
+            if bin_obj.coding_density is not None
+            else None,
+            "contig_count": len(bin_obj.contigs),
+        }
+
         if add_contigs:
-            bin_info.append(
-                ";".join(str(c) for c in bin_obj.contigs) if add_contigs else ""
-            )
+            bin_info["contigs"] = ";".join(str(c) for c in bin_obj.contigs)
 
-        bin_infos.append(bin_info)
+        data.append(bin_info)
 
-    with open(output, "w", newline="") as fl:
-        writer = csv.writer(fl, delimiter="\t")
-        writer.writerow(header)
-        writer.writerows(bin_infos)
+    # Create pandas DataFrame and write to TSV
+    df = pd.DataFrame(data, columns=columns)
+    df.to_csv(output, sep="\t", index=False)
 
 
 def write_bins_fasta(
-    selected_bins: List,
+    selected_bins: list[Bin],
     contigs_fasta: Path,
     outdir: Path,
+    contigs_names: list[str],
     max_buffer_size: int = 50_000_000,
 ):
     """
@@ -181,37 +196,42 @@ def write_bins_fasta(
 
     # Clear existing files for selected bins
     for sbin in selected_bins:
-        out_path = outdir / f"bin_{sbin.id}.fa"
+        out_path = outdir / f"{sbin.name}.fa"
         if out_path.exists():
             out_path.unlink()  # remove the file
 
     # Map contig name to bin IDs
     contig_to_bins = {}
     for sbin in selected_bins:
-        for contig in sbin.contigs:
-            contig_to_bins[contig] = sbin.id
+        for contig_id in sbin.contigs:
+            contig_name = contigs_names[contig_id]
+            contig_to_bins[contig_name] = sbin.name
+
+    assert len(contig_to_bins) == sum(len(sbin.contigs) for sbin in selected_bins), (
+        "Some contigs are present in multiple bins but should be unique."
+    )
 
     buffer = defaultdict(list)
     buffer_size = 0
 
     def flush_buffer():
         nonlocal buffer_size
-        for bin_id, seqs in buffer.items():
+        for bin_name, seqs in buffer.items():
             if seqs:
-                with open(outdir / f"bin_{bin_id}.fa", "a") as f:
+                with open(outdir / f"{bin_name}.fa", "a") as f:
                     f.writelines(seqs)
         buffer.clear()
         buffer_size = 0
 
     for name, seq in pyfastx.Fastx(contigs_fasta.as_posix()):
-        bin_id = contig_to_bins.get(name)
-        if not bin_id:
+        bin_name = contig_to_bins.get(name)
+        if not bin_name:
             continue
 
         fasta_entry = f">{name}\n{seq}\n"
         entry_size = len(fasta_entry)
 
-        buffer[bin_id].append(fasta_entry)
+        buffer[bin_name].append(fasta_entry)
 
         buffer_size += entry_size
         if buffer_size >= max_buffer_size:
@@ -235,7 +255,7 @@ def check_contig_consistency(
     :param elsewhere_file: Path to the file from an external source.
     :raises AssertionError: If inconsistencies in contig names are found.
     """
-    logging.debug("check_contig_consistency.")
+    logger.debug("Checking contig consistency")
     are_contigs_consistent = len(
         set(contigs_from_elsewhere) | set(contigs_from_assembly)
     ) <= len(set(contigs_from_assembly))
@@ -265,16 +285,44 @@ def check_resume_file(faa_file: Path, diamond_result_file: Path) -> None:
         error_msg = (
             f"Protein file '{faa_file}' does not exist. Resuming is not possible."
         )
-        logging.error(error_msg)
+        logger.error(error_msg)
         raise FileNotFoundError(error_msg)
 
     if not diamond_result_file.exists():
         error_msg = f"Diamond result file '{diamond_result_file}' does not exist. Resuming is not possible."
-        logging.error(error_msg)
+        logger.error(error_msg)
         raise FileNotFoundError(error_msg)
 
 
-def write_original_bin_metrics(original_bins: Set[Bin], original_bin_report_dir: Path):
+def write_contig2bin_table(
+    selected_bins: list[Bin],
+    output_file: Path,
+    contigs_names: list[str],
+):
+    """
+    Write a simple TSV file mapping contig IDs to bin IDs.
+
+    :param selected_bins: List of selected Bin objects.
+    :param output_file: Path to the output TSV file.
+    :param contigs_names: List of contig names where index corresponds to contig ID.
+    """
+    logger.info(f"Writing contig2bin table to '{output_file}'")
+
+    # Ensure output directory exists
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(output_file, "w") as f:
+        # Write contig to bin mappings
+        for bin_obj in selected_bins:
+            for contig_index in bin_obj.contigs:
+                contig_name = contigs_names[contig_index]
+                f.write(f"{contig_name}\t{bin_obj.name}\n")
+
+    total_entries = sum(len(bin_obj.contigs) for bin_obj in selected_bins)
+    logger.debug(f"Successfully wrote contig2bin table with {total_entries} entries")
+
+
+def write_original_bin_metrics(original_bins: list[Bin], original_bin_report_dir: Path):
     """
     Write metrics of original input bins to a specified directory.
 
@@ -287,10 +335,10 @@ def write_original_bin_metrics(original_bins: Set[Bin], original_bin_report_dir:
 
     original_bin_report_dir.mkdir(parents=True, exist_ok=True)
 
-    bin_set_name_to_bins = defaultdict(set)
+    bin_set_name_to_bins = defaultdict(list)
     for bin_obj in original_bins:
         for origin in bin_obj.origin:
-            bin_set_name_to_bins[origin].add(bin_obj)
+            bin_set_name_to_bins[origin].append(bin_obj)
 
     for i, (set_name, bins) in enumerate(sorted(bin_set_name_to_bins.items())):
         bins_metric_file = (
@@ -298,9 +346,9 @@ def write_original_bin_metrics(original_bins: Set[Bin], original_bin_report_dir:
             / f"input_bins_{i + 1}.{set_name.replace('/', '_')}.tsv"
         )
 
-        logging.debug(
-            f"Writing metrics for bin set '{set_name}' to file: {bins_metric_file}"
+        logger.debug(
+            f"Writing metrics for bin set '{set_name}' to file '{bins_metric_file}'"
         )
         write_bin_info(bins, bins_metric_file)
 
-    logging.debug("Completed writing all original input bin metrics.")
+    logger.debug("Completed writing all original input bin metrics")

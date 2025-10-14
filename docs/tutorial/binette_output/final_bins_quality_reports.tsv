@@ -1,0 +1,16 @@
+name	origin	is_original	original_name	completeness	contamination	score	checkm2_model	size	N50	coding_density	contig_count
+binette_bin1	binette	False	binette_bin1	100.0	0.1	99.8	Neural Network (Specific Model)	4658605	82084	0.8803	91
+binette_bin2	binette	False	binette_bin2	99.94	0.23	99.48	Neural Network (Specific Model)	2796059	41151	0.8882	98
+binette_bin3	binette	False	binette_bin3	96.1	0.27	95.56	Gradient Boost (General Model)	2559714	11656	0.899	315
+binette_bin4	binette	False	binette_bin4	93.43	0.12	93.19	Neural Network (Specific Model)	4229623	40395	0.9031	148
+binette_bin5	binette	False	binette_bin5	95.15	2.36	90.43	Gradient Boost (General Model)	1843697	10106	0.8835	266
+binette_bin6	binette	False	binette_bin6	91.5	2.21	87.08	Gradient Boost (General Model)	3543663	5964	0.8542	786
+binette_bin7	semibin2_output/output_bins	True	SemiBin_23.fa	84.06	1.66	80.74	Neural Network (Specific Model)	1689331	8389	0.8678	246
+binette_bin8	binette	False	binette_bin8	74.32	2.17	69.98	Gradient Boost (General Model)	1257085	5017	0.8946	257
+binette_bin9	binette	False	binette_bin9	74.08	3.82	66.44	Neural Network (Specific Model)	3492747	3005	0.9218	1308
+binette_bin10	binette	False	binette_bin10	64.49	1.79	60.91	Gradient Boost (General Model)	1266713	3796	0.9064	415
+binette_bin11	binette	False	binette_bin11	60.27	1.85	56.57	Neural Network (Specific Model)	2080860	4612	0.9044	519
+binette_bin12	binette	False	binette_bin12	52.0	1.07	49.86	Neural Network (Specific Model)	2516999	5503	0.9092	482
+binette_bin13	binette	False	binette_bin13	48.86	4.5	39.86	Gradient Boost (General Model)	1119471	1517	0.8945	729
+binette_bin14	binette	False	binette_bin14	43.66	5.11	33.44	Neural Network (Specific Model)	2087483	4593	0.9248	476
+binette_bin15	binette	False	binette_bin15	43.93	9.52	24.89	Neural Network (Specific Model)	2451217	1480	0.8544	1627

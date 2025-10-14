@@ -5,50 +5,48 @@ Binette will use the previously computed bins to refine and improve them, genera
 
 To run Binette, use the following command:
 
-```bash
-binette --bin_dirs maxbin2/ metabat2/ semibin2/output_bins/ concoct/bins/ \
-        -c Kickstart.megahit/R1.contigs.fa \
-        --verbose -t 12 -o binette_results
+```{include} snippets/05_binette.sh
+:code: bash
 ```
 
 ```{admonition} ⌛ Expected Time
 :class: note
-:class: dropdown
 
-This process should talke around 9 minutes to complete.
+This process should talke around 5 minutes to complete.
 ```
 
 
 Once Binette completes, the `binette_results` directory should have the following structure:
 
 ```
-binette_results/
+binette_output/
 ├── final_bins
-│   ├── bin_13475.fa
-│   ├── bin_17075.fa
-│   ├── bin_19689.fa
-│   ├── bin_21248.fa
-│   ├── bin_31703.fa
-│   ├── bin_33569.fa
-│   ├── bin_39350.fa
-│   ├── bin_39427.fa
-│   ├── bin_39558.fa
-│   ├── bin_44137.fa
-│   ├── bin_46775.fa
-│   ├── bin_47060.fa
-│   ├── bin_47177.fa
-│   ├── bin_47926.fa
-│   └── bin_51082.fa
-├── final_bins_quality_reports.tsv 
+│   ├── binette_bin10.fa
+│   ├── binette_bin11.fa
+│   ├── binette_bin12.fa
+│   ├── binette_bin13.fa
+│   ├── binette_bin14.fa
+│   ├── binette_bin15.fa
+│   ├── binette_bin1.fa
+│   ├── binette_bin2.fa
+│   ├── binette_bin3.fa
+│   ├── binette_bin4.fa
+│   ├── binette_bin5.fa
+│   ├── binette_bin6.fa
+│   ├── binette_bin7.fa
+│   ├── binette_bin8.fa
+│   └── binette_bin9.fa
+├── final_bins_quality_reports.tsv
 ├── input_bins_quality_reports
-│   ├── input_bins_1.concoct_bins.tsv
-│   ├── input_bins_2.maxbin2.tsv
-│   ├── input_bins_3.metabat2.tsv
-│   └── input_bins_4.semibin2_output_bins.tsv
+│   ├── input_bins_1.concoct_bins.tsv
+│   ├── input_bins_2.maxbin2_bins.tsv
+│   ├── input_bins_3.metabat2_bins.tsv
+│   └── input_bins_4.semibin2_output_output_bins.tsv
 └── temporary_files
-    ├── assembly_proteins.faa
+    ├── assembly_proteins.faa.gz
     ├── diamond_result.log
-    └── diamond_result.tsv
+    └── diamond_result.tsv.gz
+
 ```
 
 ### Key Output Files:

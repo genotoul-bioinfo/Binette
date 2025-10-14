@@ -1,0 +1,20 @@
+name	origin	is_original	original_name	completeness	contamination	score	checkm2_model	size	N50	coding_density	contig_count
+maxbin2.001	maxbin2_bins	True	maxbin2.001	95.16	0.48	94.2	Neural Network (Specific Model)	4503016	88578	0.8787	182
+maxbin2.002	maxbin2_bins	True	maxbin2.002	100.0	7.67	84.66	Neural Network (Specific Model)	3249408	39408	0.8844	259
+maxbin2.010	maxbin2_bins	True	maxbin2.010	77.56	10.57	56.42	Gradient Boost (General Model)	3025929	7106	0.8663	702
+maxbin2.006	maxbin2_bins	True	maxbin2.006	63.07	9.84	43.39	Gradient Boost (General Model)	2374963	14891	0.8822	557
+maxbin2.008	maxbin2_bins	True	maxbin2.008	59.62	9.06	41.5	Gradient Boost (General Model)	2805633	8276	0.8529	882
+maxbin2.013	maxbin2_bins	True	maxbin2.013	67.61	15.28	37.05	Neural Network (Specific Model)	3632688	3742	0.9101	1221
+maxbin2.015	maxbin2_bins	True	maxbin2.015	71.26	17.59	36.08	Gradient Boost (General Model)	1716259	2662	0.9124	665
+maxbin2.016	maxbin2_bins	True	maxbin2.016	77.58	21.99	33.6	Gradient Boost (General Model)	5044849	2778	0.8785	2175
+maxbin2.009	maxbin2_bins	True	maxbin2.009	61.76	17.39	26.98	Gradient Boost (General Model)	5815088	2126	0.8506	2736
+maxbin2.019	maxbin2_bins	True	maxbin2.019	42.1	8.2	25.7	Gradient Boost (General Model)	1703900	3145	0.8736	694
+maxbin2.007	maxbin2_bins	True	maxbin2.007	38.16	6.61	24.94	Neural Network (Specific Model)	2136732	2318	0.9217	927
+maxbin2.011	maxbin2_bins	True	maxbin2.011	40.36	8.39	23.58	Gradient Boost (General Model)	2691298	4433	0.8901	717
+maxbin2.005	maxbin2_bins	True	maxbin2.005	51.06	13.8	23.46	Gradient Boost (General Model)	1869482	2191	0.9029	797
+maxbin2.012	maxbin2_bins	True	maxbin2.012	46.9	12.51	21.88	Gradient Boost (General Model)	3343065	3283	0.9229	1305
+maxbin2.004	maxbin2_bins	True	maxbin2.004	22.54	2.0	18.54	Neural Network (Specific Model)	1272133	2203	0.9344	563
+maxbin2.003	maxbin2_bins	True	maxbin2.003	12.58	0.02	12.54	Neural Network (Specific Model)	631726	21535	0.9065	176
+maxbin2.017	maxbin2_bins	True	maxbin2.017	10.11	0.15	9.81	Neural Network (Specific Model)	402991	3603	0.8803	112
+maxbin2.018	maxbin2_bins	True	maxbin2.018	67.21	31.26	4.69	Gradient Boost (General Model)	2432011	2400	0.8962	1137
+maxbin2.014	maxbin2_bins	True	maxbin2.014	92.25	47.17	-2.09	Neural Network (Specific Model)	4626721	2390	0.9109	2046

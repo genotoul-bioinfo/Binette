@@ -19,39 +19,47 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ['ubuntu-latest', 'macos-13']
+        os: ['ubuntu-latest', 'macos-latest']
         python-version: [3.12] #["3.8", "3.9", "3.10"]
 
     steps:
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
     - uses: actions/checkout@v4
 
-    # Install requirements 
-    - uses: conda-incubator/setup-miniconda@v3
+
+    # # Always create the environment (but use cached packages when available)
+    # - name: Setup conda environment
+    #   uses: conda-incubator/setup-miniconda@v3
+    #   with:
+    #     python-version: ${{ matrix.python-version }}
+    #     channels: conda-forge,bioconda
+    #     environment-file: binette.yaml
+    #     activate-environment: binette
+    #     conda-remove-defaults: true
+
+    - name : Setup micromamba environment
+      uses: mamba-org/setup-micromamba@v2
       with:
-        # mamba-version: "*"
-        python-version: ${{ matrix.python-version }}
-        channels: conda-forge,bioconda
         environment-file: binette.yaml
-        activate-environment: binette
-  
+        create-args: python=${{ matrix.python-version }}
+        cache-environment: true
+
+
     - name: Install binette
       run: |
         pip install .
         binette -h
 
-    - name: Lint with flake8
-      run: |
-        pip install flake8
-        # stop the build if there are Python syntax errors or undefined names
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    - name: Download test data
+      uses: actions/checkout@v3
+      with:
+        repository: genotoul-bioinfo/Binette_TestData
+        path: test_data
 
     - name: Test with pytest
       run: |
         pip install pytest pytest-cov
-        pytest --cov=binette --cov-report=html --cov-report=xml --cov-report=term  -v
+        pytest --cov=binette --cov-report=html --cov-report=xml --cov-report=term  -v  --test-data-path="test_data/"
 
     - name: Generate coverage badge
       run: |
@@ -65,13 +73,7 @@ jobs:
       with:
         folder: htmlcov
         branch: gh-pages
-
-    - name: Download test data
-      uses: actions/checkout@v3
-      with:
-        repository: genotoul-bioinfo/Binette_TestData
-        path: test_data
-
+        
     - name: Run simple test case from bin2table
       run: |
         cd test_data
@@ -80,32 +82,7 @@ jobs:
     - name: Compare results from bin2table with expectation
       run: |
         cd test_data
-        head  expected_results/final_bins_quality_reports.tsv test_results/final_bins_quality_reports.tsv
-        python scripts/compare_results.py expected_results/final_bins_quality_reports.tsv test_results/final_bins_quality_reports.tsv
-
-
-    - name: Run simple test case from bin dirs
-      run: |
-        cd test_data
-        binette -d binning_results/A/ binning_results/B/ binning_results/C/  --contigs all_contigs.fna --checkm2_db checkm2_tiny_db/checkm2_tiny_db.dmnd  -v -o test_results_from_dirs
-
-    - name: Compare results from bin dirs with expectation
-      run: |
-        cd test_data
-        head  expected_results/final_bins_quality_reports.tsv test_results_from_dirs/final_bins_quality_reports.tsv
-        python scripts/compare_results.py expected_results/final_bins_quality_reports.tsv test_results_from_dirs/final_bins_quality_reports.tsv
-
-
-    - name: Run simple test case from bin dirs and with proteins input
-      run: |
-        cd test_data
-        binette -d binning_results/A/ binning_results/B/ binning_results/C/ \
-                --contigs all_contigs.fna --checkm2_db checkm2_tiny_db/checkm2_tiny_db.dmnd  -v -o test_results_from_dirs_and_prot_input --proteins proteins.faa
-
-    - name: Compare results from bin dirs with expectation
-      run: |
-        cd test_data
-        head  expected_results/final_bins_quality_reports.tsv test_results_from_dirs_and_prot_input/final_bins_quality_reports.tsv
-        python scripts/compare_results.py expected_results/final_bins_quality_reports.tsv test_results_from_dirs_and_prot_input/final_bins_quality_reports.tsv
+        head  ../tests/expected_results/final_bins_quality_reports.tsv test_results/final_bins_quality_reports.tsv
+        python scripts/compare_results.py ../tests/expected_results/final_bins_quality_reports.tsv test_results/final_bins_quality_reports.tsv
 
 

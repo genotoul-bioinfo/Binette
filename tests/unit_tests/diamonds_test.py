@@ -1,20 +1,14 @@
-import re
-import subprocess
+import logging
 import shutil
-import sys
-import logging
-
-from unittest.mock import patch, MagicMock
-
 import subprocess
 import sys
-import logging
+from collections import Counter
+from unittest.mock import patch
+
+import pandas as pd
 import pytest
 
 from binette import diamond
-
-import pandas as pd
-from collections import Counter
 
 
 class CompletedProcess:
@@ -39,14 +33,12 @@ def test_get_checkm2_db_no_checkm2(monkeypatch):
     with pytest.raises(SystemExit) as pytest_wrapped_e:
         diamond.get_checkm2_db()
 
-    assert pytest_wrapped_e.type == SystemExit
+    assert pytest_wrapped_e.type is SystemExit
     assert pytest_wrapped_e.value.code == 1
 
 
 def test_get_checkm2_db_with_success(monkeypatch):
-
     def mock_subprocess_run(*args, **kwargs):
-
         # Simulating the behavior of checkm2 command
         if (
             args[0][0] == "checkm2"
@@ -66,9 +58,7 @@ def test_get_checkm2_db_with_success(monkeypatch):
 
 
 def test_get_checkm2_db_checkm2_exit_error(monkeypatch):
-
     def mock_subprocess_run(*args, **kwargs):
-
         # Simulating the behavior of checkm2 command
         if (
             args[0][0] == "checkm2"
@@ -84,14 +74,12 @@ def test_get_checkm2_db_checkm2_exit_error(monkeypatch):
     with pytest.raises(SystemExit) as pytest_wrapped_e:
         diamond.get_checkm2_db()
 
-    assert pytest_wrapped_e.type == SystemExit
+    assert pytest_wrapped_e.type is SystemExit
     assert pytest_wrapped_e.value.code == 1
 
 
 def test_get_checkm2_db_wrong_path_format(monkeypatch):
-
     def mock_subprocess_run(*args, **kwargs):
-
         # Simulating the behavior of checkm2 command
         if (
             args[0][0] == "checkm2"
@@ -110,7 +98,7 @@ def test_get_checkm2_db_wrong_path_format(monkeypatch):
     with pytest.raises(SystemExit) as pytest_wrapped_e:
         diamond.get_checkm2_db()
 
-    assert pytest_wrapped_e.type == SystemExit
+    assert pytest_wrapped_e.type is SystemExit
     assert pytest_wrapped_e.value.code == 1
 
 
@@ -140,8 +128,7 @@ def test_check_tool_exists_tool_not_found(monkeypatch):
         diamond.check_tool_exists("non_existing_tool")
 
 
-def test_run_diamond_tool_found(monkeypatch):
-
+def test_run_diamond_tool_found(monkeypatch, tmp_path):
     monkeypatch.setattr(
         sys, "exit", lambda x: None
     )  # Patch sys.exit to avoid test interruption
@@ -155,19 +142,21 @@ def test_run_diamond_tool_found(monkeypatch):
         # Simulating successful run of diamond command
         if (
             args[0]
-            == "diamond blastp --outfmt 6 --max-target-seqs 1 --query test.faa -o output.txt --threads 1 --db db --compress 1 --query-cover 80 --subject-cover 80 --id 30 --evalue 1e-05 --block-size 2 2> log.txt"
+            == f"diamond blastp --outfmt 6 --max-target-seqs 1 --query test.faa -o {output_file.as_posix()} --threads 1 --db db --compress 1 --query-cover 80 --subject-cover 80 --id 30 --evalue 1e-05 --block-size 2 2> {log_path.as_posix()}"
         ):
             return CompletedProcess(0)
 
+    log_path = tmp_path / "log.txt"
+    output_file = tmp_path / "output.txt"
     monkeypatch.setattr(subprocess, "run", mock_subprocess_run)
     monkeypatch.setattr(logging, "error", lambda x: None)  # Avoid logging during test
 
     # Call the function
     diamond.run(
         "test.faa",
-        "output.txt",
+        output_file.as_posix(),
         "db",
-        "log.txt",
+        log_path.as_posix(),
         threads=1,
         query_cover=80,
         subject_cover=80,
@@ -177,20 +166,22 @@ def test_run_diamond_tool_found(monkeypatch):
     )
 
 
-def test_run_diamond_tool_not_found(monkeypatch):
+def test_run_diamond_tool_not_found(monkeypatch, tmp_path):
     # Mocking check_tool_exists to simulate tool not found scenario
     def mock_check_tool_exists(*args, **kwargs):
         raise FileNotFoundError
 
     monkeypatch.setattr(logging, "error", lambda x: None)  # Avoid logging during test
 
+    log_file = tmp_path / "log.txt"
+    output_file = tmp_path / "output.txt"
     # Call the function and expect it to raise FileNotFoundError
     with patch("sys.exit") as mock_exit:
         diamond.run(
             "test.faa",
-            "output.txt",
+            output_file.as_posix(),
             "db",
-            "log.txt",
+            log_file.as_posix(),
             threads=1,
             query_cover=80,
             subject_cover=80,
@@ -235,7 +226,6 @@ def test_get_contig_to_kegg_id():
         patch("pandas.read_csv", return_value=mocked_df),
         patch("checkm2.keggData.KeggCalculator", return_value=mocked_kegg_calculator),
     ):
-
         # Call the function
         result = diamond.get_contig_to_kegg_id(diamond_result_file)
 
@@ -251,4 +241,16 @@ def test_get_contig_to_kegg_id():
     assert result == expected_result
 
 
-# Additional tests can be added to cover more edge cases and scenarios.
+def test_get_contig_to_kegg_id_empty_file():
+    """Test that get_contig_to_kegg_id exits with code 3 when DIAMOND result file is empty."""
+    diamond_result_file = "empty_diamond_results.txt"
+
+    # Mock empty dataframe
+    empty_df = pd.DataFrame()
+
+    with patch("pandas.read_csv", return_value=empty_df):
+        with pytest.raises(SystemExit) as pytest_wrapped_e:
+            diamond.get_contig_to_kegg_id(diamond_result_file)
+
+    assert pytest_wrapped_e.type is SystemExit
+    assert pytest_wrapped_e.value.code == 3

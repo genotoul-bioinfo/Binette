@@ -1,0 +1,5 @@
+name	origin	is_original	original_name	completeness	contamination	score	checkm2_model	size	N50	coding_density	contig_count
+binette_bin1	binette	False	binette_bin1	99.67	0.05	99.57	Neural Network (Specific Model)	1043034	333900		3
+binette_bin2	B	True	binC	100.0	0.28	99.44	Neural Network (Specific Model)	719535	378240		2
+binette_bin3	binette	False	binette_bin3	98.72	0.48	97.76	Neural Network (Specific Model)	490885	133360		4
+binette_bin4	binette	False	binette_bin4	75.42	1.16	73.1	Neural Network (Specific Model)	560035	39288		25

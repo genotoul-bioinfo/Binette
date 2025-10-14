@@ -26,6 +26,6 @@ Please ensure that the Checkm2 database is installed as described in the install
 After the environment is created, activate it by running:
 
 ```{code-block} bash
-conda activate binette_tuto
+conda activate binette_tutorial
 ```
 
