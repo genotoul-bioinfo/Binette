@@ -8,7 +8,6 @@ We will use **MEGAHIT** to assemble the reads from our dataset. Run the followin
 
 :::{admonition} ⌛ Expected Time
 :class: note
-:class: dropdown
 
 This process takes approximately 28 minutes to complete.
 :::
@@ -49,7 +48,6 @@ To obtain this coverage data, we first need to map the reads back to the assembl
 
 :::{admonition} ⌛ Expected Time
 :class: note
-:class: dropdown
 
 This process takes approximately 12 minutes to complete.
 :::

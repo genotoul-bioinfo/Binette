@@ -28,7 +28,6 @@ Let's use different binning tools to group the contigs into bins, which we'll re
 
 ```{admonition} ⌛ Expected Time
 :class: note
-:class: dropdown
 
 This process take around 1 hour to complete.
 ```

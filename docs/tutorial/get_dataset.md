@@ -14,6 +14,21 @@ You can download the "Kickstart" dataset with the following commands:
 :code: bash
 ```
 
+:::{admonition} SRA Toolkit Information
+:class: tip
+
+The SRA toolkit provides direct access to sequencing data from NCBI's Sequence Read Archive. The `prefetch` command downloads the SRA file locally, and `fastq-dump` converts it to standard FASTQ format with proper paired-end splitting and gzip compression for efficiency.
+
+
+You can remove the SRA file `SRR5058924/SRR5058924.sra` as it is no longer needed after conversion to FASTQ files. To remove it run:
+
+```{code-block} bash
+rm SRR5058924/SRR5058924.sra
+```
+
+:::
+
+
 :::{admonition} ⌛ Expected Time
 :class: note
 
@@ -36,18 +51,4 @@ In the next section, we will assemble the two reads files to obtain an assembly 
 - `SRR5058924_1.fastq.gz` (forward reads)  
 - `SRR5058924_2.fastq.gz` (reverse reads)
 
-:::{admonition} 🧹 Cleaning Tip
-:class: tip
 
-You can remove the SRA file `SRR5058924/SRR5058924.sra` as it is no longer needed after conversion to FASTQ files. To remove it run:
-
-```{code-block} bash
-rm SRR5058924/SRR5058924.sra
-```
-:::
-
-```{admonition} SRA Toolkit Information
-:class: tip
-
-The SRA toolkit provides direct access to sequencing data from NCBI's Sequence Read Archive. The `prefetch` command downloads the SRA file locally, and `fastq-dump` converts it to standard FASTQ format with proper paired-end splitting and gzip compression for efficiency.
-```
