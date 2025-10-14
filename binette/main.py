@@ -20,16 +20,8 @@ from rich.console import Console
 from rich.logging import RichHandler
 
 import binette as binette_init
-from binette import (
-    bin_manager,
-    bin_quality,
-    cds,
-    contig_manager,
-    diamond,
-)
-from binette import (
-    io_manager as io,
-)
+from binette import bin_manager, bin_quality, cds, contig_manager, diamond
+from binette import io_manager as io
 
 logger = logging.getLogger(__name__)
 err_console = Console(stderr=True)
@@ -328,24 +320,6 @@ def manage_protein_alignement(
     return contig_to_kegg_counter, contig_to_genes, contig_to_coding_len
 
 
-def write_bins_fasta(
-    selected_bins: list[bin_manager.Bin],
-    contigs_fasta: Path,
-    contigs_in_bins: dict,
-    outdir: Path,
-):
-    for b in selected_bins:
-        b.contigs = {contigs_in_bins[c_index] for c_index in b.contigs}
-
-    outdir_final_bin_set = outdir / "final_bins"
-
-    io.write_bins_fasta(
-        selected_bins, contigs_fasta, outdir_final_bin_set, contigs_in_bins
-    )
-
-    return selected_bins
-
-
 def log_selected_bin_info(
     selected_bins: list[bin_manager.Bin],
     hq_min_completeness: float,
@@ -602,16 +576,14 @@ def binette(
 
     # Validate that exactly one of bin_dirs or contig2bin_tables is provided
     if bin_dirs is None and contig2bin_tables is None:
-        typer.echo(
-            "Error: Either --bin-dirs or --contig2bin-tables must be provided. None were given."
+        raise typer.BadParameter(
+            "Error: Either --bin-dirs or --contig2bin_tables must be provided. None were given."
         )
-        raise typer.Exit(code=1)
 
     if bin_dirs is not None and contig2bin_tables is not None:
-        typer.echo(
-            "Error: Either --bin-dirs or --contig2bin-tables must be provided, but not both."
+        raise typer.BadParameter(
+            "Error: Either --bin-dirs or --contig2bin_tables must be provided, but not both."
         )
-        raise typer.Exit(code=1)
 
     # High quality threshold used just to log number of high quality bins.
     hq_max_conta = 5
