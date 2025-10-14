@@ -294,6 +294,34 @@ def check_resume_file(faa_file: Path, diamond_result_file: Path) -> None:
         raise FileNotFoundError(error_msg)
 
 
+def write_contig2bin_table(
+    selected_bins: list[Bin],
+    output_file: Path,
+    contigs_names: list[str],
+):
+    """
+    Write a simple TSV file mapping contig IDs to bin IDs.
+
+    :param selected_bins: List of selected Bin objects.
+    :param output_file: Path to the output TSV file.
+    :param contigs_names: List of contig names where index corresponds to contig ID.
+    """
+    logger.info(f"Writing contig2bin table to '{output_file}'")
+
+    # Ensure output directory exists
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(output_file, "w") as f:
+        # Write contig to bin mappings
+        for bin_obj in selected_bins:
+            for contig_index in bin_obj.contigs:
+                contig_name = contigs_names[contig_index]
+                f.write(f"{contig_name}\t{bin_obj.name}\n")
+
+    total_entries = sum(len(bin_obj.contigs) for bin_obj in selected_bins)
+    logger.debug(f"Successfully wrote contig2bin table with {total_entries} entries")
+
+
 def write_original_bin_metrics(original_bins: list[Bin], original_bin_report_dir: Path):
     """
     Write metrics of original input bins to a specified directory.

@@ -159,8 +159,10 @@ def test_bin_tables_input_and_protein_input(test_data_path: Path, tmp_path):
 
     assert result.exit_code == 0
 
-    result_table = tmp_path / "test_results_from_dirs" / "final_bins_quality_reports.tsv"
+    result_table = (
+        tmp_path / "test_results_from_dirs" / "final_bins_quality_reports.tsv"
+    )
     expected_table = Path(
         "tests/expected_results/final_bins_quality_reports_from_proteins_input.tsv"
     )
-    compare_results(result_table, expected_table)    
+    compare_results(result_table, expected_table)
