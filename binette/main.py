@@ -244,12 +244,12 @@ def manage_protein_alignement(
 
     :param faa_file: The path to the .faa file.
     :param contigs_fasta: The path to the contigs FASTA file.
-    :param contigs_in_bins: Dictionary mapping bin names to lists of contigs.
+    :param contigs_in_bins: Set of contigs in bins.
     :param diamond_result_file: The path to the diamond result file.
     :param checkm2_db: The path to the CheckM2 database.
     :param threads: Number of threads for parallel processing.
     :param use_existing_protein_file: Boolean indicating whether to use an existing protein file.
-    :param resume_diamond: Boolean indicating whether to resume diamond alignement.
+    :param resume_diamond: Boolean indicating whether to resume diamond alignment.
     :param low_mem: Boolean indicating whether to use low memory mode.
 
     :return: A tuple containing dictionaries - contig_to_kegg_counter, contig_to_genes, and contig_to_coding_len.
@@ -271,6 +271,7 @@ def manage_protein_alignement(
         )
 
     else:
+        logger.info(f"Loading {len(contigs_in_bins)} contigs from '{contigs_fasta}'")
         contigs_iterator = (
             (name, seq)
             for name, seq in pyfastx.Fastx(contigs_fasta.as_posix())
@@ -630,7 +631,7 @@ def binette(
         use_existing_protein_file = True
 
         cds.filter_faa_file(
-            contigs_in_bins,
+            set(contigs_in_bins),
             input_faa_file=proteins,
             filtered_faa_file=faa_file,
         )
@@ -639,7 +640,7 @@ def binette(
         manage_protein_alignement(
             faa_file=faa_file,
             contigs_fasta=contigs,
-            contigs_in_bins=contigs_in_bins,
+            contigs_in_bins=set(contigs_in_bins),
             diamond_result_file=diamond_result_file,
             checkm2_db=checkm2_db,
             threads=threads,
