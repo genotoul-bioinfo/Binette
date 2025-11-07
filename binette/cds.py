@@ -234,7 +234,7 @@ def get_contig_cds_metadata(
 
 
 def filter_faa_file(
-    contigs_to_keep: list[str],
+    contigs_to_keep: set[str],
     input_faa_file: Path,
     filtered_faa_file: Path,
 ):
