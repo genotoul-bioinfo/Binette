@@ -272,13 +272,13 @@ def manage_protein_alignement(
 
     else:
         logger.info(f"Loading {len(contigs_in_bins)} contigs from '{contigs_fasta}'")
-        contigs_list = [
+        contigs_iterator = (
             (name, seq)
             for name, seq in pyfastx.Fastx(contigs_fasta.as_posix())
             if name in contigs_in_bins
-        ]
+        )
         contig_to_genes, contig_to_coding_len = cds.predict(
-            contigs_list, faa_file.as_posix(), threads
+            contigs_iterator, faa_file.as_posix(), threads
         )
         logger.info("Coding density will be computed from freshly identified genes")
 
