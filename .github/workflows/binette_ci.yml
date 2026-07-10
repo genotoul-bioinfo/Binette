@@ -58,11 +58,13 @@ jobs:
         path: test_data
 
     - name: Test with pytest
+      shell: bash -l {0}
       run: |
         pip install pytest pytest-cov
         pytest --cov=binette --cov-report=html --cov-report=xml --cov-report=term  -v  --test-data-path="test_data/"
 
     - name: Generate coverage badge
+      shell: bash -l {0}
       run: |
         pip install genbadge[coverage]
         genbadge coverage -i coverage.xml  -o htmlcov/coverage-badge.svg
@@ -76,11 +78,13 @@ jobs:
         branch: gh-pages
         
     - name: Run simple test case from bin2table
+      shell: bash -l {0}
       run: |
         cd test_data
         binette -b binning_results/*binning --contigs all_contigs.fna --checkm2_db checkm2_tiny_db/checkm2_tiny_db.dmnd  -v -o test_results
 
     - name: Compare results from bin2table with expectation
+      shell: bash -l {0}
       run: |
         cd test_data
         head  ../tests/expected_results/final_bins_quality_reports.tsv test_results/final_bins_quality_reports.tsv
