@@ -43,7 +43,10 @@ jobs:
         environment-file: binette.yaml
         create-args: python=${{ matrix.python-version }}
         cache-environment: true
-        channels: conda-forge,bioconda
+        condarc: |
+          channels:
+            - conda-forge
+            - bioconda
 
 
     - name: Install binette
