@@ -26,27 +26,24 @@ jobs:
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
     - uses: actions/checkout@v7
 
-
-    # # Always create the environment (but use cached packages when available)
-    # - name: Setup conda environment
-    #   uses: conda-incubator/setup-miniconda@v3
-    #   with:
-    #     python-version: ${{ matrix.python-version }}
-    #     channels: conda-forge,bioconda
-    #     environment-file: binette.yaml
-    #     activate-environment: binette
-    #     conda-remove-defaults: true
-
-    - name : Setup micromamba environment
-      uses: mamba-org/setup-micromamba@v3
+    - name : Setup miniconda environment
+      uses: conda-incubator/setup-miniconda@v3
       with:
+        python-version: ${{ matrix.python-version }}
+        channels: conda-forge,bioconda,defaults
         environment-file: binette.yaml
-        create-args: python=${{ matrix.python-version }}
-        cache-environment: true
-        condarc: |
-          channels:
-            - conda-forge
-            - bioconda
+        activate-environment: binette
+
+    # - name : Setup micromamba environment
+    #   uses: mamba-org/setup-micromamba@v3
+    #   with:
+    #     environment-file: binette.yaml
+    #     create-args: python=${{ matrix.python-version }}
+    #     cache-environment: true
+    #     condarc: |
+    #       channels:
+    #         - conda-forge
+    #         - bioconda
 
 
     - name: Install binette
