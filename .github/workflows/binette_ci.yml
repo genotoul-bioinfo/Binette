@@ -47,6 +47,7 @@ jobs:
 
 
     - name: Install binette
+      shell: bash -l {0}
       run: |
         pip install .
         binette -h
