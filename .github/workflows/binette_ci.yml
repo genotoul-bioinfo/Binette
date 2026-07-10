@@ -24,44 +24,48 @@ jobs:
 
     steps:
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
 
-
-    # # Always create the environment (but use cached packages when available)
-    # - name: Setup conda environment
-    #   uses: conda-incubator/setup-miniconda@v3
-    #   with:
-    #     python-version: ${{ matrix.python-version }}
-    #     channels: conda-forge,bioconda
-    #     environment-file: binette.yaml
-    #     activate-environment: binette
-    #     conda-remove-defaults: true
-
-    - name : Setup micromamba environment
-      uses: mamba-org/setup-micromamba@v2
+    - name : Setup miniconda environment
+      uses: conda-incubator/setup-miniconda@v3
       with:
+        python-version: ${{ matrix.python-version }}
+        channels: conda-forge,bioconda,defaults
         environment-file: binette.yaml
-        create-args: python=${{ matrix.python-version }}
-        cache-environment: true
+        activate-environment: binette
+
+    # - name : Setup micromamba environment
+    #   uses: mamba-org/setup-micromamba@v3
+    #   with:
+    #     environment-file: binette.yaml
+    #     create-args: python=${{ matrix.python-version }}
+    #     cache-environment: true
+    #     condarc: |
+    #       channels:
+    #         - conda-forge
+    #         - bioconda
 
 
     - name: Install binette
+      shell: bash -l {0}
       run: |
         pip install .
         binette -h
 
     - name: Download test data
-      uses: actions/checkout@v3
+      uses: actions/checkout@v7
       with:
         repository: genotoul-bioinfo/Binette_TestData
         path: test_data
 
     - name: Test with pytest
+      shell: bash -l {0}
       run: |
         pip install pytest pytest-cov
         pytest --cov=binette --cov-report=html --cov-report=xml --cov-report=term  -v  --test-data-path="test_data/"
 
     - name: Generate coverage badge
+      shell: bash -l {0}
       run: |
         pip install genbadge[coverage]
         genbadge coverage -i coverage.xml  -o htmlcov/coverage-badge.svg
@@ -75,11 +79,13 @@ jobs:
         branch: gh-pages
         
     - name: Run simple test case from bin2table
+      shell: bash -l {0}
       run: |
         cd test_data
         binette -b binning_results/*binning --contigs all_contigs.fna --checkm2_db checkm2_tiny_db/checkm2_tiny_db.dmnd  -v -o test_results
 
     - name: Compare results from bin2table with expectation
+      shell: bash -l {0}
       run: |
         cd test_data
         head  ../tests/expected_results/final_bins_quality_reports.tsv test_results/final_bins_quality_reports.tsv
