@@ -24,7 +24,7 @@ jobs:
 
     steps:
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
 
 
     # # Always create the environment (but use cached packages when available)
@@ -38,7 +38,7 @@ jobs:
     #     conda-remove-defaults: true
 
     - name : Setup micromamba environment
-      uses: mamba-org/setup-micromamba@v2
+      uses: mamba-org/setup-micromamba@v3
       with:
         environment-file: binette.yaml
         create-args: python=${{ matrix.python-version }}
@@ -51,7 +51,7 @@ jobs:
         binette -h
 
     - name: Download test data
-      uses: actions/checkout@v3
+      uses: actions/checkout@v7
       with:
         repository: genotoul-bioinfo/Binette_TestData
         path: test_data
