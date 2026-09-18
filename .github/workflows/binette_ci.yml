@@ -30,7 +30,7 @@ jobs:
       uses: conda-incubator/setup-miniconda@v3
       with:
         python-version: ${{ matrix.python-version }}
-        channels: conda-forge,bioconda,defaults
+        channels: conda-forge,bioconda
         environment-file: binette.yaml
         activate-environment: binette
 
