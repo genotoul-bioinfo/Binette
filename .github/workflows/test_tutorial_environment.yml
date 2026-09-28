@@ -27,7 +27,6 @@ jobs:
         uses: conda-incubator/setup-miniconda@v4
         with:
           environment-file: docs/tutorial/binette_tutorial_env.yaml
-          python-version: python=3.12
           channels: conda-forge,bioconda
           activate-environment: binette_tutorial
           conda-remove-defaults: "true"
