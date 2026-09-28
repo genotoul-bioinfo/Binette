@@ -21,13 +21,15 @@ jobs:
         
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name : Setup micromamba environment
-        uses: mamba-org/setup-micromamba@v2
+        uses: conda-incubator/setup-miniconda@v4
         with:
           environment-file: docs/tutorial/binette_tutorial_env.yaml
-          create-args: python=3.12
+          channels: conda-forge,bioconda
+          activate-environment: binette_tutorial
+          conda-remove-defaults: "true"
 
       - name: Test key tools
         shell: bash -l {0}
