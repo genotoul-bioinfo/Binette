@@ -195,6 +195,25 @@ def test_bin_tables_input_and_resume(test_data_path: Path, tmp_path, caplog):
     assert "Creating intermediate bins" not in caplog.text
     assert {p.name: p.read_text() for p in final_bins_dir.glob("*.fa")} == bins_fasta
 
+    # --low_mem changes DIAMOND block size: DIAMOND and bin selection are rerun,
+    # proteins are reused
+    result = run_binette(cmd_args + ["--low_mem"], caplog)
+    assert result.exit_code == 0
+    assert "Binette already completed" not in caplog.text
+    assert "Resuming: reusing protein sequences" in caplog.text
+    assert "Cannot reuse DIAMOND results" in caplog.text
+    assert "--block-size 0.5" in caplog.text
+    result = run_binette(cmd_args + ["--low_mem"], caplog)
+    assert result.exit_code == 0
+    assert "Binette already completed" in caplog.text
+
+    # Back to default memory mode: DIAMOND is rerun with the default block size
+    result = run_binette(cmd_args, caplog)
+    assert result.exit_code == 0
+    assert "--block-size 2" in caplog.text
+    compare_results(result_table, expected_table)
+    diamond_mtime = diamond_file.stat().st_mtime_ns
+
     # Different selection parameter: proteins and DIAMOND results are reused
     result = run_binette(cmd_args + ["--prefix", "other"], caplog)
     assert result.exit_code == 0

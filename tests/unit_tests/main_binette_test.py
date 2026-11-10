@@ -10,6 +10,7 @@ from binette import checkpoint
 from binette.bin_manager import Bin
 from binette.main import (
     can_reuse_step,
+    diamond_result_parameters,
     get_diamond_hits,
     get_proteins,
     log_selected_bin_info,
@@ -370,3 +371,15 @@ def test_parse_input_files_bin_dirs(create_temp_bin_directories, tmp_path):
         "contig5",
     }
     assert len(contig_id_to_length) == 5
+
+
+def test_diamond_result_parameters_include_block_size():
+    default = diamond_result_parameters(low_mem=False)
+    low_mem = diamond_result_parameters(low_mem=True)
+
+    assert default["block_size"] == 2
+    assert low_mem["block_size"] == 0.5
+    assert {k: v for k, v in default.items() if k != "block_size"} == {
+        k: v for k, v in low_mem.items() if k != "block_size"
+    }
+    assert {"query_cover", "subject_cover", "percent_id", "evalue"} <= set(default)

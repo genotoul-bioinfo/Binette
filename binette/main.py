@@ -411,12 +411,33 @@ def get_diamond_hits(
     return contig_to_kegg_counter
 
 
-def diamond_result_parameters() -> dict:
-    """DIAMOND parameters that change its results (threads/memory settings do not)."""
+def diamond_result_parameters(low_mem: bool) -> dict:
+    """
+    DIAMOND parameters that can change its results. Threads do not, but the block
+    size set by --low_mem does.
+
+    :param low_mem: Whether DIAMOND low memory mode is used.
+    """
     params = inspect.signature(diamond.run).parameters
-    return {
+    result_params = {
         name: params[name].default
         for name in ("query_cover", "subject_cover", "percent_id", "evalue")
+    }
+    result_params["block_size"] = diamond.get_block_size(low_mem)
+    return result_params
+
+
+def make_diamond_step_inputs(
+    ckpt: checkpoint.Checkpoint, faa_file: Path, checkm2_db: dict, low_mem: bool
+) -> dict:
+    """
+    Inputs of the DIAMOND step: the proteins it runs on (as recorded in the
+    checkpoint), the CheckM2 database and the DIAMOND parameters.
+    """
+    return {
+        "proteins_sha256": ckpt.step_output_digest("proteins", faa_file),
+        "checkm2_db": checkm2_db,
+        "parameters": diamond_result_parameters(low_mem),
     }
 
 
@@ -811,6 +832,11 @@ def binette(
             "prefix": prefix,
             "debug": debug,
         },
+        # Chain to upstream steps: final results are only reusable if the DIAMOND
+        # results (and through them, the proteins) of the previous run match.
+        "diamond": make_diamond_step_inputs(
+            ckpt, faa_file, run_inputs["checkm2_db"], low_mem
+        ),
     }
 
     if resume and not ckpt.data["steps"]:
@@ -859,11 +885,9 @@ def binette(
         ckpt.record_step("proteins", proteins_step_inputs, protein_outputs)
 
     # DIAMOND #
-    diamond_step_inputs = {
-        "proteins_sha256": ckpt.step_output_digest("proteins", faa_file),
-        "checkm2_db": run_inputs["checkm2_db"],
-        "parameters": diamond_result_parameters(),
-    }
+    diamond_step_inputs = make_diamond_step_inputs(
+        ckpt, faa_file, run_inputs["checkm2_db"], low_mem
+    )
     reuse_diamond = can_reuse_step(
         ckpt, "diamond", diamond_step_inputs, resume, "DIAMOND results"
     )
@@ -994,6 +1018,7 @@ def binette(
     ]
     if debug:
         final_outputs += [index_to_contig_file, all_bin_compo_file]
+    final_step_inputs["diamond"] = diamond_step_inputs
     ckpt.record_step("final", final_step_inputs, final_outputs)
 
     if write_fasta_bins:

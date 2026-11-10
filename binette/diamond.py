@@ -61,6 +61,16 @@ def check_tool_exists(tool_name: str):
         )
 
 
+def get_block_size(low_mem: bool) -> float:
+    """
+    DIAMOND block size used by Binette. It changes memory usage and can also
+    slightly change alignment results.
+
+    :param low_mem: Use low memory mode if True.
+    """
+    return 0.5 if low_mem else 2
+
+
 def run(
     faa_file: str,
     output: str,
@@ -94,7 +104,7 @@ def run(
     final_output = Path(output)
     tmp_output = partial_path(final_output)
 
-    blocksize = 0.5 if low_mem else 2
+    blocksize = get_block_size(low_mem)
 
     cmd = (
         "diamond blastp --outfmt 6 --max-target-seqs 1 "
