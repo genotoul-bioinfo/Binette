@@ -279,42 +279,48 @@ def test_check_contig_consistency_no_error():
     )
 
 
-@pytest.fixture
-def temp_files(tmp_path):
-    # Create temporary files for testing
-    faa_file = tmp_path / "test_protein.faa"
-    diamond_result_file = tmp_path / "test_diamond_result.txt"
-    faa_file.touch()
-    diamond_result_file.touch()
-    yield str(faa_file), str(diamond_result_file)
+@pytest.mark.parametrize("filename", ["coding_length.tsv", "coding_length.tsv.gz"])
+def test_write_and_read_contig_coding_length(tmp_path, filename):
+    output = tmp_path / filename
+    contig_to_coding_length = {"contig1": 120, "contig_2": 0, "contig3": None}
+
+    io_manager.write_contig_coding_length(contig_to_coding_length, output)
+
+    assert output.exists()
+    assert not (tmp_path / f"partial_{filename}").exists()
+    assert io_manager.read_contig_coding_length(output) == contig_to_coding_length
 
 
-def test_check_resume_file_exists(temp_files, caplog):
-    # Test when both files exist
-    faa_file, diamond_result_file = temp_files
-    io_manager.check_resume_file(Path(faa_file), Path(diamond_result_file))
-    assert "Protein file" not in caplog.text
-    assert "Diamond result file" not in caplog.text
+def test_write_contig_coding_length_casts_float_to_int(tmp_path):
+    output = tmp_path / "coding_length.tsv"
+    io_manager.write_contig_coding_length({"contig1": 120.0}, output)
+    assert output.read_text() == "contig1\t120\n"
 
 
-def test_check_resume_file_missing_faa(temp_files, caplog):
-    # Test when faa_file is missing
-    _, diamond_result_file = temp_files
-    with pytest.raises(FileNotFoundError):
-        io_manager.check_resume_file(Path("nonexistent.faa"), Path(diamond_result_file))
-    assert "Protein file" in caplog.text
-    assert "Diamond result file" not in caplog.text
+def test_clear_previous_outputs(tmp_path):
+    final_bins_dir = tmp_path / "final_bins"
+    report_dir = tmp_path / "input_bins_quality_reports"
+    final_bins_dir.mkdir()
+    report_dir.mkdir()
+
+    old_bin = final_bins_dir / "old_prefix_bin1.fa"
+    old_report = report_dir / "input_bins_1.A.tsv"
+    unrelated_file = final_bins_dir / "notes.txt"
+    for path in (old_bin, old_report, unrelated_file):
+        path.write_text("x")
+
+    io_manager.clear_previous_outputs(final_bins_dir, report_dir)
+
+    assert not old_bin.exists()
+    assert not old_report.exists()
+    assert unrelated_file.exists()
 
 
-def test_check_resume_file_missing_diamond(temp_files, caplog):
-    # Test when diamond_result_file is missing
-    faa_file, _ = temp_files
-    with pytest.raises(FileNotFoundError):
-        io_manager.check_resume_file(
-            Path(faa_file), Path("nonexistent_diamond_result.txt")
-        )
-    assert "Protein file" not in caplog.text
-    assert "Diamond result file" in caplog.text
+def test_clear_previous_outputs_missing_dirs(tmp_path):
+    # Nothing to clear on a fresh output directory
+    io_manager.clear_previous_outputs(
+        tmp_path / "final_bins", tmp_path / "input_bins_quality_reports"
+    )
 
 
 def test_write_original_bin_metrics(bin1, bin2, tmp_path):
@@ -339,3 +345,30 @@ def test_write_original_bin_metrics(bin1, bin2, tmp_path):
 
     for file in expected_files:
         assert file.exists(), f"Expected file {file} was not created."
+
+
+def test_read_contig2bin_table(tmp_path):
+    table = tmp_path / "final_contig_to_bin.tsv"
+    table.write_text("contig1\tbin1\ncontig2\tbin1\ncontig3\tbin2\n")
+    assert io_manager.read_contig2bin_table(table) == {
+        "contig1": "bin1",
+        "contig2": "bin1",
+        "contig3": "bin2",
+    }
+
+
+def test_write_bins_fasta_from_contig_to_bin(tmp_path):
+    contigs_fasta = tmp_path / "contigs.fasta"
+    contigs_fasta.write_text(">contig1\nAAAA\n>contig2\nCCCC\n>contig3\nGGGG\n")
+    outdir = tmp_path / "final_bins"
+    outdir.mkdir()
+    (outdir / "bin1.fa").write_text(">stale\nTTTT\n")
+
+    io_manager.write_bins_fasta_from_contig_to_bin(
+        {"contig1": "bin1", "contig3": "bin1", "contig2": "bin2"},
+        contigs_fasta,
+        outdir,
+    )
+
+    assert (outdir / "bin1.fa").read_text() == ">contig1\nAAAA\n>contig3\nGGGG\n"
+    assert (outdir / "bin2.fa").read_text() == ">contig2\nCCCC\n"

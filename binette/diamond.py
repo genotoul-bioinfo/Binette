@@ -4,9 +4,12 @@ import shutil
 import subprocess
 import sys
 from collections import Counter
+from pathlib import Path
 
 import pandas as pd
 from checkm2 import keggData
+
+from binette.checkpoint import atomic_replace, partial_path
 
 logger = logging.getLogger(__name__)
 
@@ -86,12 +89,17 @@ def run(
     """
     check_tool_exists("diamond")
 
+    # DIAMOND writes to a temporary file which is moved to its final location
+    # only on success, so an interrupted job never leaves a truncated result file.
+    final_output = Path(output)
+    tmp_output = partial_path(final_output)
+
     blocksize = 0.5 if low_mem else 2
 
     cmd = (
         "diamond blastp --outfmt 6 --max-target-seqs 1 "
         f"--query {faa_file} "
-        f"-o {output} "
+        f"-o {tmp_output} "
         f"--threads {threads} "
         f"--db {db} "
         f"--compress 1 "
@@ -110,6 +118,7 @@ def run(
         logger.error(f"An error occurred while running DIAMOND. Check log file '{log}'")
         sys.exit(1)
 
+    atomic_replace(tmp_output, final_output)
     logger.info("Finished running DIAMOND")
 
 

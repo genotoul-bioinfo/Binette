@@ -170,7 +170,7 @@ In this directory you will find:
 - **`final_bins/`**: This directory stores all the selected bins in fasta format. Can be skipped with `--no-write-fasta-bins`.
 - **`final_contig_to_bin.tsv`**: A headerless TSV file mapping each contig to its assigned bin. This format is much lighter than the fasta output to describe the final Binette bins.
 - **`input_bins_quality_reports/`**: A directory storing quality reports for the input bin sets, with files following the same structure as `final_bins_quality_reports.tsv`.
-- **`temporary_files/`**: This directory contains intermediate files. If you choose to use the `--resume` option, Binette will utilize files in this directory to prevent the recomputation of time-consuming steps.
+- **`temporary_files/`**: This directory contains intermediate files (predicted proteins, DIAMOND alignments and a `checkpoint.json` file tracking them). They are reused to avoid recomputing time-consuming steps when Binette is run again in the same output directory (see [Resuming a run](#resuming-a-run-and-reusing-an-output-directory)).
 
 
 The `final_bins_quality_reports.tsv` file contains the following columns:
@@ -186,10 +186,22 @@ The `final_bins_quality_reports.tsv` file contains the following columns:
 | **score**          | Computed score: `completeness - contamination * weight`. The contamination weight can be customized using the `--contamination_weight` option. |
 | **size**           | Total size of the bin in nucleotides.                                                                                                          |
 | **N50**            | The N50 of the bin, representing the length for which 50% of the total nucleotides are in contigs of that length or longer.                    |
-| **coding\_density** | The percentage of the bin that codes for proteins (genes length / total bin length × 100). Only computed when genes are freshly identified. Empty when using `--proteins` or `--resume` options. |
+| **coding\_density** | The percentage of the bin that codes for proteins (genes length / total bin length × 100). Only computed when genes are freshly identified. Empty when using the `--proteins` option. |
 | **contig\_count**  | Number of contigs contained within the bin.                                                                                                    |
    
 
+
+### Resuming a run and reusing an output directory
+
+Binette keeps track of its intermediate results in `temporary_files/`. When it is run again with the same output directory, it automatically reuses whatever was already computed. Resuming is on by default, so the same command can be resubmitted after a failed or interrupted job (e.g. a SLURM job that ran out of time or memory) without any change:
+
+- Predicted proteins and DIAMOND alignments are reused only when they were computed from the same inputs (contig sequences, input bin sets, `--proteins` file and CheckM2 database) and their files are complete and unmodified. Otherwise they are recomputed, and Binette logs why.
+- If a previous run already completed with the same inputs and parameters, Binette reports that there is nothing to do and exits successfully.
+- Changing only parameters that affect bin selection (e.g. `--min_completeness`, `--contamination_weight`, `--prefix`) reuses the proteins and DIAMOND alignments and overwrites the final results.
+- `--no-write-fasta-bins` does not change the results: rerunning a completed run with or without it does not recompute anything. If bin FASTA files are missing or modified, they are written again from `final_contig_to_bin.tsv`.
+- Use `--no-resume` to recompute everything.
+
+To prevent accidentally mixing results from different analyses, Binette stops with an error if the output directory contains results computed from **different inputs**, or results from an older Binette version that cannot be verified. Use a different `--outdir`, or add `--force` to discard the previous intermediate files and overwrite the results.
 
 ## Help, feature requests and bug reporting
 
