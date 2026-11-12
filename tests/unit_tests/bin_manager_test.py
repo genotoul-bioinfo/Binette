@@ -4,6 +4,9 @@ Unit tests for binette.
 """
 
 import logging
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 import networkx as nx
@@ -576,3 +579,30 @@ def test_get_contigs_in_bin_sets(caplog):
 
     # Check if the result matches expected contigs
     assert set(result) == expected_contigs, "The returned set of contigs is incorrect."
+    # Contigs are sorted so that contig indices do not depend on set ordering
+    assert result == ["1", "3", "4", "5"]
+
+
+def test_contig_index_independent_of_hash_seed():
+    """
+    Contig indices must not depend on Python's string hash randomization, otherwise
+    outputs (contig2bin row order, tie-breaking in bin selection) change between runs.
+    """
+    script = (
+        "from binette import bin_manager, contig_manager\n"
+        "bins = {'set1': [{'contigs': [f'contig_{i}' for i in range(50)], "
+        "'set_name': 'set1', 'bin_name': 'bin1'}]}\n"
+        "contigs = bin_manager.get_contigs_in_bin_sets(bins)\n"
+        "print(contig_manager.make_contig_index(contigs))\n"
+    )
+    outputs = {
+        subprocess.run(
+            [sys.executable, "-c", script],
+            env={**os.environ, "PYTHONHASHSEED": str(seed)},
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        for seed in range(5)
+    }
+    assert len(outputs) == 1

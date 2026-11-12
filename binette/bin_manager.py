@@ -537,7 +537,9 @@ def get_contigs_in_bin_sets(bin_set_name_to_bins: dict[str, set[Bin]]) -> list[s
 
     :param bin_set_name_to_bins: A dictionary where keys are bin set names and values are sets of Bin objects.
 
-    :return:  A set of contig names found in bin sets
+    :return: Sorted list of the contig names found in bin sets. Sorting makes contig
+        indices, and therefore Binette outputs, identical from one run to another
+        (iterating over a set of strings depends on Python's hash randomization).
     """
     # To track all unique contigs across bin sets
     all_contigs_in_bins = set()
@@ -573,7 +575,7 @@ def get_contigs_in_bin_sets(bin_set_name_to_bins: dict[str, set[Bin]]) -> list[s
             f"Bin set '{bin_set_name}': {len(bins_info)} bins, {len(unique_contigs_in_bin_set)} unique contigs."
         )
 
-    return list(all_contigs_in_bins)
+    return sorted(all_contigs_in_bins)
 
 
 def sum_contig_lengths(
