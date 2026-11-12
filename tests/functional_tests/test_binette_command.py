@@ -66,6 +66,29 @@ def test_wrong_input_both_input_types(tmp_path):
     assert result.exit_code == 2
 
 
+def test_diamond_error_exit_code(tmp_path, monkeypatch, caplog):
+    """A DIAMOND error ends Binette with its exit code and a logged message, no traceback."""
+    from binette import diamond, pipeline
+
+    def failing_run(config):
+        raise diamond.DiamondError("DIAMOND result file is empty", exit_code=3)
+
+    monkeypatch.setattr(pipeline, "run", failing_run)
+    contigs = tmp_path / "contigs.fna"
+    contigs.write_text(">c1\nACGT\n")
+    bin_dirs = [tmp_path / "set1", tmp_path / "set2"]
+    for bin_dir in bin_dirs:
+        bin_dir.mkdir()
+
+    with caplog.at_level(logging.ERROR):
+        result = runner.invoke(
+            app, ["-c", str(contigs), "-d", str(bin_dirs[0]), "-d", str(bin_dirs[1])]
+        )
+
+    assert result.exit_code == 3
+    assert "DIAMOND result file is empty" in caplog.text
+
+
 def test_quiet_and_verbose_flag(tmp_path):
     input = tmp_path / "contig.fna"
     input.write_text(">contig1\nATGC\n>contig2\nATGC")

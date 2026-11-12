@@ -29,11 +29,10 @@ def test_get_checkm2_db_no_checkm2(monkeypatch):
     monkeypatch.setattr(shutil, "which", mock_shutil_which_none)
 
     # Call the function
-    with pytest.raises(SystemExit) as pytest_wrapped_e:
+    with pytest.raises(diamond.DiamondError) as exc_info:
         diamond.get_checkm2_db()
 
-    assert pytest_wrapped_e.type is SystemExit
-    assert pytest_wrapped_e.value.code == 1
+    assert exc_info.value.exit_code == 1
 
 
 def test_get_checkm2_db_with_success(monkeypatch):
@@ -70,11 +69,10 @@ def test_get_checkm2_db_checkm2_exit_error(monkeypatch):
     monkeypatch.setattr(shutil, "which", mock_shutil_which)
 
     # Call the function
-    with pytest.raises(SystemExit) as pytest_wrapped_e:
+    with pytest.raises(diamond.DiamondError) as exc_info:
         diamond.get_checkm2_db()
 
-    assert pytest_wrapped_e.type is SystemExit
-    assert pytest_wrapped_e.value.code == 1
+    assert exc_info.value.exit_code == 1
 
 
 def test_get_checkm2_db_wrong_path_format(monkeypatch):
@@ -94,11 +92,10 @@ def test_get_checkm2_db_wrong_path_format(monkeypatch):
     monkeypatch.setattr(shutil, "which", mock_shutil_which)
 
     # Call the function
-    with pytest.raises(SystemExit) as pytest_wrapped_e:
+    with pytest.raises(diamond.DiamondError) as exc_info:
         diamond.get_checkm2_db()
 
-    assert pytest_wrapped_e.type is SystemExit
-    assert pytest_wrapped_e.value.code == 1
+    assert exc_info.value.exit_code == 1
 
 
 def test_check_tool_exists_tool_found(monkeypatch):
@@ -184,7 +181,7 @@ def test_run_diamond_fails(monkeypatch, tmp_path):
     monkeypatch.setattr(subprocess, "run", mock_subprocess_run)
     monkeypatch.setattr(diamond, "check_tool_exists", lambda tool: None)
 
-    with pytest.raises(SystemExit) as exc_info:
+    with pytest.raises(diamond.DiamondError) as exc_info:
         diamond.run(
             "test.faa",
             output_file.as_posix(),
@@ -193,7 +190,7 @@ def test_run_diamond_fails(monkeypatch, tmp_path):
             threads=1,
         )
 
-    assert exc_info.value.code == 1
+    assert exc_info.value.exit_code == 1
     # A failed run never produces the final result file
     assert not output_file.exists()
 
@@ -247,18 +244,17 @@ def test_get_contig_to_kegg_id():
 
 
 def test_get_contig_to_kegg_id_empty_file():
-    """Test that get_contig_to_kegg_id exits with code 3 when DIAMOND result file is empty."""
+    """Test that get_contig_to_kegg_id raises an error with exit code 3 when DIAMOND result file is empty."""
     diamond_result_file = "empty_diamond_results.txt"
 
     # Mock empty dataframe
     empty_df = pd.DataFrame()
 
     with patch("pandas.read_csv", return_value=empty_df):
-        with pytest.raises(SystemExit) as pytest_wrapped_e:
+        with pytest.raises(diamond.DiamondError) as exc_info:
             diamond.get_contig_to_kegg_id(diamond_result_file)
 
-    assert pytest_wrapped_e.type is SystemExit
-    assert pytest_wrapped_e.value.code == 3
+    assert exc_info.value.exit_code == 3
 
 
 def test_resolve_checkm2_db(tmp_path):
