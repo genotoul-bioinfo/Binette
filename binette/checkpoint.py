@@ -212,6 +212,31 @@ class Checkpoint:
 
         return True, ""
 
+    def can_reuse(
+        self, step: str, inputs: dict[str, Any], resume: bool, description: str
+    ) -> bool:
+        """
+        Decide whether a recorded step can be reused and log the decision.
+
+        :param step: Name of the step.
+        :param inputs: Inputs of the step in the current run.
+        :param resume: Whether resuming is enabled.
+        :param description: Human readable description of the step results.
+        """
+        if not resume:
+            return False
+
+        if step not in self.data["steps"]:
+            logger.debug(f"No {description} from a previous run to reuse")
+            return False
+
+        is_valid, reason = self.step_status(step, inputs)
+        if is_valid:
+            logger.info(f"Resuming: reusing {description} from a previous run")
+        else:
+            logger.info(f"Cannot reuse {description} from a previous run: {reason}")
+        return is_valid
+
     def step_output_digest(self, step: str, path: Path) -> str | None:
         """Return the recorded sha256 of an output file of a step."""
         record = self.data["steps"].get(step, {})

@@ -1,6 +1,7 @@
 import shutil
 import subprocess
 from collections import Counter
+from pathlib import Path
 from unittest.mock import patch
 
 import pandas as pd
@@ -258,3 +259,27 @@ def test_get_contig_to_kegg_id_empty_file():
 
     assert pytest_wrapped_e.type is SystemExit
     assert pytest_wrapped_e.value.code == 3
+
+
+def test_resolve_checkm2_db(tmp_path):
+    db = tmp_path / "db.dmnd"
+    db.write_text("db")
+    assert diamond.resolve_checkm2_db(db) == db
+
+    with pytest.raises(FileNotFoundError):
+        diamond.resolve_checkm2_db(tmp_path / "missing.dmnd")
+
+    with patch("binette.diamond.get_checkm2_db", return_value="/some/db.dmnd"):
+        assert diamond.resolve_checkm2_db(None) == Path("/some/db.dmnd")
+
+
+def test_result_parameters_include_block_size():
+    default = diamond.result_parameters(low_mem=False)
+    low_mem = diamond.result_parameters(low_mem=True)
+
+    assert default["block_size"] == 2
+    assert low_mem["block_size"] == 0.5
+    assert {k: v for k, v in default.items() if k != "block_size"} == {
+        k: v for k, v in low_mem.items() if k != "block_size"
+    }
+    assert {"query_cover", "subject_cover", "percent_id", "evalue"} <= set(default)
