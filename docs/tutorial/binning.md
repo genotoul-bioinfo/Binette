@@ -20,6 +20,10 @@ Let's use different binning tools to group the contigs into bins, which we'll re
 :code: bash
 ```
 
+```{note}
+CONCOCT may print a `SyntaxWarning: invalid escape sequence` and many `No consensus cluster for contig ...` messages. These are expected and can be safely ignored.
+```
+
 ### SemiBin2
 
 ```{include} snippets/04d_binning_semibin2.sh
@@ -29,5 +33,5 @@ Let's use different binning tools to group the contigs into bins, which we'll re
 ```{admonition} ⌛ Expected Time
 :class: note
 
-This process take around 1 hour to complete.
+With 12 threads, MetaBAT2 and MaxBin2 take a couple of minutes, CONCOCT around 15 minutes and SemiBin2 around 1 hour.
 ```
