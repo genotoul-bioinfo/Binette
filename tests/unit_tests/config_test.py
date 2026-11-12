@@ -30,6 +30,7 @@ def test_selection_parameters_exclude_runtime_options():
         resume=False,
         force=True,
         write_fasta_bins=False,
+        clean_tmp=True,
         show_progress=False,
     )
     assert base.selection_parameters() == runtime_changes.selection_parameters()

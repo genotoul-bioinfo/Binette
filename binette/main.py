@@ -322,6 +322,14 @@ def binette(
             rich_help_panel="Advanced Options",
         ),
     ] = False,
+    clean_tmp: Annotated[
+        bool,
+        typer.Option(
+            "--clean_tmp",
+            help="Delete intermediate files (proteins, DIAMOND hits) at the end of a successful run.",
+            rich_help_panel="Advanced Options",
+        ),
+    ] = False,
     resume: Annotated[
         bool,
         typer.Option(
@@ -395,6 +403,7 @@ def binette(
         force=force,
         debug=debug,
         write_fasta_bins=write_fasta_bins,
+        clean_tmp=clean_tmp,
         show_progress=progress and not quiet,
     )
 

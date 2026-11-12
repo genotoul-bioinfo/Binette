@@ -170,7 +170,7 @@ In this directory you will find:
 - **`final_bins/`**: This directory stores all the selected bins in fasta format. Can be skipped with `--no-write-fasta-bins`.
 - **`final_contig_to_bin.tsv`**: A headerless TSV file mapping each contig to its assigned bin. This format is much lighter than the fasta output to describe the final Binette bins.
 - **`input_bins_quality_reports/`**: A directory storing quality reports for the input bin sets, with files following the same structure as `final_bins_quality_reports.tsv`.
-- **`temporary_files/`**: This directory contains intermediate files (predicted proteins, DIAMOND alignments and a `checkpoint.json` file tracking them). They are reused to avoid recomputing time-consuming steps when Binette is run again in the same output directory (see [Resuming a run](#resuming-a-run-and-reusing-an-output-directory)).
+- **`temporary_files/`**: This directory contains intermediate files (predicted proteins, DIAMOND alignments and a `checkpoint.json` file tracking them). They are reused to avoid recomputing time-consuming steps when Binette is run again in the same output directory (see [Resuming a run](#resuming-a-run-and-reusing-an-output-directory)). Use `--clean_tmp` to delete them at the end of a successful run.
 
 
 The `final_bins_quality_reports.tsv` file contains the following columns:
@@ -200,6 +200,7 @@ Binette keeps track of its intermediate results in `temporary_files/`. When it i
 - Changing only parameters that affect bin selection (e.g. `--min_completeness`, `--contamination_weight`, `--prefix`) reuses the proteins and DIAMOND alignments and overwrites the final results.
 - `--no-write-fasta-bins` does not change the results: rerunning a completed run with or without it does not recompute anything. If bin FASTA files are missing or modified, they are written again from `final_contig_to_bin.tsv`.
 - Use `--no-resume` to recompute everything.
+- With `--clean_tmp`, intermediate files are deleted at the end of a successful run (only `checkpoint.json` is kept). Rerunning the same command is still recognised as completed; changing selection parameters recomputes the deleted files. If a run fails, intermediate files are kept so it can be resumed.
 
 To prevent accidentally mixing results from different analyses, Binette stops with an error if the output directory contains results computed from **different inputs**, or results from an older Binette version that cannot be verified. Use a different `--outdir`, or add `--force` to discard the previous intermediate files and overwrite the results.
 

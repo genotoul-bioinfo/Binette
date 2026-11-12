@@ -69,6 +69,8 @@ def run(config: RunConfig) -> int:
         )
 
     if is_already_completed(config, paths, ckpt, run_inputs):
+        if config.clean_tmp:
+            clean_temporary_files(paths)
         return 0
 
     # Results of this run will be rewritten: they no longer reflect a completed run.
@@ -100,7 +102,37 @@ def run(config: RunConfig) -> int:
         final_step_inputs(config, diamond_step_inputs),
     )
 
+    if config.clean_tmp:
+        clean_temporary_files(paths)
+
     return 0
+
+
+def clean_temporary_files(paths: OutputPaths) -> None:
+    """
+    Delete intermediate files at the end of a successful run (--clean_tmp).
+
+    The checkpoint file is kept: rerunning the same command is still recognised as
+    already completed, and a rerun with other selection parameters recomputes the
+    deleted files (the checkpoint detects they are missing).
+
+    :param paths: Output paths of the run.
+    """
+    to_remove = [
+        path
+        for path in paths.tmp_dir.iterdir()
+        if path.is_file() and path != paths.manifest
+    ]
+    if not to_remove:
+        return
+
+    freed_mb = sum(path.stat().st_size for path in to_remove) / 1e6
+    logger.info(
+        f"Removing {len(to_remove)} intermediate files from '{paths.tmp_dir}' "
+        f"({freed_mb:.1f} MB)"
+    )
+    for path in to_remove:
+        path.unlink()
 
 
 # Inputs #

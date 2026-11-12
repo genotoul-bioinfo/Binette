@@ -253,6 +253,47 @@ def test_bin_tables_input_and_resume(test_data_path: Path, tmp_path, caplog):
 
 
 @pytest.mark.requires_test_data
+def test_clean_tmp(test_data_path: Path, tmp_path, caplog):
+    caplog.set_level(logging.INFO, logger="binette")
+    outdir = tmp_path / "test_results"
+    tmp_dir = outdir / "temporary_files"
+    cmd_args = bin_tables_cmd(test_data_path, outdir) + ["--clean_tmp"]
+    result_table = outdir / "final_bins_quality_reports.tsv"
+    expected_table = Path("tests/expected_results/final_bins_quality_reports.tsv")
+
+    # Intermediate files are removed at the end, the checkpoint is kept
+    result = run_binette(cmd_args, caplog)
+    assert result.exit_code == 0
+    assert "Removing" in caplog.text
+    assert [p.name for p in tmp_dir.iterdir()] == ["checkpoint.json"]
+    compare_results(result_table, expected_table)
+
+    # Same command again: still recognised as completed
+    result = run_binette(cmd_args, caplog)
+    assert result.exit_code == 0
+    assert "Binette already completed" in caplog.text
+
+    # Other selection parameter: deleted files are recomputed, then removed again
+    result = run_binette(cmd_args + ["--prefix", "other"], caplog)
+    assert result.exit_code == 0
+    assert "Predicting CDS sequences" in caplog.text
+    assert "Running diamond" in caplog.text
+    assert [p.name for p in tmp_dir.iterdir()] == ["checkpoint.json"]
+
+    # A run without --clean_tmp keeps intermediate files
+    result = run_binette(cmd_args[:-1], caplog)
+    assert result.exit_code == 0
+    assert (tmp_dir / "diamond_result.tsv.gz").exists()
+    compare_results(result_table, expected_table)
+
+    # --clean_tmp on an already completed run frees the space
+    result = run_binette(cmd_args, caplog)
+    assert result.exit_code == 0
+    assert "Binette already completed" in caplog.text
+    assert [p.name for p in tmp_dir.iterdir()] == ["checkpoint.json"]
+
+
+@pytest.mark.requires_test_data
 def test_outdir_with_different_inputs(test_data_path: Path, tmp_path, caplog):
     caplog.set_level(logging.INFO, logger="binette")
     outdir = tmp_path / "test_results"

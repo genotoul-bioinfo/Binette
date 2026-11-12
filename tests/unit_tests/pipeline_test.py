@@ -4,7 +4,9 @@ from unittest.mock import patch
 
 import pytest
 
+from binette.config import OutputPaths
 from binette.pipeline import (
+    clean_temporary_files,
     get_diamond_hits,
     get_proteins,
     parse_input_files,
@@ -284,3 +286,27 @@ def test_parse_input_files_bin_dirs(create_temp_bin_directories, tmp_path):
         "contig5",
     }
     assert len(contig_id_to_length) == 5
+
+
+def test_clean_temporary_files(tmp_path):
+    paths = OutputPaths.from_outdir(tmp_path / "results")
+    paths.tmp_dir.mkdir(parents=True)
+    for path in (
+        paths.manifest,
+        paths.faa_file,
+        paths.coding_length_file,
+        paths.diamond_result_file,
+        paths.tmp_dir / "diamond_result.log",
+    ):
+        path.write_text("content")
+    paths.final_bin_report.write_text("final results")
+
+    clean_temporary_files(paths)
+
+    # Only the checkpoint is kept in the temporary directory
+    assert list(paths.tmp_dir.iterdir()) == [paths.manifest]
+    # Final results are untouched
+    assert paths.final_bin_report.read_text() == "final results"
+
+    # Nothing left to clean: no error
+    clean_temporary_files(paths)

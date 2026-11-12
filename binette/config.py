@@ -71,6 +71,7 @@ class RunConfig:
     force: bool = False
     debug: bool = False
     write_fasta_bins: bool = True
+    clean_tmp: bool = False
     show_progress: bool = True
 
     def selection_parameters(self) -> dict[str, Any]:
