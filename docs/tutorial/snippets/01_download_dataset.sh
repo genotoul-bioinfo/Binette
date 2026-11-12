@@ -1,4 +1,6 @@
 #!/bin/bash
+set -euo pipefail
+
 # Download the Kickstart dataset using SRA toolkit
 prefetch SRR5058924
 
