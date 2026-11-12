@@ -1,3 +1,4 @@
+import inspect
 import logging
 import re
 import shutil
@@ -59,6 +60,20 @@ def check_tool_exists(tool_name: str):
         raise FileNotFoundError(
             f"The '{tool_name}' tool is not found on your system PATH."
         )
+
+
+def resolve_checkm2_db(checkm2_db: Path | None) -> Path:
+    """
+    Return the path of the CheckM2 diamond database to use.
+
+    :param checkm2_db: Database given by the user, or None to use the one set via `checkm2 database`.
+    :raises FileNotFoundError: If the given database does not exist.
+    """
+    if checkm2_db is None:
+        return Path(get_checkm2_db())
+    if not checkm2_db.exists():
+        raise FileNotFoundError(checkm2_db)
+    return checkm2_db
 
 
 def get_block_size(low_mem: bool) -> float:
@@ -179,3 +194,19 @@ def get_contig_to_kegg_id(diamond_result_file: str) -> dict:
     )
 
     return contig_to_kegg_counter
+
+
+def result_parameters(low_mem: bool) -> dict:
+    """
+    DIAMOND parameters that can change its results. Threads do not, but the block
+    size set by --low_mem does.
+
+    :param low_mem: Whether DIAMOND low memory mode is used.
+    """
+    params = inspect.signature(run).parameters
+    result_params = {
+        name: params[name].default
+        for name in ("query_cover", "subject_cover", "percent_id", "evalue")
+    }
+    result_params["block_size"] = get_block_size(low_mem)
+    return result_params

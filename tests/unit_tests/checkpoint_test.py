@@ -222,3 +222,21 @@ def test_check_outdir_corrupted_manifest(outdir, manifest_path):
 
     ckpt = check_outdir(outdir, manifest_path, RUN_INPUTS, force=True)
     assert ckpt.run_inputs == RUN_INPUTS
+
+
+def test_can_reuse(tmp_path, caplog):
+    caplog.set_level(logging.INFO)
+    output = tmp_path / "out.txt"
+    output.write_text("result")
+    ckpt = Checkpoint.new(tmp_path / "checkpoint.json", tmp_path, {})
+    ckpt.record_step("step", {"a": 1}, [output])
+
+    assert ckpt.can_reuse("step", {"a": 1}, True, "step results")
+    assert "Resuming: reusing step results" in caplog.text
+
+    assert not ckpt.can_reuse("step", {"a": 1}, False, "step results")
+
+    assert not ckpt.can_reuse("step", {"a": 2}, True, "step results")
+    assert "inputs changed since previous run (a)" in caplog.text
+
+    assert not ckpt.can_reuse("other_step", {"a": 1}, True, "other results")

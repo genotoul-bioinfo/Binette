@@ -1,29 +1,25 @@
 #!/usr/bin/env python
 """
 Module      : Main
-Description : The main entry point for the program.
+Description : Command line interface of Binette.
 Copyright   : (c) Jean Mainguy, 28 nov. 2022
 License     : GPL-3.0
 Maintainer  : Jean Mainguy
 Portability : POSIX
 """
 
-import hashlib
-import inspect
 import logging
 import sys
-from collections import Counter
 from pathlib import Path
 from typing import Annotated
 
-import pyfastx
 import typer
 from rich.console import Console
 from rich.logging import RichHandler
 
 import binette as binette_init
-from binette import bin_manager, bin_quality, cds, checkpoint, contig_manager, diamond
-from binette import io_manager as io
+from binette import checkpoint, pipeline
+from binette.config import RunConfig
 
 logger = logging.getLogger(__name__)
 err_console = Console(stderr=True)
@@ -128,6 +124,21 @@ def preprocess_args():
     sys.argv = final_cmd
 
 
+def validate_bin_inputs(
+    bin_dirs: list[Path] | None, contig2bin_tables: list[Path] | None
+) -> None:
+    """Validate that exactly one of bin_dirs or contig2bin_tables is provided."""
+    if bin_dirs is None and contig2bin_tables is None:
+        raise typer.BadParameter(
+            "Error: Either --bin-dirs or --contig2bin_tables must be provided. None were given."
+        )
+
+    if bin_dirs is not None and contig2bin_tables is not None:
+        raise typer.BadParameter(
+            "Error: Either --bin-dirs or --contig2bin_tables must be provided, but not both."
+        )
+
+
 # Create the Typer app with no args help enabled and rich formatting
 app = typer.Typer(
     name="binette",
@@ -136,405 +147,6 @@ app = typer.Typer(
     context_settings={"help_option_names": ["-h", "--help"]},
     rich_markup_mode="rich",
 )
-
-
-def parse_input_files(
-    bin_dirs: list[Path],
-    contig2bin_tables: list[Path],
-    contigs_fasta: Path,
-    fasta_extensions: set[str] | None = None,
-):
-    """
-    Parses input files to retrieve information related to bins and contigs.
-
-    :param bin_dirs: List of paths to directories containing bin FASTA files.
-    :param contig2bin_tables: List of paths to contig-to-bin tables.
-    :param contigs_fasta: Path to the contigs FASTA file.
-    :param temporary_dir: Path to the temporary directory to store intermediate files.
-    :param fasta_extensions: Possible fasta extensions to look for in the bin directory.
-
-    :return: A tuple containing:
-        - Dictionary mapping contig keys to original bins.
-        - List of contigs found in the input bins.
-        - Dictionary mapping contig indexes to their lengths.
-        - Dictionary mapping contig names to their indexes.
-        - Dictionary of input fingerprints ("contigs" and "bins") identifying the run.
-    """
-    if fasta_extensions is None:
-        fasta_extensions = {".fasta", ".fa", ".fna"}
-
-    if bin_dirs:
-        logger.info("Parsing bin directories")
-        bin_name_to_bin_dir = io.infer_bin_set_names_from_input_paths(bin_dirs)
-        bin_set_name_to_bins_info = bin_manager.parse_bin_directories(
-            bin_name_to_bin_dir, fasta_extensions
-        )
-    else:
-        logger.info("Parsing bin2contig files")
-        bin_name_to_bin_table = io.infer_bin_set_names_from_input_paths(
-            contig2bin_tables
-        )
-        bin_set_name_to_bins_info = bin_manager.parse_contig2bin_tables(
-            bin_name_to_bin_table
-        )
-
-    logger.info(f"Processing {len(bin_set_name_to_bins_info)} bin sets")
-    for bin_set_id, bins_info in bin_set_name_to_bins_info.items():
-        logger.info(f"  {bin_set_id} - {len(bins_info)} bins")
-
-    contigs_in_bins = bin_manager.get_contigs_in_bin_sets(bin_set_name_to_bins_info)
-    logger.info(f"Found {len(contigs_in_bins)} contigs in input bins")
-
-    contig_to_index = contig_manager.make_contig_index(contigs_in_bins)
-
-    contig_key_to_bin = bin_manager.make_bins_from_bins_info(
-        bin_set_name_to_bins_info, contig_to_index, are_original_bins=True
-    )
-
-    # original_bins = bin_manager.dereplicate_bin_sets(bin_set_name_to_bins.values())
-
-    logger.info(
-        f"Parsing contig fasta file '{contigs_fasta}' to retrieve contig lengths"
-    )
-
-    contigs_in_bins_set = set(contigs_in_bins)
-    contig_to_length = {}
-    contig_to_seq_digest = {}
-    for name, seq in pyfastx.Fastx(contigs_fasta.as_posix()):
-        if name in contigs_in_bins_set:
-            contig_to_length[name] = len(seq)
-            contig_to_seq_digest[name] = hashlib.sha256(seq.encode()).hexdigest()
-
-    logger.debug("Finished parsing contig fasta file")
-    # check if all contigs from input bins are present in contigs file
-    unexpected_contigs = {
-        contig for contig in contigs_in_bins if contig not in contig_to_length
-    }
-
-    if len(unexpected_contigs):
-        raise ValueError(
-            f"{len(unexpected_contigs)} contigs from the input bins were not "
-            f"found in the contigs file '{contigs_fasta}'. "
-            f"The missing contigs are: {', '.join(unexpected_contigs)}. "
-            f"Please ensure all contigs from input bins are present in "
-            f"contig file."
-        )
-    logger.debug("No unexpected contigs found")
-
-    contig_id_to_length = {
-        contig_to_index[name]: length for name, length in contig_to_length.items()
-    }
-
-    input_fingerprints = {
-        "contigs": checkpoint.contigs_fingerprint(contig_to_seq_digest),
-        "bins": checkpoint.bins_fingerprint(bin_set_name_to_bins_info),
-    }
-
-    return (
-        contig_key_to_bin,
-        contigs_in_bins,
-        contig_id_to_length,
-        contig_to_index,
-        input_fingerprints,
-    )
-
-
-def resolve_checkm2_db(checkm2_db: Path | None) -> Path:
-    """
-    Return the path of the CheckM2 diamond database to use.
-
-    :param checkm2_db: Database given by the user, or None to use the one set via `checkm2 database`.
-    :raises FileNotFoundError: If the given database does not exist.
-    """
-    if checkm2_db is None:
-        return Path(diamond.get_checkm2_db())
-    if not checkm2_db.exists():
-        raise FileNotFoundError(checkm2_db)
-    return checkm2_db
-
-
-def can_reuse_step(
-    ckpt: checkpoint.Checkpoint,
-    step: str,
-    inputs: dict,
-    resume: bool,
-    description: str,
-) -> bool:
-    """
-    Decide whether a checkpointed step can be reused and log the decision.
-
-    :param ckpt: Checkpoint of the run.
-    :param step: Name of the step.
-    :param inputs: Inputs of the step in the current run.
-    :param resume: Whether resuming is enabled.
-    :param description: Human readable description of the step results.
-    """
-    if not resume:
-        return False
-
-    if step not in ckpt.data["steps"]:
-        logger.debug(f"No {description} from a previous run to reuse")
-        return False
-
-    is_valid, reason = ckpt.step_status(step, inputs)
-    if is_valid:
-        logger.info(f"Resuming: reusing {description} from a previous run")
-    else:
-        logger.info(f"Cannot reuse {description} from a previous run: {reason}")
-    return is_valid
-
-
-def get_proteins(
-    faa_file: Path,
-    coding_length_file: Path,
-    contigs_fasta: Path,
-    contigs_in_bins: set[str],
-    proteins: Path | None,
-    threads: int,
-    reuse: bool,
-) -> tuple[dict[str, list[str]], dict[str, int | None] | None, list[Path]]:
-    """
-    Predict genes, filter user-provided proteins, or reuse proteins from a previous run.
-
-    :param faa_file: Path of the protein file used by Binette.
-    :param coding_length_file: Path of the file storing contig coding lengths.
-    :param contigs_fasta: Path to the contigs FASTA file.
-    :param contigs_in_bins: Set of contigs in bins.
-    :param proteins: Protein file provided by the user, or None to predict genes.
-    :param threads: Number of threads for gene prediction.
-    :param reuse: Reuse files of a previous run instead of computing them.
-
-    :return: contig_to_genes, contig_to_coding_length (None when not computable) and
-        the list of files produced.
-    """
-    if reuse:
-        logger.info(f"Parsing protein sequences from '{faa_file}'")
-        contig_to_genes = cds.parse_faa_file(faa_file.as_posix())
-        contig_to_coding_len = (
-            None if proteins else io.read_contig_coding_length(coding_length_file)
-        )
-
-    elif proteins:
-        logger.info(f"Using the provided protein sequences file '{proteins}'")
-        cds.filter_faa_file(
-            contigs_in_bins,
-            input_faa_file=proteins,
-            filtered_faa_file=faa_file,
-        )
-        logger.info(f"Parsing protein sequences from '{faa_file}'")
-        contig_to_genes = cds.parse_faa_file(faa_file.as_posix())
-        contig_to_coding_len = None
-
-    else:
-        logger.info(f"Loading {len(contigs_in_bins)} contigs from '{contigs_fasta}'")
-        contigs_iterator = (
-            (name, seq)
-            for name, seq in pyfastx.Fastx(contigs_fasta.as_posix())
-            if name in contigs_in_bins
-        )
-        contig_to_genes, contig_to_coding_len = cds.predict(
-            contigs_iterator, faa_file.as_posix(), threads
-        )
-        io.write_contig_coding_length(contig_to_coding_len, coding_length_file)
-
-    if proteins:
-        io.check_contig_consistency(
-            contigs_in_bins,
-            contig_to_genes,
-            contigs_fasta.as_posix(),
-            faa_file.as_posix(),
-        )
-        logger.info(
-            "Coding density will not be computed (using provided protein sequences)"
-        )
-        outputs = [faa_file]
-    else:
-        logger.info("Coding density will be computed from identified genes")
-        outputs = [faa_file, coding_length_file]
-
-    return contig_to_genes, contig_to_coding_len, outputs
-
-
-def get_diamond_hits(
-    faa_file: Path,
-    contigs_fasta: Path,
-    contigs_in_bins: set[str],
-    diamond_result_file: Path,
-    diamond_db_path: Path,
-    threads: int,
-    low_mem: bool,
-    reuse: bool,
-) -> dict[str, Counter]:
-    """
-    Run DIAMOND on proteins against the CheckM2 database (or reuse a previous result)
-    and parse its results.
-
-    :param faa_file: Path to the protein file.
-    :param contigs_fasta: Path to the contigs FASTA file.
-    :param contigs_in_bins: Set of contigs in bins.
-    :param diamond_result_file: Path of the DIAMOND result file.
-    :param diamond_db_path: Path of the CheckM2 diamond database.
-    :param threads: Number of threads.
-    :param low_mem: Use DIAMOND low memory mode.
-    :param reuse: Reuse the result file of a previous run instead of running DIAMOND.
-
-    :return: Mapping of contig name to a counter of KEGG annotations.
-    """
-    if not reuse:
-        diamond_log = (
-            diamond_result_file.parents[0]
-            / f"{diamond_result_file.stem.split('.')[0]}.log"
-        )
-
-        diamond.run(
-            faa_file.as_posix(),
-            diamond_result_file.as_posix(),
-            diamond_db_path.as_posix(),
-            diamond_log.as_posix(),
-            threads,
-            low_mem=low_mem,
-        )
-
-    logger.info("Parsing diamond results")
-    contig_to_kegg_counter = diamond.get_contig_to_kegg_id(
-        diamond_result_file.as_posix()
-    )
-
-    # Check contigs from diamond vs input assembly consistency
-    io.check_contig_consistency(
-        contigs_in_bins,
-        contig_to_kegg_counter,
-        contigs_fasta.as_posix(),
-        diamond_result_file.as_posix(),
-    )
-
-    return contig_to_kegg_counter
-
-
-def diamond_result_parameters(low_mem: bool) -> dict:
-    """
-    DIAMOND parameters that can change its results. Threads do not, but the block
-    size set by --low_mem does.
-
-    :param low_mem: Whether DIAMOND low memory mode is used.
-    """
-    params = inspect.signature(diamond.run).parameters
-    result_params = {
-        name: params[name].default
-        for name in ("query_cover", "subject_cover", "percent_id", "evalue")
-    }
-    result_params["block_size"] = diamond.get_block_size(low_mem)
-    return result_params
-
-
-def make_diamond_step_inputs(
-    ckpt: checkpoint.Checkpoint, faa_file: Path, checkm2_db: dict, low_mem: bool
-) -> dict:
-    """
-    Inputs of the DIAMOND step: the proteins it runs on (as recorded in the
-    checkpoint), the CheckM2 database and the DIAMOND parameters.
-    """
-    return {
-        "proteins_sha256": ckpt.step_output_digest("proteins", faa_file),
-        "checkm2_db": checkm2_db,
-        "parameters": diamond_result_parameters(low_mem),
-    }
-
-
-def bins_fasta_step_inputs(contig2bin_table: Path) -> dict:
-    """Inputs of the bins FASTA step: the final bins it was written from."""
-    return {"contig2bin_table_sha256": checkpoint.sha256_file(contig2bin_table)}
-
-
-def record_bins_fasta_step(
-    ckpt: checkpoint.Checkpoint, contig2bin_table: Path, final_bins_dir: Path
-) -> None:
-    """Record the final bins FASTA files in the checkpoint."""
-    ckpt.record_step(
-        "bins_fasta",
-        bins_fasta_step_inputs(contig2bin_table),
-        sorted(final_bins_dir.glob("*.fa")),
-    )
-
-
-def ensure_bins_fasta(
-    ckpt: checkpoint.Checkpoint,
-    contig2bin_table: Path,
-    contigs_fasta: Path,
-    final_bins_dir: Path,
-) -> None:
-    """
-    Make sure the FASTA files of the final bins of a completed run are present and
-    intact. Missing or modified files are written again from the final contig2bin
-    table, without recomputing bin selection.
-
-    :param ckpt: Checkpoint of the run.
-    :param contig2bin_table: Final contig2bin table of the completed run.
-    :param contigs_fasta: Path to the contigs FASTA file.
-    :param final_bins_dir: Directory of the final bins FASTA files.
-    """
-    is_valid, reason = ckpt.step_status(
-        "bins_fasta", bins_fasta_step_inputs(contig2bin_table)
-    )
-    if is_valid:
-        return
-
-    logger.info(
-        f"Writing selected bins FASTA files to '{final_bins_dir}' from "
-        f"'{contig2bin_table}' ({reason})"
-    )
-    for fasta_file in final_bins_dir.glob("*.fa"):
-        fasta_file.unlink()
-    io.write_bins_fasta_from_contig_to_bin(
-        io.read_contig2bin_table(contig2bin_table), contigs_fasta, final_bins_dir
-    )
-    record_bins_fasta_step(ckpt, contig2bin_table, final_bins_dir)
-
-
-def log_selected_bin_info(
-    selected_bins: list[bin_manager.Bin],
-    hq_min_completeness: float,
-    hq_max_conta: float,
-):
-    """
-    Log information about selected bins based on quality thresholds.
-
-    :param selected_bins: List of Bin objects to analyze.
-    :param hq_min_completeness: Minimum completeness threshold for high-quality bins.
-    :param hq_max_conta: Maximum contamination threshold for high-quality bins.
-
-    This function logs information about selected bins that meet specified quality thresholds.
-    It counts the number of high-quality bins based on completeness and contamination values.
-    """
-
-    # Log completeness and contamination in debug log
-    logger.debug("High quality bins:")
-    for sb in selected_bins:
-        if sb.is_high_quality(
-            min_completeness=hq_min_completeness, max_contamination=hq_max_conta
-        ):
-            logger.debug(
-                f"  {sb} completeness={sb.completeness}, contamination={sb.contamination}"
-            )
-
-    # Count high-quality bins and single-contig high-quality bins
-    hq_bins = len(
-        [
-            sb
-            for sb in selected_bins
-            if sb.is_high_quality(
-                min_completeness=hq_min_completeness, max_contamination=hq_max_conta
-            )
-        ]
-    )
-
-    # Log information about high-quality bins
-    thresholds = (
-        f"(completeness >= {hq_min_completeness} and contamination <= {hq_max_conta})"
-    )
-    logger.info(
-        f"{hq_bins}/{len(selected_bins)} selected bins have high quality {thresholds}"
-    )
 
 
 @app.command(
@@ -761,270 +373,36 @@ def binette(
     # Set up logging based on verbosity flags
     setup_logging(verbose=verbose, quiet=quiet)
 
-    # Validate that exactly one of bin_dirs or contig2bin_tables is provided
-    if bin_dirs is None and contig2bin_tables is None:
-        raise typer.BadParameter(
-            "Error: Either --bin-dirs or --contig2bin_tables must be provided. None were given."
-        )
+    validate_bin_inputs(bin_dirs, contig2bin_tables)
 
-    if bin_dirs is not None and contig2bin_tables is not None:
-        raise typer.BadParameter(
-            "Error: Either --bin-dirs or --contig2bin_tables must be provided, but not both."
-        )
-
-    # High quality threshold used just to log number of high quality bins.
-    hq_max_conta = 5
-    hq_min_completeness = 90
-
-    # Temporary files #
-    out_tmp_dir: Path = outdir / "temporary_files"
-    manifest_path = out_tmp_dir / checkpoint.CHECKPOINT_FILENAME
-    faa_file = out_tmp_dir / "assembly_proteins.faa.gz"
-    coding_length_file = out_tmp_dir / "contig_coding_length.tsv.gz"
-    diamond_result_file = out_tmp_dir / "diamond_result.tsv.gz"
-
-    # Output files #
-    final_bin_report: Path = outdir / "final_bins_quality_reports.tsv"
-    final_contig2bin_table: Path = outdir / "final_contig_to_bin.tsv"
-    original_bin_report_dir: Path = outdir / "input_bins_quality_reports"
-    final_bins_dir: Path = outdir / "final_bins"
-    index_to_contig_file: Path = outdir / "index_to_contig.tsv"
-    all_bin_compo_file: Path = outdir / "all_bins_quality_reports.tsv"
-
-    (
-        contig_key_to_original_bin,
-        contigs_in_bins,
-        contig_to_length,
-        contig_to_index,
-        input_fingerprints,
-    ) = parse_input_files(
-        bin_dirs,
-        contig2bin_tables,
-        contigs,
-        fasta_extensions=set(fasta_extensions),
+    config = RunConfig(
+        contigs=contigs,
+        bin_dirs=bin_dirs,
+        contig2bin_tables=contig2bin_tables,
+        proteins=proteins,
+        outdir=outdir,
+        prefix=prefix,
+        threads=threads,
+        min_completeness=min_completeness,
+        max_contamination=max_contamination,
+        min_length=min_length,
+        max_length=max_length,
+        contamination_weight=contamination_weight,
+        fasta_extensions=tuple(fasta_extensions),
+        checkm2_db=checkm2_db,
+        low_mem=low_mem,
+        resume=resume,
+        force=force,
+        debug=debug,
+        write_fasta_bins=write_fasta_bins,
+        show_progress=progress and not quiet,
     )
 
-    diamond_db_path = resolve_checkm2_db(checkm2_db)
-
-    # Identity of the run: data inputs only. Parameters that only affect bin
-    # selection can change between runs sharing an output directory.
-    run_inputs = {
-        "contigs": input_fingerprints["contigs"],
-        "bins": input_fingerprints["bins"],
-        "proteins": checkpoint.sha256_file(proteins) if proteins else None,
-        "checkm2_db": checkpoint.checkm2_db_identity(diamond_db_path),
-    }
-
     try:
-        ckpt = checkpoint.check_outdir(outdir, manifest_path, run_inputs, force)
+        return pipeline.run(config)
     except checkpoint.OutputDirConflictError as exc:
         logger.error(str(exc))
         raise typer.Exit(code=1) from exc
-
-    final_step_inputs = {
-        "binette_version": binette_init.__version__,
-        "parameters": {
-            "min_completeness": min_completeness,
-            "max_contamination": max_contamination,
-            "min_length": min_length,
-            "max_length": max_length,
-            "contamination_weight": contamination_weight,
-            "prefix": prefix,
-            "debug": debug,
-        },
-        # Chain to upstream steps: final results are only reusable if the DIAMOND
-        # results (and through them, the proteins) of the previous run match.
-        "diamond": make_diamond_step_inputs(
-            ckpt, faa_file, run_inputs["checkm2_db"], low_mem
-        ),
-    }
-
-    if resume and not ckpt.data["steps"]:
-        logger.info(
-            "No intermediate results from a previous run to resume from: starting from scratch"
-        )
-
-    if can_reuse_step(ckpt, "final", final_step_inputs, resume, "final results"):
-        if write_fasta_bins:
-            ensure_bins_fasta(ckpt, final_contig2bin_table, contigs, final_bins_dir)
-        logger.info(
-            f"Binette already completed with identical inputs and parameters in '{outdir}': "
-            "nothing to do. Use --no-resume to rerun."
-        )
-        return 0
-
-    # Results of this run will be rewritten: they no longer reflect a completed run.
-    ckpt.invalidate("final", "bins_fasta")
-
-    if debug:
-        logger.info(f"Writing index to contig mapping to '{index_to_contig_file}'")
-        with open(index_to_contig_file, "w") as flout:
-            flout.write("\n".join((f"{i}\t{c}" for i, c in enumerate(contigs_in_bins))))
-
-    # Proteins #
-    proteins_step_inputs = {
-        "contigs": run_inputs["contigs"],
-        "proteins": run_inputs["proteins"],
-    }
-    reuse_proteins = can_reuse_step(
-        ckpt, "proteins", proteins_step_inputs, resume, "protein sequences"
-    )
-    if not reuse_proteins:
-        ckpt.invalidate("proteins", "diamond")
-
-    contig_name_to_genes, contig_to_coding_length, protein_outputs = get_proteins(
-        faa_file=faa_file,
-        coding_length_file=coding_length_file,
-        contigs_fasta=contigs,
-        contigs_in_bins=set(contigs_in_bins),
-        proteins=proteins,
-        threads=threads,
-        reuse=reuse_proteins,
-    )
-    if not reuse_proteins:
-        ckpt.record_step("proteins", proteins_step_inputs, protein_outputs)
-
-    # DIAMOND #
-    diamond_step_inputs = make_diamond_step_inputs(
-        ckpt, faa_file, run_inputs["checkm2_db"], low_mem
-    )
-    reuse_diamond = can_reuse_step(
-        ckpt, "diamond", diamond_step_inputs, resume, "DIAMOND results"
-    )
-    if not reuse_diamond:
-        ckpt.invalidate("diamond")
-
-    contig_name_to_kegg_counter = get_diamond_hits(
-        faa_file=faa_file,
-        contigs_fasta=contigs,
-        contigs_in_bins=set(contigs_in_bins),
-        diamond_result_file=diamond_result_file,
-        diamond_db_path=diamond_db_path,
-        threads=threads,
-        low_mem=low_mem,
-        reuse=reuse_diamond,
-    )
-    if not reuse_diamond:
-        ckpt.record_step("diamond", diamond_step_inputs, [diamond_result_file])
-
-    contig_to_kegg_counter = contig_manager.apply_contig_index(
-        contig_to_index, contig_name_to_kegg_counter
-    )
-    contig_to_genes = contig_manager.apply_contig_index(
-        contig_to_index, contig_name_to_genes
-    )
-    if contig_to_coding_length:
-        contig_to_coding_length = contig_manager.apply_contig_index(
-            contig_to_index, contig_to_coding_length
-        )
-    # Extract cds metadata ##
-    logger.info("Computing CDS metadata")
-    contig_metadat = cds.get_contig_cds_metadata(contig_to_genes, threads)
-
-    contig_metadat["contig_to_kegg_counter"] = contig_to_kegg_counter
-    contig_metadat["contig_to_length"] = contig_to_length
-
-    logger.info("Adding size and assessing quality of input bins")
-    original_bins = bin_quality.add_bin_metrics(
-        list(contig_key_to_original_bin.values()),
-        contig_metadat,
-        contamination_weight,
-        threads,
-        disable_progress_bar=not progress or quiet,
-    )
-    contig_key_to_original_bin = {b.contigs_key: b for b in original_bins}
-
-    bin_quality.add_bin_size_and_N50(original_bins, contig_to_length)
-
-    if contig_to_coding_length:
-        bin_quality.add_bin_coding_density(original_bins, contig_to_coding_length)
-
-    io.clear_previous_outputs(final_bins_dir, original_bin_report_dir)
-
-    logger.info(
-        f"Writing original input bin metrics to directory '{original_bin_report_dir}'"
-    )
-    io.write_original_bin_metrics(original_bins, original_bin_report_dir)
-
-    logger.info("Creating intermediate bins")
-
-    contig_lengths = bin_quality.prepare_contig_sizes(contig_to_length)
-
-    contig_key_to_new_bin = bin_manager.create_intermediate_bins(
-        contig_key_to_original_bin,
-        contig_lengths=contig_lengths,
-        min_comp=min_completeness,
-        max_conta=max_contamination,
-        min_len=min_length,
-        max_len=max_length,
-        disable_progress_bar=not progress or quiet,
-    )
-
-    logger.info(f"Assessing quality for {len(contig_key_to_new_bin)} intermediate bins")
-
-    new_bins = bin_quality.add_bin_metrics(
-        bins=contig_key_to_new_bin.values(),
-        contig_info=contig_metadat,
-        contamination_weight=contamination_weight,
-        threads=threads,
-        disable_progress_bar=not progress or quiet,
-    )
-    contig_key_to_new_bin = {b.contigs_key: b for b in new_bins}
-
-    contig_key_to_all_bin = contig_key_to_original_bin | contig_key_to_new_bin
-
-    bin_quality.add_bin_size_and_N50(contig_key_to_all_bin.values(), contig_to_length)
-
-    if debug:
-        logger.info(f"Writing all bins to '{all_bin_compo_file}'")
-        io.write_bin_info(
-            contig_key_to_all_bin.values(), all_bin_compo_file, add_contigs=True
-        )
-
-    selected_bins = bin_manager.select_best_bins(
-        contig_key_to_all_bin,
-        min_completeness=min_completeness,
-        max_contamination=max_contamination,
-        prefix=prefix,
-    )
-
-    if contig_to_coding_length:
-        bin_quality.add_bin_coding_density(selected_bins, contig_to_coding_length)
-
-    logger.info(f"Writing selected bins information to '{final_bin_report}'")
-    io.write_bin_info(selected_bins, output=final_bin_report)
-
-    io.write_contig2bin_table(
-        selected_bins,
-        final_contig2bin_table,
-        contigs_in_bins,
-    )
-
-    if write_fasta_bins:
-        logger.info(f"Writing selected bins FASTA files to '{final_bins_dir}'")
-        io.write_bins_fasta(
-            selected_bins,
-            contigs,
-            outdir=final_bins_dir,
-            contigs_names=contigs_in_bins,
-        )
-
-    log_selected_bin_info(selected_bins, hq_min_completeness, hq_max_conta)
-
-    final_outputs = [
-        final_bin_report,
-        final_contig2bin_table,
-        *sorted(original_bin_report_dir.glob("input_bins_*.tsv")),
-    ]
-    if debug:
-        final_outputs += [index_to_contig_file, all_bin_compo_file]
-    final_step_inputs["diamond"] = diamond_step_inputs
-    ckpt.record_step("final", final_step_inputs, final_outputs)
-
-    if write_fasta_bins:
-        record_bins_fasta_step(ckpt, final_contig2bin_table, final_bins_dir)
-
-    return 0
 
 
 def main():

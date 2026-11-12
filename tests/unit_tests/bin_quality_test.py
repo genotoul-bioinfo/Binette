@@ -1,6 +1,8 @@
+import logging
 from collections import Counter
 from unittest.mock import patch
 
+import pytest
 from pyroaring import BitMap
 
 from binette import bin_quality
@@ -495,3 +497,31 @@ def test_add_bin_metrics_empty_bins():
     )
 
     assert result_bins == [], "Result should be an empty list when input bins are empty"
+
+
+@pytest.fixture
+def bins():
+    b1 = Bin(contigs=BitMap({1}), origin="set1", name="bin1")
+    b2 = Bin(contigs=BitMap({3}), origin="set1", name="bin2")
+    b3 = Bin(contigs=BitMap({3, 2}), origin="set1", name="bin3")
+
+    b1.add_quality(100, 0, 0)
+    b2.add_quality(95, 10, 0)
+    b3.add_quality(70, 20, 0)
+
+    return [b1, b2, b3]
+
+
+def test_log_selected_bin_info(caplog, bins):
+    caplog.set_level(logging.INFO)
+
+    hq_min_completeness = 85
+    hq_max_conta = 15
+
+    # Call the function
+    bin_quality.log_selected_bin_info(bins, hq_min_completeness, hq_max_conta)
+
+    # Check if the logs contain expected messages
+    expected_logs = "2/3 selected bins have high quality (completeness >= 85 and contamination <= 15)"
+
+    assert expected_logs in caplog.text

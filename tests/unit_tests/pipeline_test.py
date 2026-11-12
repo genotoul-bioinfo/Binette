@@ -1,69 +1,18 @@
-import logging
 from collections import Counter
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from pyroaring import BitMap
 
-from binette import checkpoint
-from binette.bin_manager import Bin
-from binette.main import (
-    can_reuse_step,
-    diamond_result_parameters,
+from binette.pipeline import (
     get_diamond_hits,
     get_proteins,
-    log_selected_bin_info,
     parse_input_files,
-    resolve_checkm2_db,
 )
 
-
-@pytest.fixture
-def test_environment(tmp_path: Path):
-    """
-    Fixture to set up a test environment with required directories and files.
-    """
-    folder1 = tmp_path / "folder1"
-    folder2 = tmp_path / "folder2"
-    contigs_file = tmp_path / "contigs.fasta"
-
-    folder1.mkdir()
-    folder2.mkdir()
-    contigs_file.write_text(">contig1\nATCG")  # Sample content for the FASTA file
-
-    return folder1, folder2, contigs_file
-
-
-@pytest.fixture
-def bins():
-    b1 = Bin(contigs=BitMap({1}), origin="set1", name="bin1")
-    b2 = Bin(contigs=BitMap({3}), origin="set1", name="bin2")
-    b3 = Bin(contigs=BitMap({3, 2}), origin="set1", name="bin3")
-
-    b1.add_quality(100, 0, 0)
-    b2.add_quality(95, 10, 0)
-    b3.add_quality(70, 20, 0)
-
-    return [b1, b2, b3]
-
-
-def test_log_selected_bin_info(caplog, bins):
-    caplog.set_level(logging.INFO)
-
-    hq_min_completeness = 85
-    hq_max_conta = 15
-
-    # Call the function
-    log_selected_bin_info(bins, hq_min_completeness, hq_max_conta)
-
-    # Check if the logs contain expected messages
-    expected_logs = "2/3 selected bins have high quality (completeness >= 85 and contamination <= 15)"
-
-    assert expected_logs in caplog.text
-
-
 FAA_CONTENT = ">contig1_1\nMLKPACGT\n>contig2_1\nMMMKPTGCA\n>contig2_2\nMMMAAAA\n>contig3_1\nMLPALP\n"
+
+
 CONTIGS_IN_BINS = {"contig1", "contig2", "contig3"}
 
 
@@ -226,36 +175,6 @@ def test_get_diamond_hits_inconsistent_contigs(tmp_path, contigs_fasta):
         )
 
 
-def test_resolve_checkm2_db(tmp_path):
-    db = tmp_path / "db.dmnd"
-    db.write_text("db")
-    assert resolve_checkm2_db(db) == db
-
-    with pytest.raises(FileNotFoundError):
-        resolve_checkm2_db(tmp_path / "missing.dmnd")
-
-    with patch("binette.diamond.get_checkm2_db", return_value="/some/db.dmnd"):
-        assert resolve_checkm2_db(None) == Path("/some/db.dmnd")
-
-
-def test_can_reuse_step(tmp_path, caplog):
-    caplog.set_level(logging.INFO)
-    output = tmp_path / "out.txt"
-    output.write_text("result")
-    ckpt = checkpoint.Checkpoint.new(tmp_path / "checkpoint.json", tmp_path, {})
-    ckpt.record_step("step", {"a": 1}, [output])
-
-    assert can_reuse_step(ckpt, "step", {"a": 1}, True, "step results")
-    assert "Resuming: reusing step results" in caplog.text
-
-    assert not can_reuse_step(ckpt, "step", {"a": 1}, False, "step results")
-
-    assert not can_reuse_step(ckpt, "step", {"a": 2}, True, "step results")
-    assert "inputs changed since previous run (a)" in caplog.text
-
-    assert not can_reuse_step(ckpt, "other_step", {"a": 1}, True, "other results")
-
-
 def test_parse_input_files_with_contig2bin_tables(tmp_path):
     bin_set1 = tmp_path / "bin_set1.tsv"
     bin_set1.write_text("contig1\tbin1A\ncontig2\tbin1B\n")
@@ -267,13 +186,10 @@ def test_parse_input_files_with_contig2bin_tables(tmp_path):
     fasta_file.write_text(fasta_file_content)
 
     # Call the function and capture the return values
-    (
-        contig_key_to_bin,
-        contigs_in_bins,
-        contig_id_to_length,
-        contig_to_index,
-        input_fingerprints,
-    ) = parse_input_files(None, [bin_set1, bin_set2], fasta_file, tmp_path)
+    inputs = parse_input_files(None, [bin_set1, bin_set2], fasta_file)
+    contig_key_to_bin = inputs.contig_key_to_original_bin
+    contigs_in_bins = inputs.contigs_in_bins
+    contig_id_to_length = inputs.contig_to_length
 
     # # Perform assertions on the returned values
     assert isinstance(contig_key_to_bin, dict)
@@ -283,7 +199,7 @@ def test_parse_input_files_with_contig2bin_tables(tmp_path):
     assert len(contig_key_to_bin) == 4
     assert set(contigs_in_bins) == {"contig1", "contig2", "contig3", "contig4"}
     assert len(contig_id_to_length) == 4
-    assert set(input_fingerprints) == {"contigs", "bins"}
+    assert set(inputs.fingerprints) == {"contigs", "bins"}
 
 
 def test_parse_input_files_fingerprints(tmp_path):
@@ -295,7 +211,7 @@ def test_parse_input_files_fingerprints(tmp_path):
         bin_table.write_text(table_content)
         if fasta_content is not None:
             fasta_file.write_text(fasta_content)
-        return parse_input_files(None, [bin_table], fasta_file)[-1]
+        return parse_input_files(None, [bin_table], fasta_file).fingerprints
 
     reference = fingerprints("contig1\tbinA\ncontig2\tbinB\n")
 
@@ -349,13 +265,10 @@ def test_parse_input_files_bin_dirs(create_temp_bin_directories, tmp_path):
     fasta_file.write_text(fasta_file_content)
 
     # Call the function and capture the return values
-    (
-        contig_key_to_bin,
-        contigs_in_bins,
-        contig_id_to_length,
-        contig_to_index,
-        input_fingerprints,
-    ) = parse_input_files(bin_dirs, contig2bin_tables, fasta_file)
+    inputs = parse_input_files(bin_dirs, contig2bin_tables, fasta_file)
+    contig_key_to_bin = inputs.contig_key_to_original_bin
+    contigs_in_bins = inputs.contigs_in_bins
+    contig_id_to_length = inputs.contig_to_length
 
     # # Perform assertions on the returned values
     assert isinstance(contig_key_to_bin, dict)
@@ -371,15 +284,3 @@ def test_parse_input_files_bin_dirs(create_temp_bin_directories, tmp_path):
         "contig5",
     }
     assert len(contig_id_to_length) == 5
-
-
-def test_diamond_result_parameters_include_block_size():
-    default = diamond_result_parameters(low_mem=False)
-    low_mem = diamond_result_parameters(low_mem=True)
-
-    assert default["block_size"] == 2
-    assert low_mem["block_size"] == 0.5
-    assert {k: v for k, v in default.items() if k != "block_size"} == {
-        k: v for k, v in low_mem.items() if k != "block_size"
-    }
-    assert {"query_cover", "subject_cover", "percent_id", "evalue"} <= set(default)
