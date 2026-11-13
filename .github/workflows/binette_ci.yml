@@ -20,31 +20,20 @@ jobs:
       fail-fast: false
       matrix:
         os: ['ubuntu-latest', 'macos-latest']
-        python-version: [3.12] #["3.8", "3.9", "3.10"]
+        python-version: ['3.12']  # checkm2 1.1 needs tensorflow <2.20, not built for python 3.13
 
     steps:
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
     - uses: actions/checkout@v7
 
     - name : Setup miniconda environment
-      uses: conda-incubator/setup-miniconda@v3
+      uses: conda-incubator/setup-miniconda@v4
       with:
         python-version: ${{ matrix.python-version }}
         channels: conda-forge,bioconda
         environment-file: binette.yaml
         activate-environment: binette
-
-    # - name : Setup micromamba environment
-    #   uses: mamba-org/setup-micromamba@v3
-    #   with:
-    #     environment-file: binette.yaml
-    #     create-args: python=${{ matrix.python-version }}
-    #     cache-environment: true
-    #     condarc: |
-    #       channels:
-    #         - conda-forge
-    #         - bioconda
-
+        conda-remove-defaults: "true"
 
     - name: Install binette
       shell: bash -l {0}
