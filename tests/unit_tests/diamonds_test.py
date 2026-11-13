@@ -106,10 +106,7 @@ def test_check_tool_exists_tool_found(monkeypatch):
     monkeypatch.setattr(shutil, "which", mock_shutil_which)
 
     # Call the function
-    try:
-        diamond.check_tool_exists("existing_tool")
-    except FileNotFoundError:
-        pytest.fail("check_tool_exists raised FileNotFoundError unexpectedly.")
+    diamond.check_tool_exists("existing_tool")
 
 
 def test_check_tool_exists_tool_not_found(monkeypatch):
@@ -119,9 +116,11 @@ def test_check_tool_exists_tool_not_found(monkeypatch):
 
     monkeypatch.setattr(shutil, "which", mock_shutil_which)
 
-    # Call the function and expect FileNotFoundError
-    with pytest.raises(FileNotFoundError):
+    with pytest.raises(diamond.DiamondError) as exc_info:
         diamond.check_tool_exists("non_existing_tool")
+
+    assert exc_info.value.exit_code == 1
+    assert "non_existing_tool" in str(exc_info.value)
 
 
 def test_run_diamond_tool_found(monkeypatch, tmp_path):

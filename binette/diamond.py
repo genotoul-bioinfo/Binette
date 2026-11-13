@@ -60,12 +60,10 @@ def check_tool_exists(tool_name: str):
 
     :param tool_name: The name of the tool to check for.
     :type tool_name: str
-    :raises FileNotFoundError: If the tool is not found on the system's PATH.
+    :raises DiamondError: If the tool is not found on the system's PATH.
     """
     if shutil.which(tool_name) is None:
-        raise FileNotFoundError(
-            f"The '{tool_name}' tool is not found on your system PATH."
-        )
+        raise DiamondError(f"The '{tool_name}' tool is not found on your system PATH.")
 
 
 def resolve_checkm2_db(checkm2_db: Path | None) -> Path:
