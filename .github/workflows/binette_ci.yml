@@ -7,11 +7,17 @@ on:
   pull_request:
     branches: 
       - '*'
+  # Runs on main after a merge, to publish the coverage report
+  push:
+    branches:
+      - main
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
     
 jobs:
   build:
+    permissions:
+      contents: write  # push the coverage report to the gh-pages branch
     defaults:
       run:
         shell: bash -el {0}
@@ -20,31 +26,20 @@ jobs:
       fail-fast: false
       matrix:
         os: ['ubuntu-latest', 'macos-latest']
-        python-version: [3.12] #["3.8", "3.9", "3.10"]
+        python-version: ['3.12']  # checkm2 1.1 needs tensorflow <2.20, not built for python 3.13
 
     steps:
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
     - uses: actions/checkout@v7
 
     - name : Setup miniconda environment
-      uses: conda-incubator/setup-miniconda@v3
+      uses: conda-incubator/setup-miniconda@v4
       with:
         python-version: ${{ matrix.python-version }}
         channels: conda-forge,bioconda
         environment-file: binette.yaml
         activate-environment: binette
-
-    # - name : Setup micromamba environment
-    #   uses: mamba-org/setup-micromamba@v3
-    #   with:
-    #     environment-file: binette.yaml
-    #     create-args: python=${{ matrix.python-version }}
-    #     cache-environment: true
-    #     condarc: |
-    #       channels:
-    #         - conda-forge
-    #         - bioconda
-
+        conda-remove-defaults: "true"
 
     - name: Install binette
       shell: bash -l {0}
@@ -72,7 +67,7 @@ jobs:
         rm htmlcov/.gitignore
 
     - name: Publish coverage report to GitHub Pages
-      if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+      if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && matrix.os == 'ubuntu-latest'
       uses: JamesIves/github-pages-deploy-action@v4
       with:
         folder: htmlcov

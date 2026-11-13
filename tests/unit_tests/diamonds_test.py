@@ -1,8 +1,7 @@
-import logging
 import shutil
 import subprocess
-import sys
 from collections import Counter
+from pathlib import Path
 from unittest.mock import patch
 
 import pandas as pd
@@ -129,9 +128,9 @@ def test_check_tool_exists_tool_not_found(monkeypatch):
 
 
 def test_run_diamond_tool_found(monkeypatch, tmp_path):
-    monkeypatch.setattr(
-        sys, "exit", lambda x: None
-    )  # Patch sys.exit to avoid test interruption
+    log_path = tmp_path / "log.txt"
+    output_file = tmp_path / "output.txt"
+    partial_output_file = tmp_path / "partial_output.txt"
 
     # Mocking subprocess.run
     def mock_subprocess_run(*args, **kwargs):
@@ -139,17 +138,18 @@ def test_run_diamond_tool_found(monkeypatch, tmp_path):
             def __init__(self, returncode):
                 self.returncode = returncode
 
-        # Simulating successful run of diamond command
-        if (
-            args[0]
-            == f"diamond blastp --outfmt 6 --max-target-seqs 1 --query test.faa -o {output_file.as_posix()} --threads 1 --db db --compress 1 --query-cover 80 --subject-cover 80 --id 30 --evalue 1e-05 --block-size 2 2> {log_path.as_posix()}"
-        ):
-            return CompletedProcess(0)
+        # DIAMOND writes to a temporary file that is moved on success
+        expected_cmd = (
+            "diamond blastp --outfmt 6 --max-target-seqs 1 --query test.faa "
+            f"-o {partial_output_file.as_posix()} --threads 1 --db db --compress 1 "
+            "--query-cover 80 --subject-cover 80 --id 30 --evalue 1e-05 "
+            f"--block-size 2 2> {log_path.as_posix()}"
+        )
+        assert args[0] == expected_cmd
+        partial_output_file.write_text("diamond results")
+        return CompletedProcess(0)
 
-    log_path = tmp_path / "log.txt"
-    output_file = tmp_path / "output.txt"
     monkeypatch.setattr(subprocess, "run", mock_subprocess_run)
-    monkeypatch.setattr(logging, "error", lambda x: None)  # Avoid logging during test
 
     # Call the function
     diamond.run(
@@ -165,32 +165,37 @@ def test_run_diamond_tool_found(monkeypatch, tmp_path):
         low_mem=False,
     )
 
+    assert output_file.read_text() == "diamond results"
+    assert not partial_output_file.exists()
 
-def test_run_diamond_tool_not_found(monkeypatch, tmp_path):
-    # Mocking check_tool_exists to simulate tool not found scenario
-    def mock_check_tool_exists(*args, **kwargs):
-        raise FileNotFoundError
 
-    monkeypatch.setattr(logging, "error", lambda x: None)  # Avoid logging during test
-
+def test_run_diamond_fails(monkeypatch, tmp_path):
     log_file = tmp_path / "log.txt"
     output_file = tmp_path / "output.txt"
-    # Call the function and expect it to raise FileNotFoundError
-    with patch("sys.exit") as mock_exit:
+
+    def mock_subprocess_run(*args, **kwargs):
+        class CompletedProcess:
+            returncode = 1
+
+        # Simulate a partial output left by a failing DIAMOND run
+        (tmp_path / "partial_output.txt").write_text("truncated")
+        return CompletedProcess()
+
+    monkeypatch.setattr(subprocess, "run", mock_subprocess_run)
+    monkeypatch.setattr(diamond, "check_tool_exists", lambda tool: None)
+
+    with pytest.raises(SystemExit) as exc_info:
         diamond.run(
             "test.faa",
             output_file.as_posix(),
             "db",
             log_file.as_posix(),
             threads=1,
-            query_cover=80,
-            subject_cover=80,
-            percent_id=30,
-            evalue=1e-05,
-            low_mem=False,
         )
 
-    mock_exit.assert_called_once_with(1)
+    assert exc_info.value.code == 1
+    # A failed run never produces the final result file
+    assert not output_file.exists()
 
 
 def test_get_contig_to_kegg_id():
@@ -254,3 +259,27 @@ def test_get_contig_to_kegg_id_empty_file():
 
     assert pytest_wrapped_e.type is SystemExit
     assert pytest_wrapped_e.value.code == 3
+
+
+def test_resolve_checkm2_db(tmp_path):
+    db = tmp_path / "db.dmnd"
+    db.write_text("db")
+    assert diamond.resolve_checkm2_db(db) == db
+
+    with pytest.raises(FileNotFoundError):
+        diamond.resolve_checkm2_db(tmp_path / "missing.dmnd")
+
+    with patch("binette.diamond.get_checkm2_db", return_value="/some/db.dmnd"):
+        assert diamond.resolve_checkm2_db(None) == Path("/some/db.dmnd")
+
+
+def test_result_parameters_include_block_size():
+    default = diamond.result_parameters(low_mem=False)
+    low_mem = diamond.result_parameters(low_mem=True)
+
+    assert default["block_size"] == 2
+    assert low_mem["block_size"] == 0.5
+    assert {k: v for k, v in default.items() if k != "block_size"} == {
+        k: v for k, v in low_mem.items() if k != "block_size"
+    }
+    assert {"query_cover", "subject_cover", "percent_id", "evalue"} <= set(default)

@@ -1,12 +1,16 @@
+import inspect
 import logging
 import re
 import shutil
 import subprocess
 import sys
 from collections import Counter
+from pathlib import Path
 
 import pandas as pd
 from checkm2 import keggData
+
+from binette.checkpoint import atomic_replace, partial_path
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +62,30 @@ def check_tool_exists(tool_name: str):
         )
 
 
+def resolve_checkm2_db(checkm2_db: Path | None) -> Path:
+    """
+    Return the path of the CheckM2 diamond database to use.
+
+    :param checkm2_db: Database given by the user, or None to use the one set via `checkm2 database`.
+    :raises FileNotFoundError: If the given database does not exist.
+    """
+    if checkm2_db is None:
+        return Path(get_checkm2_db())
+    if not checkm2_db.exists():
+        raise FileNotFoundError(checkm2_db)
+    return checkm2_db
+
+
+def get_block_size(low_mem: bool) -> float:
+    """
+    DIAMOND block size used by Binette. It changes memory usage and can also
+    slightly change alignment results.
+
+    :param low_mem: Use low memory mode if True.
+    """
+    return 0.5 if low_mem else 2
+
+
 def run(
     faa_file: str,
     output: str,
@@ -86,12 +114,17 @@ def run(
     """
     check_tool_exists("diamond")
 
-    blocksize = 0.5 if low_mem else 2
+    # DIAMOND writes to a temporary file which is moved to its final location
+    # only on success, so an interrupted job never leaves a truncated result file.
+    final_output = Path(output)
+    tmp_output = partial_path(final_output)
+
+    blocksize = get_block_size(low_mem)
 
     cmd = (
         "diamond blastp --outfmt 6 --max-target-seqs 1 "
         f"--query {faa_file} "
-        f"-o {output} "
+        f"-o {tmp_output} "
         f"--threads {threads} "
         f"--db {db} "
         f"--compress 1 "
@@ -110,6 +143,7 @@ def run(
         logger.error(f"An error occurred while running DIAMOND. Check log file '{log}'")
         sys.exit(1)
 
+    atomic_replace(tmp_output, final_output)
     logger.info("Finished running DIAMOND")
 
 
@@ -160,3 +194,19 @@ def get_contig_to_kegg_id(diamond_result_file: str) -> dict:
     )
 
     return contig_to_kegg_counter
+
+
+def result_parameters(low_mem: bool) -> dict:
+    """
+    DIAMOND parameters that can change its results. Threads do not, but the block
+    size set by --low_mem does.
+
+    :param low_mem: Whether DIAMOND low memory mode is used.
+    """
+    params = inspect.signature(run).parameters
+    result_params = {
+        name: params[name].default
+        for name in ("query_cover", "subject_cover", "percent_id", "evalue")
+    }
+    result_params["block_size"] = get_block_size(low_mem)
+    return result_params

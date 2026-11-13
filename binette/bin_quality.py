@@ -685,3 +685,49 @@ def _assess_bins_quality_batch(
         bin_obj.add_model(chosen_model)
 
     return bins
+
+
+def log_selected_bin_info(
+    selected_bins: list[Bin],
+    hq_min_completeness: float,
+    hq_max_conta: float,
+):
+    """
+    Log information about selected bins based on quality thresholds.
+
+    :param selected_bins: List of Bin objects to analyze.
+    :param hq_min_completeness: Minimum completeness threshold for high-quality bins.
+    :param hq_max_conta: Maximum contamination threshold for high-quality bins.
+
+    This function logs information about selected bins that meet specified quality thresholds.
+    It counts the number of high-quality bins based on completeness and contamination values.
+    """
+
+    # Log completeness and contamination in debug log
+    logger.debug("High quality bins:")
+    for sb in selected_bins:
+        if sb.is_high_quality(
+            min_completeness=hq_min_completeness, max_contamination=hq_max_conta
+        ):
+            logger.debug(
+                f"  {sb} completeness={sb.completeness}, contamination={sb.contamination}"
+            )
+
+    # Count high-quality bins and single-contig high-quality bins
+    hq_bins = len(
+        [
+            sb
+            for sb in selected_bins
+            if sb.is_high_quality(
+                min_completeness=hq_min_completeness, max_contamination=hq_max_conta
+            )
+        ]
+    )
+
+    # Log information about high-quality bins
+    thresholds = (
+        f"(completeness >= {hq_min_completeness} and contamination <= {hq_max_conta})"
+    )
+    logger.info(
+        f"{hq_bins}/{len(selected_bins)} selected bins have high quality {thresholds}"
+    )
