@@ -299,7 +299,9 @@ def parse_bin_directories(
     bin_name_to_bin_dir: dict[str, Path], fasta_extensions: set[str]
 ) -> dict[str, list[dict[str, Any]]]:
     """
-    Parses multiple bin directories and returns a dictionary mapping bin names to a list of Bin objects.
+    Parses multiple bin directories and returns a dictionary mapping bin set names to a list of bin info dicts.
+
+    Bins with identical contigs are merged later, in make_bins_from_bins_info.
 
     :param bin_name_to_bin_dir: A dictionary mapping bin names to their respective bin directories.
     :fasta_extensions: Possible fasta extensions to look for in the bin directory.
@@ -310,20 +312,6 @@ def parse_bin_directories(
 
     for name, bin_dir in sorted(bin_name_to_bin_dir.items()):
         bins = get_bins_from_directory(bin_dir, name, fasta_extensions)
-
-        # TODO: redo this check
-        # set_of_bins = set(bins)
-
-        # # Calculate the number of duplicates
-        # num_duplicates = len(bins) - len(set_of_bins)
-
-        # if num_duplicates > 0:
-        #     logger.warning(
-        #         f'{num_duplicates} bins with identical contig compositions detected in bin set "{name}". '
-        #         "These bins were merged to ensure uniqueness."
-        #     )
-
-        # Store the unique set of bins
         bin_set_name_to_bins_info[name] = bins
 
     return bin_set_name_to_bins_info
@@ -333,34 +321,19 @@ def parse_contig2bin_tables(
     bin_name_to_bin_tables: dict[str, Path],
 ) -> dict[str, list[dict[str, Any]]]:
     """
-    Parses multiple contig-to-bin tables and returns a dictionary mapping bin names to a set of unique Bin objects.
+    Parses multiple contig-to-bin tables and returns a dictionary mapping bin set names to a list of bin info dicts.
 
-    Logs a warning if duplicate bins are detected within a bin set.
+    Bins with identical contigs are merged later, in make_bins_from_bins_info.
 
     :param bin_name_to_bin_tables: A dictionary where keys are bin set names and values are file paths or identifiers
-                                   for contig-to-bin tables. Each table is parsed to extract Bin objects.
+                                   for contig-to-bin tables.
 
-    :return: A dictionary where keys are bin set names and values are sets of Bin objects. Duplicates are removed based
-             on contig composition.
+    :return: A dictionary mapping bin set names to a list of dict created from the contig-to-bin tables.
     """
     bin_set_name_to_bins_info = {}
 
     for name, contig2bin_table in sorted(bin_name_to_bin_tables.items()):
         bins = get_bins_from_contig2bin_table(contig2bin_table, name)
-
-        # TODO: redo this check
-        # set_of_bins = set(bins)
-
-        # # Calculate the number of duplicates
-        # num_duplicates = len(bins) - len(set_of_bins)
-
-        # if num_duplicates > 0:
-        #     logger.warning(
-        #         f'{num_duplicates*2} bins with identical contig compositions detected in bin set "{name}". '
-        #         "These bins were merged to ensure uniqueness."
-        #     )
-
-        # Store the unique set of bins
         bin_set_name_to_bins_info[name] = bins
 
     return bin_set_name_to_bins_info
