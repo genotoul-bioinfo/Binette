@@ -256,7 +256,9 @@ def make_bins_from_bins_info(
             if bin_obj.contigs_key not in contig_key_to_bin:
                 contig_key_to_bin[bin_obj.contigs_key] = bin_obj
             else:
-                bin_obj.origin.add(set_name)
+                # Same contigs as a bin already seen: keep that bin and record
+                # that this bin set also produced it.
+                contig_key_to_bin[bin_obj.contigs_key].origin.add(set_name)
 
     return contig_key_to_bin
 
