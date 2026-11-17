@@ -13,6 +13,28 @@ from pyroaring import BitMap
 from binette import bin_manager, bin_quality
 
 
+def test_make_bins_from_bins_info_merges_origins():
+    """A bin produced by several bin sets is kept once, with all its origins."""
+    bin_set_name_to_bins_info = {
+        "set1": [{"bin_name": "bin1", "contigs": {"c1", "c2"}}],
+        "set2": [
+            {"bin_name": "binA", "contigs": {"c1", "c2"}},
+            {"bin_name": "binB", "contigs": {"c3"}},
+        ],
+    }
+    contig_to_index = {"c1": 0, "c2": 1, "c3": 2}
+
+    contig_key_to_bin = bin_manager.make_bins_from_bins_info(
+        bin_set_name_to_bins_info, contig_to_index, are_original_bins=True
+    )
+
+    bins = sorted(contig_key_to_bin.values(), key=lambda b: b.name)
+    assert [b.name for b in bins] == ["bin1", "binB"]
+    assert bins[0].origin == {"set1", "set2"}
+    assert bins[1].origin == {"set2"}
+    assert all(b.is_original for b in bins)
+
+
 def test_get_all_possible_combinations():
     input_list = ["2", "3", "4"]
     expected_list = [("2", "3"), ("2", "4"), ("3", "4"), ("2", "3", "4")]
