@@ -1,4 +1,6 @@
 #!/bin/bash
+set -euo pipefail
+
 # Run MaxBin2 using the depth file from MetaBAT2
 mkdir -p maxbin2_bins
 run_MaxBin.pl -contig Kickstart.megahit/R1.contigs.fa \

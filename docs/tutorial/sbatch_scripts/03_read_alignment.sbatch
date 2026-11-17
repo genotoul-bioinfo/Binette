@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=tutorial_03_read_alignment
-#SBATCH --cpus-per-task=8
+#SBATCH --cpus-per-task=12
 #SBATCH --mem=16GB
 #SBATCH --time=01:00:00
 #SBATCH --output=logs/tutorial_03_read_alignment_%j.out

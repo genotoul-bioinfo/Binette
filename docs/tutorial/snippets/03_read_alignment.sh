@@ -1,6 +1,5 @@
 #!/bin/bash
-# Create a directory for the alignments
-mkdir -p alignments_bwa/
+set -euo pipefail
 
 # Index the contigs file using BWA-MEM2
 bwa-mem2 index Kickstart.megahit/R1.contigs.fa -p Kickstart.megahit/R1.contigs.fa

@@ -1,4 +1,6 @@
 #!/bin/bash
+set -euo pipefail
+
 # Assemble the reads using MEGAHIT
 megahit -1 SRR5058924_1.fastq.gz \
         -2 SRR5058924_2.fastq.gz \
