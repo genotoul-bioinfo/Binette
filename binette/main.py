@@ -18,7 +18,7 @@ from rich.console import Console
 from rich.logging import RichHandler
 
 import binette as binette_init
-from binette import checkpoint, pipeline
+from binette import checkpoint, diamond, pipeline
 from binette.config import RunConfig
 
 logger = logging.getLogger(__name__)
@@ -403,6 +403,9 @@ def binette(
     except checkpoint.OutputDirConflictError as exc:
         logger.error(str(exc))
         raise typer.Exit(code=1) from exc
+    except diamond.DiamondError as exc:
+        logger.error(str(exc))
+        raise typer.Exit(code=exc.exit_code) from exc
 
 
 def main():
