@@ -53,7 +53,7 @@ Binette is inspired by the **metaWRAP bin-refinement tool** but effectively addr
 Binette can be easily installed with conda 
 
 ```bash
-conda create -c bioconda -c defaults -c conda-forge -n binette binette
+conda create -c conda-forge -c bioconda -n binette binette
 conda activate binette
 ```
 
