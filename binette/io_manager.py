@@ -1,3 +1,4 @@
+import gzip
 import logging
 from collections import defaultdict
 from collections.abc import Iterable
@@ -7,6 +8,7 @@ import pandas as pd
 import pyfastx
 
 from binette.bin_manager import Bin
+from binette.checkpoint import atomic_replace, partial_path
 
 logger = logging.getLogger(__name__)
 
@@ -192,24 +194,43 @@ def write_bins_fasta(
     :param outdir: Directory to save bin FASTA files.
     :param max_buffer_size: Maximum total character size to buffer before flushing.
     """
-    outdir.mkdir(parents=True, exist_ok=True)
-
-    # Clear existing files for selected bins
-    for sbin in selected_bins:
-        out_path = outdir / f"{sbin.name}.fa"
-        if out_path.exists():
-            out_path.unlink()  # remove the file
-
     # Map contig name to bin IDs
-    contig_to_bins = {}
+    contig_to_bin = {}
     for sbin in selected_bins:
         for contig_id in sbin.contigs:
             contig_name = contigs_names[contig_id]
-            contig_to_bins[contig_name] = sbin.name
+            contig_to_bin[contig_name] = sbin.name
 
-    assert len(contig_to_bins) == sum(len(sbin.contigs) for sbin in selected_bins), (
+    assert len(contig_to_bin) == sum(len(sbin.contigs) for sbin in selected_bins), (
         "Some contigs are present in multiple bins but should be unique."
     )
+
+    write_bins_fasta_from_contig_to_bin(
+        contig_to_bin, contigs_fasta, outdir, max_buffer_size
+    )
+
+
+def write_bins_fasta_from_contig_to_bin(
+    contig_to_bin: dict[str, str],
+    contigs_fasta: Path,
+    outdir: Path,
+    max_buffer_size: int = 50_000_000,
+):
+    """
+    Write one FASTA file per bin from a mapping of contig name to bin name.
+
+    :param contig_to_bin: Mapping of contig name to bin name.
+    :param contigs_fasta: Path to the input FASTA file.
+    :param outdir: Directory to save bin FASTA files.
+    :param max_buffer_size: Maximum total character size to buffer before flushing.
+    """
+    outdir.mkdir(parents=True, exist_ok=True)
+
+    # Clear existing files for the bins to write
+    for bin_name in set(contig_to_bin.values()):
+        out_path = outdir / f"{bin_name}.fa"
+        if out_path.exists():
+            out_path.unlink()  # remove the file
 
     buffer = defaultdict(list)
     buffer_size = 0
@@ -224,7 +245,7 @@ def write_bins_fasta(
         buffer_size = 0
 
     for name, seq in pyfastx.Fastx(contigs_fasta.as_posix()):
-        bin_name = contig_to_bins.get(name)
+        bin_name = contig_to_bin.get(name)
         if not bin_name:
             continue
 
@@ -269,29 +290,58 @@ def check_contig_consistency(
     assert are_contigs_consistent, message
 
 
-def check_resume_file(faa_file: Path, diamond_result_file: Path) -> None:
+def write_contig_coding_length(
+    contig_to_coding_length: dict[str, int | None], output_file: Path
+) -> None:
     """
-    Check the existence of files required for resuming the process.
+    Write the coding length of each contig to a (gzipped) TSV file.
 
-    :param faa_file: Path to the protein file.
-    :param diamond_result_file: Path to the Diamond result file.
-    :raises FileNotFoundError: If the required files don't exist for resuming.
+    The file is written atomically so an interrupted run never leaves a partial file.
+
+    :param contig_to_coding_length: Mapping of contig name to coding length (or None).
+    :param output_file: Output path. Compressed with gzip if it ends with '.gz'.
     """
+    proper_open = gzip.open if output_file.name.endswith(".gz") else open
+    tmp_file = partial_path(output_file)
+    with proper_open(tmp_file, "wt") as fl:
+        for contig, coding_length in contig_to_coding_length.items():
+            value = "NA" if coding_length is None else int(coding_length)
+            fl.write(f"{contig}\t{value}\n")
+    atomic_replace(tmp_file, output_file)
 
-    if faa_file.exists() and diamond_result_file.exists():
-        return
 
-    if not faa_file.exists():
-        error_msg = (
-            f"Protein file '{faa_file}' does not exist. Resuming is not possible."
-        )
-        logger.error(error_msg)
-        raise FileNotFoundError(error_msg)
+def read_contig_coding_length(input_file: Path) -> dict[str, int | None]:
+    """
+    Read a file written by :func:`write_contig_coding_length`.
 
-    if not diamond_result_file.exists():
-        error_msg = f"Diamond result file '{diamond_result_file}' does not exist. Resuming is not possible."
-        logger.error(error_msg)
-        raise FileNotFoundError(error_msg)
+    :param input_file: Path of the coding length file.
+    :return: Mapping of contig name to coding length (or None).
+    """
+    proper_open = gzip.open if input_file.name.endswith(".gz") else open
+    contig_to_coding_length: dict[str, int | None] = {}
+    with proper_open(input_file, "rt") as fl:
+        for line in fl:
+            contig, value = line.rstrip("\n").split("\t")
+            contig_to_coding_length[contig] = None if value == "NA" else int(value)
+    return contig_to_coding_length
+
+
+def clear_previous_outputs(final_bins_dir: Path, original_bin_report_dir: Path) -> None:
+    """
+    Remove final outputs from a previous run that may not be overwritten by the current
+    one (e.g. bins written with another prefix). Only files written by Binette are removed.
+
+    :param final_bins_dir: Directory of final bin FASTA files.
+    :param original_bin_report_dir: Directory of input bin quality reports.
+    """
+    to_remove = [
+        *final_bins_dir.glob("*.fa"),
+        *original_bin_report_dir.glob("input_bins_*.tsv"),
+    ]
+    if to_remove:
+        logger.info(f"Removing {len(to_remove)} result files from a previous run")
+    for path in to_remove:
+        path.unlink()
 
 
 def write_contig2bin_table(
@@ -320,6 +370,22 @@ def write_contig2bin_table(
 
     total_entries = sum(len(bin_obj.contigs) for bin_obj in selected_bins)
     logger.debug(f"Successfully wrote contig2bin table with {total_entries} entries")
+
+
+def read_contig2bin_table(input_file: Path) -> dict[str, str]:
+    """
+    Read a headerless contig-to-bin TSV file written by :func:`write_contig2bin_table`.
+
+    :param input_file: Path to the contig2bin table.
+    :return: Mapping of contig name to bin name.
+    """
+    contig_to_bins = {}
+    with open(input_file) as fl:
+        for line in fl:
+            if line.strip():
+                contig, bin_name = line.rstrip("\n").split("\t")
+                contig_to_bins[contig] = bin_name
+    return contig_to_bins
 
 
 def write_original_bin_metrics(original_bins: list[Bin], original_bin_report_dir: Path):

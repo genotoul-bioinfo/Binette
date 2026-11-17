@@ -13,6 +13,28 @@ from pyroaring import BitMap
 from binette import bin_manager, bin_quality
 
 
+def test_make_bins_from_bins_info_merges_origins():
+    """A bin produced by several bin sets is kept once, with all its origins."""
+    bin_set_name_to_bins_info = {
+        "set1": [{"bin_name": "bin1", "contigs": {"c1", "c2"}}],
+        "set2": [
+            {"bin_name": "binA", "contigs": {"c1", "c2"}},
+            {"bin_name": "binB", "contigs": {"c3"}},
+        ],
+    }
+    contig_to_index = {"c1": 0, "c2": 1, "c3": 2}
+
+    contig_key_to_bin = bin_manager.make_bins_from_bins_info(
+        bin_set_name_to_bins_info, contig_to_index, are_original_bins=True
+    )
+
+    bins = sorted(contig_key_to_bin.values(), key=lambda b: b.name)
+    assert [b.name for b in bins] == ["bin1", "binB"]
+    assert bins[0].origin == {"set1", "set2"}
+    assert bins[1].origin == {"set2"}
+    assert all(b.is_original for b in bins)
+
+
 def test_get_all_possible_combinations():
     input_list = ["2", "3", "4"]
     expected_list = [("2", "3"), ("2", "4"), ("3", "4"), ("2", "3", "4")]
@@ -480,36 +502,6 @@ def test_parse_contig2bin_tables(tmp_path):
         assert len(result_bin_dict[name]) == len(expected)
         for result_bin in result_bin_dict[name]:
             assert result_bin in expected
-
-
-@pytest.fixture
-def create_temp_bin_files(tmpdir):
-    # Create temporary bin files
-    bin_dir = tmpdir.mkdir("bins")
-    bin1 = bin_dir.join("bin1.fasta")
-    bin1.write(">contig1\nATGC\n>contig2\nGCTA")
-
-    bin2 = bin_dir.join("bin2.fasta")
-    bin2.write(">contig3\nTTAG\n>contig4\nCGAT")
-
-    return bin_dir
-
-
-@pytest.fixture
-def create_temp_bin_directories(tmpdir, create_temp_bin_files):
-    # Create temporary bin directories
-    bin_dir1 = tmpdir.mkdir("set1")
-    bin1 = bin_dir1.join("bin1.fasta")
-    bin1.write(">contig1\nATGC\n>contig2\nGCTA")
-
-    bin2 = bin_dir1.join("bin2.fasta")
-    bin2.write(">contig3\nTTAG\n>contig4\nCGAT")
-
-    bin_dir2 = tmpdir.mkdir("set2")
-    bin2 = bin_dir2.join("binA.fasta")
-    bin2.write(">contig3\nTTAG\n>contig4\nCGAT\n>contig5\nCGGC")
-
-    return {"set1": Path(bin_dir1), "set2": Path(bin_dir2)}
 
 
 def test_get_bins_from_directory(create_temp_bin_files):

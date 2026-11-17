@@ -29,6 +29,24 @@
    :show-inheritance:
 ```
 
+## binette.checkpoint module
+
+```{eval-rst}
+.. automodule:: binette.checkpoint
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
+## binette.config module
+
+```{eval-rst}
+.. automodule:: binette.config
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
 ## binette.contig_manager module
 
 ```{eval-rst}
@@ -60,6 +78,15 @@
 
 ```{eval-rst}
 .. automodule:: binette.main
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
+## binette.pipeline module
+
+```{eval-rst}
+.. automodule:: binette.pipeline
    :members:
    :undoc-members:
    :show-inheritance:

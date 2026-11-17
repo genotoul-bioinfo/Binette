@@ -11,6 +11,8 @@ import numpy as np
 import pyfastx
 import pyrodigal
 
+from binette.checkpoint import atomic_replace, partial_path
+
 logger = logging.getLogger(__name__)
 
 
@@ -95,9 +97,11 @@ def write_faa(outfaa: str, contig_to_genes: list[tuple[str, pyrodigal.Genes]]) -
 
     """
     logger.info("Writing predicted protein sequences")
-    with gzip.open(outfaa, "wt") as fl:
+    tmp_faa = partial_path(Path(outfaa))
+    with gzip.open(tmp_faa, "wt") as fl:
         for contig_id, genes in contig_to_genes:
             genes.write_translations(fl, contig_id)
+    atomic_replace(tmp_faa, Path(outfaa))
 
 
 def is_nucleic_acid(sequence: str) -> bool:
@@ -259,13 +263,15 @@ def filter_faa_file(
     contigs_parsed = set()
 
     # Process the input FASTA file and filter sequences based on contigs_to_keep
-    with proper_open(filtered_faa_file, "wt") as fl:
-        for name, seq in pyfastx.Fastx(input_faa_file):
+    tmp_faa_file = partial_path(Path(filtered_faa_file))
+    with proper_open(tmp_faa_file, "wt") as fl:
+        for name, seq in pyfastx.Fastx(str(input_faa_file)):
             contig = get_contig_from_cds_name(name)
             contigs_parsed.add(contig)
             if contig in contigs_to_keep:
                 contigs_with_genes.add(contig)
                 fl.write(f">{name}\n{seq}\n")
+    atomic_replace(tmp_faa_file, Path(filtered_faa_file))
 
     # Calculate metrics
     total_contigs = len(contigs_to_keep)

@@ -1,6 +1,6 @@
+import logging
 import os
 import warnings
-import logging
 from pathlib import Path
 
 import pytest

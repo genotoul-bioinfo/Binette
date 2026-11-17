@@ -7,6 +7,13 @@ In this tutorial, we'll walk through a practical example of how to use Binette w
   2. Next, we'll use different binning tools to group the contigs into bins.
   3. Finally, we'll use Binette to refine these bins.
 
+```{admonition} Computational resources
+:class: note
+
+The commands in this tutorial use 12 threads (`-t 12`, `--num-cpu-threads 12`, ...): adjust this value to your machine.
+The full analysis requires around 6 GB of disk space, plus ~3 GB for the CheckM2 database, and takes about 2.5 hours in total with 12 threads.
+```
+
 ```{mermaid}
 
 --- 
