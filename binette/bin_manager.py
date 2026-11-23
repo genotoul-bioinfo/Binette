@@ -398,38 +398,6 @@ def get_all_possible_combinations(clique: list) -> Iterable[tuple]:
     )
 
 
-def build_contig_index(bins_dict: dict[bytes, Bin]) -> dict[int, set[bytes]]:
-    """
-    Build an inverted index: contig_id -> set of contigs_key of bins containing it.
-    :param bins_dict: Mapping from contigs_key -> Bin.
-    :return: Inverted index (contig_id -> set of contigs_key).
-    """
-    contig_to_bins = defaultdict(set)
-    for key, bin_obj in bins_dict.items():
-        for contig in bin_obj.contigs:
-            contig_to_bins[contig].add(key)
-    return contig_to_bins
-
-
-def remove_bins_from_index(
-    bin_keys: set[bytes],
-    bins_dict: dict[bytes, Bin],
-    contig_to_bins: dict[int, set[bytes]],
-) -> None:
-    """
-    Remove a set of bins from the inverted index.
-
-    :param bin_keys: The contig_keys of bins to remove.
-    :param bins_dict: Mapping from contig_key -> Bin.
-    :param contig_to_bins: Inverted index (contig_id -> set of contig_keys).
-    """
-    for key in bin_keys:
-        ob = bins_dict.get(key)
-        if ob is not None:
-            for c in ob.contigs:
-                contig_to_bins[c].discard(key)
-
-
 def select_best_bins(
     bins_dict: dict[bytes, Bin],
     min_completeness: float,
@@ -454,7 +422,7 @@ def select_best_bins(
     good_enough_bins = {
         k: b
         for k, b in bins_dict.items()
-        if b.completeness >= min_completeness and b.contamination <= max_contamination
+        if b.is_high_quality(min_completeness, max_contamination)
     }
 
     logger.info("Sorting bins")
@@ -468,32 +436,18 @@ def select_best_bins(
         ),
     )
 
-    logger.info("Building contig index")
-    contig_to_bin_keys = build_contig_index(good_enough_bins)
-
     logger.info("Selecting bins")
+    # A bin is selected when it shares no contig with the bins selected before it.
+    # Tracking the contigs already used is enough: no per-contig index of bins is
+    # needed, which would take a lot of memory with many candidate bins.
     selected_bins = []
-    discarded_keys = set()
+    used_contigs = BitMap()
 
     for bin_key in sorted_bin_keys:
-        if bin_key in discarded_keys:
-            continue
-
         bin_obj = good_enough_bins[bin_key]
-        selected_bins.append(bin_obj)
-
-        # Gather overlapping bins via inverted index
-        overlapping_bin_keys = set()
-        for contig in bin_obj.contigs:
-            overlapping_bin_keys |= contig_to_bin_keys[contig]
-
-        # Discard them
-        discarded_keys |= overlapping_bin_keys
-
-        # Remove discarded bins from index to shrink future lookups
-        remove_bins_from_index(
-            overlapping_bin_keys, good_enough_bins, contig_to_bin_keys
-        )
+        if bin_obj.contigs.isdisjoint(used_contigs):
+            selected_bins.append(bin_obj)
+            used_contigs |= bin_obj.contigs
 
     logger.info(f"Selected {len(selected_bins)} bins")
 
