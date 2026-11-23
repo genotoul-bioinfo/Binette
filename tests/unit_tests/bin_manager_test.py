@@ -4,6 +4,7 @@ Unit tests for binette.
 """
 
 import logging
+import random
 from pathlib import Path
 
 import networkx as nx
@@ -598,3 +599,50 @@ def test_get_contigs_in_bin_sets(caplog):
 
     # Check if the result matches expected contigs
     assert set(result) == expected_contigs, "The returned set of contigs is incorrect."
+
+
+def select_best_bins_with_index(bins_dict, min_completeness, max_contamination):
+    """Reference: previous selection, discarding bins through a contig -> bins index."""
+    good = {
+        k: b
+        for k, b in bins_dict.items()
+        if b.completeness >= min_completeness and b.contamination <= max_contamination
+    }
+    order = sorted(
+        good, key=lambda k: (-good[k].score, -good[k].N50, -good[k].is_original, k)
+    )
+    contig_to_keys = {}
+    for k, b in good.items():
+        for c in b.contigs:
+            contig_to_keys.setdefault(c, set()).add(k)
+    selected, discarded = [], set()
+    for k in order:
+        if k in discarded:
+            continue
+        selected.append(k)
+        for c in good[k].contigs:
+            discarded |= contig_to_keys[c]
+    return selected
+
+
+@pytest.mark.parametrize("seed", range(5))
+def test_select_best_bins_matches_index_based_selection(seed):
+    rng = random.Random(seed)
+    bins = {}
+    for _ in range(300):
+        start = rng.randrange(200)
+        contigs = BitMap(range(start, start + rng.randint(1, 15)))
+        b = bin_manager.Bin(contigs, is_original=rng.random() < 0.3)
+        # few distinct values: many ties on score and N50
+        b.add_quality(rng.choice([35, 50, 80, 95]), rng.choice([0, 5, 12]), 2)
+        b.N50 = rng.choice([1000, 2000])
+        bins[b.contigs_key] = b
+
+    expected = select_best_bins_with_index(bins, 40, 10)
+    selected = bin_manager.select_best_bins(bins, 40, 10)
+
+    assert [b.contigs_key for b in selected] == expected
+    used = BitMap()
+    for b in selected:
+        assert b.contigs.isdisjoint(used)
+        used |= b.contigs
