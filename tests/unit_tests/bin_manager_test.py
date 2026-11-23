@@ -3,6 +3,7 @@ Unit tests for binette.
 
 """
 
+import itertools
 import logging
 import random
 from pathlib import Path
@@ -36,11 +37,36 @@ def test_make_bins_from_bins_info_merges_origins():
     assert all(b.is_original for b in bins)
 
 
-def test_get_all_possible_combinations():
-    input_list = ["2", "3", "4"]
-    expected_list = [("2", "3"), ("2", "4"), ("3", "4"), ("2", "3", "4")]
+def test_iter_cliques_small_graph():
+    graph = nx.Graph([("a", "b"), ("a", "c"), ("b", "c"), ("c", "d")])
 
-    assert list(bin_manager.get_all_possible_combinations(input_list)) == expected_list
+    assert list(bin_manager.iter_cliques(graph)) == [
+        ("a", "b"),
+        ("a", "b", "c"),
+        ("a", "c"),
+        ("b", "c"),
+        ("c", "d"),
+    ]
+
+
+def subsets_of_maximal_cliques(graph: nx.Graph) -> list[tuple]:
+    """Subsets of >= 2 nodes of every maximal clique, as Binette enumerated them before."""
+    return [
+        combination
+        for clique in nx.find_cliques(graph)
+        for r in range(2, len(clique) + 1)
+        for combination in itertools.combinations(sorted(clique), r)
+    ]
+
+
+@pytest.mark.parametrize("seed", range(5))
+def test_iter_cliques_yields_each_subset_of_maximal_cliques_once(seed):
+    graph = nx.gnp_random_graph(40, 0.3, seed=seed)
+
+    cliques = list(bin_manager.iter_cliques(graph))
+
+    assert len(cliques) == len(set(cliques))
+    assert set(cliques) == set(subsets_of_maximal_cliques(graph))
 
 
 def test_bin_eq_true():
