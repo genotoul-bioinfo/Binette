@@ -9,7 +9,6 @@ dependencies:
   - pandas>=2,<3
   - checkm2==1.1  # not yet on PyPI
   - setuptools
-  - joblib>=1.0,<2.0
   - networkx>=3.0,<4.0
   - pyfastx>=2,<3
   - pyrodigal>=3,<4

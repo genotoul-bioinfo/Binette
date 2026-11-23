@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
-import gc
+import concurrent.futures as cf
 import logging
+import multiprocessing
 import os
-from collections import Counter, defaultdict
-from collections.abc import Iterable, Iterator
-from itertools import islice
+from collections import Counter
+from collections.abc import Generator, Iterable, Iterator, Sequence
+from contextlib import closing, contextmanager
 
-import joblib
 import numpy as np
 import pandas as pd
 from checkm2 import keggData
+from pyroaring import BitMap
 from rich.progress import Progress
 
 from binette.bin_manager import Bin
@@ -77,56 +78,44 @@ def get_modelProcessing():
 
 
 def get_bins_metadata_df(
-    bins: list[Bin],
-    contig_to_cds_count: dict[str, int],
-    contig_to_aa_counter: dict[str, Counter],
-    contig_to_aa_length: dict[str, int],
+    contig_sets: Sequence[BitMap],
+    contig_to_cds_count: dict[int, int],
+    contig_to_aa_counter: dict[int, Counter],
+    contig_to_aa_length: dict[int, int],
+    kegg_calc: keggData.KeggCalculator | None = None,
 ) -> pd.DataFrame:
     """
-    Optimized: Generate a DataFrame containing metadata for a list of bins.
-    Handles contigs that appear in multiple bins.
+    Generate a DataFrame containing metadata (CDS count, amino acid length and
+    composition) for a list of contig sets.
+
+    :param contig_sets: Contig sets (one per bin) to describe.
+    :param contig_to_cds_count: Number of CDS per contig.
+    :param contig_to_aa_counter: Amino acid composition per contig.
+    :param contig_to_aa_length: Total amino acid length per contig.
+    :param kegg_calc: KeggCalculator to reuse (one is created when not given).
+
+    :return: DataFrame with one row per contig set, in input order. The "Name" column
+        and the index hold the position of the contig set in ``contig_sets``.
     """
-    metadata_order = keggData.KeggCalculator().return_proper_order("Metadata")
-    bin_keys = [b.contigs_key for b in bins]
+    if kegg_calc is None:
+        kegg_calc = keggData.KeggCalculator()
+    metadata_order = kegg_calc.return_proper_order("Metadata")
 
-    # --- Pre-aggregate CDS and AA length ---
-    cds_per_bin = defaultdict(int)
-    aa_len_per_bin = defaultdict(int)
-    aa_counter_per_bin = defaultdict(Counter)
-
-    # map contigs → all bins they belong to
-    contig_to_bins = defaultdict(list)
-    for b in bins:
-        for c in b.contigs:
-            contig_to_bins[c].append(b.contigs_key)
-
-    # distribute CDS counts
-    for contig, cds in contig_to_cds_count.items():
-        for bin_key in contig_to_bins.get(contig, []):
-            cds_per_bin[bin_key] += cds
-
-    # distribute AA lengths
-    for contig, length in contig_to_aa_length.items():
-        for bin_key in contig_to_bins.get(contig, []):
-            aa_len_per_bin[bin_key] += length
-
-    # distribute AA counters
-    for contig, counter in contig_to_aa_counter.items():
-        for bin_key in contig_to_bins.get(contig, []):
-            aa_counter_per_bin[bin_key].update(counter)
-
-    # --- Build rows ---
     rows = []
-    for key in bin_keys:
-        row = {
-            "Name": key,
-            "CDS": cds_per_bin.get(key, 0),
-            "AALength": aa_len_per_bin.get(key, 0),
-        }
-        row.update(aa_counter_per_bin.get(key, {}))
+    for i, contigs in enumerate(contig_sets):
+        cds = 0
+        aa_length = 0
+        aa_counter = Counter()
+        for contig in contigs:
+            cds += contig_to_cds_count.get(contig, 0)
+            aa_length += contig_to_aa_length.get(contig, 0)
+            counter = contig_to_aa_counter.get(contig)
+            if counter:
+                aa_counter.update(counter)
+        row = {"Name": i, "CDS": cds, "AALength": aa_length}
+        row.update(aa_counter)
         rows.append(row)
 
-    # --- Construct DataFrame directly ---
     metadata_df = pd.DataFrame(rows).fillna(0)
 
     # Ensure column order
@@ -142,37 +131,40 @@ def get_bins_metadata_df(
 
 
 def get_diamond_feature_per_bin_df(
-    bins: list[Bin], contig_to_kegg_counter: dict[str, Counter]
+    contig_sets: Sequence[BitMap],
+    contig_to_kegg_counter: dict[int, Counter],
+    kegg_calc: keggData.KeggCalculator | None = None,
 ) -> tuple[pd.DataFrame, int]:
     """
-    Optimized: Generate a DataFrame containing Diamond feature counts per bin,
+    Generate a DataFrame containing Diamond feature counts per contig set,
     including KEGG KO counts and completeness information for pathways, categories, and modules.
-    Handles contigs that may belong to multiple bins.
+
+    :param contig_sets: Contig sets (one per bin) to describe.
+    :param contig_to_kegg_counter: KO counts per contig.
+    :param kegg_calc: KeggCalculator to reuse (one is created when not given).
+
+    :return: DataFrame with one row per contig set, indexed by the position of the
+        contig set in ``contig_sets``, and the number of default KOs.
     """
-    KeggCalc = keggData.KeggCalculator()
-    defaultKOs = KeggCalc.return_default_values_from_category("KO_Genes")
-    bin_keys = [b.contigs_key for b in bins]
+    if kegg_calc is None:
+        kegg_calc = keggData.KeggCalculator()
+    defaultKOs = kegg_calc.return_default_values_from_category("KO_Genes")
+    row_ids = range(len(contig_sets))
 
-    # --- Build contig → bins mapping ---
-    contig_to_bins = defaultdict(list)
-    for b in bins:
-        for c in b.contigs:
-            contig_to_bins[c].append(b.contigs_key)
-
-    # --- Aggregate KO counters per bin ---
-    bin_to_ko_counter = {}
-    for bin_obj in bins:
-        bin_ko_counter = Counter()
-        for contig in bin_obj.contigs:
-            ko_counter = contig_to_kegg_counter.get(contig)
-            if ko_counter:
-                bin_ko_counter.update(ko_counter)
-        bin_to_ko_counter[bin_obj.contigs_key] = bin_ko_counter
+    # --- Aggregate KO counters per contig set ---
+    row_to_ko_counter = {}
+    for i, contigs in enumerate(contig_sets):
+        ko_counter = Counter()
+        for contig in contigs:
+            contig_ko_counter = contig_to_kegg_counter.get(contig)
+            if contig_ko_counter:
+                ko_counter.update(contig_ko_counter)
+        row_to_ko_counter[i] = ko_counter
 
     # --- Build KO count DataFrame directly ---
     ko_count_per_bin_df = (
-        pd.DataFrame.from_dict(bin_to_ko_counter, orient="index")
-        .reindex(bin_keys)  # keep bin order
+        pd.DataFrame.from_dict(row_to_ko_counter, orient="index")
+        .reindex(row_ids)  # keep input order
         .fillna(0)
         .astype(int)
     )
@@ -182,15 +174,14 @@ def get_diamond_feature_per_bin_df(
         columns=list(defaultKOs), fill_value=0
     )
 
-    # ko_count_per_bin_df.index.name = "Name"
     ko_count_per_bin_df["Name"] = ko_count_per_bin_df.index
 
     # --- Calculate higher-level completeness ---
     logger.debug("Calculating completeness of pathways, categories, and modules")
-    KO_pathways = calculate_KO_group(KeggCalc, "KO_Pathways", ko_count_per_bin_df)
-    KO_categories = calculate_KO_group(KeggCalc, "KO_Categories", ko_count_per_bin_df)
+    KO_pathways = calculate_KO_group(kegg_calc, "KO_Pathways", ko_count_per_bin_df)
+    KO_categories = calculate_KO_group(kegg_calc, "KO_Categories", ko_count_per_bin_df)
 
-    KO_modules = calculate_module_completeness(KeggCalc, ko_count_per_bin_df)
+    KO_modules = calculate_module_completeness(kegg_calc, ko_count_per_bin_df)
 
     # --- Concatenate results ---
     diamond_complete_results = pd.concat(
@@ -353,338 +344,321 @@ def add_bin_coding_density(
         bin_obj.add_coding_density(contig_to_coding_length)
 
 
+QualityScores = tuple[np.ndarray, np.ndarray, np.ndarray]
+"""Completeness, contamination and CheckM2 model chosen, one value per contig set."""
+
+
+class QualityScorer:
+    """
+    Predict completeness and contamination of contig sets with the CheckM2 models.
+
+    The models and the contig annotations are loaded once, when the scorer is created,
+    and reused for every contig set scored.
+    """
+
+    CONTIG_INFO_KEYS = (
+        "contig_to_kegg_counter",
+        "contig_to_cds_count",
+        "contig_to_aa_counter",
+        "contig_to_aa_length",
+    )
+
+    def __init__(self, contig_info: dict, threads: int = 1, batch_size: int = 500):
+        """
+        :param contig_info: Contig annotations: "contig_to_kegg_counter",
+            "contig_to_cds_count", "contig_to_aa_counter" and "contig_to_aa_length".
+        :param threads: Number of threads used by the CheckM2 models.
+        :param batch_size: Maximum number of contig sets sent to the models at once,
+            to bound the memory used by feature vectors.
+        """
+        self.contig_to_kegg_counter = contig_info["contig_to_kegg_counter"]
+        self.contig_to_cds_count = contig_info["contig_to_cds_count"]
+        self.contig_to_aa_counter = contig_info["contig_to_aa_counter"]
+        self.contig_to_aa_length = contig_info["contig_to_aa_length"]
+        self.batch_size = batch_size
+
+        self.kegg_calc = keggData.KeggCalculator()
+        self.model_processor = get_modelProcessing().modelProcessor(threads)
+        self.post_processor = get_modelPostprocessing().modelProcessor(threads)
+
+    def score(self, contig_sets: Sequence[BitMap]) -> QualityScores:
+        """
+        Score contig sets.
+
+        :param contig_sets: Contig sets (one per bin) to score.
+        :return: Completeness, contamination and CheckM2 model chosen, in input order.
+        """
+        results = [
+            self._score_batch(contig_sets[start : start + self.batch_size])
+            for start in range(0, len(contig_sets), self.batch_size)
+        ]
+        if not results:
+            empty = np.array([])
+            return empty, empty, np.array([], dtype=object)
+        completeness, contamination, models = zip(*results, strict=True)
+        return (
+            np.concatenate(completeness),
+            np.concatenate(contamination),
+            np.concatenate(models),
+        )
+
+    def _score_batch(self, contig_sets: Sequence[BitMap]) -> QualityScores:
+        """Score one batch of contig sets. This code is adapted from CheckM2."""
+        metadata_df = get_bins_metadata_df(
+            contig_sets,
+            self.contig_to_cds_count,
+            self.contig_to_aa_counter,
+            self.contig_to_aa_length,
+            self.kegg_calc,
+        )
+
+        diamond_complete_results, ko_list_length = get_diamond_feature_per_bin_df(
+            contig_sets, self.contig_to_kegg_counter, self.kegg_calc
+        )
+        diamond_complete_results = diamond_complete_results.drop(columns=["Name"])
+
+        # Both tables have one row per contig set, in input order.
+        feature_vectors = pd.concat([metadata_df, diamond_complete_results], axis=1)
+
+        vector_array = feature_vectors.iloc[:, 1:].values.astype(float)
+
+        logger.debug(
+            "Predicting completeness and contamination using the general model"
+        )
+        general_results_comp, general_results_cont = (
+            self.model_processor.run_prediction_general(vector_array)
+        )
+
+        logger.debug("Predicting completeness using the specific model")
+        specific_model_vector_len = (ko_list_length + len(metadata_df.columns)) - 1
+
+        # also retrieve scaled data for CSM calculations
+        specific_results_comp, scaled_features = (
+            self.model_processor.run_prediction_specific(
+                vector_array, specific_model_vector_len
+            )
+        )
+
+        logger.debug(
+            "Using cosine similarity to reference data to select an appropriate predictor model."
+        )
+        final_comp, final_cont, models_chosen, _ = (
+            self.post_processor.calculate_general_specific_ratio(
+                vector_array[:, 20],
+                scaled_features,
+                general_results_comp,
+                general_results_cont,
+                specific_results_comp,
+            )
+        )
+
+        return (
+            np.round(np.asarray(final_comp, dtype=float), 2),
+            np.round(np.asarray(final_cont, dtype=float), 2),
+            np.asarray(models_chosen, dtype=object),
+        )
+
+
+# Scorer of a worker process, created once by the pool initializer.
+_worker_scorer: QualityScorer | None = None
+
+# Environment variables limiting the threads of numerical libraries in worker processes:
+# each worker uses one thread, parallelism comes from the number of workers.
+_SINGLE_THREAD_ENV = {
+    var: "1"
+    for var in (
+        "OMP_NUM_THREADS",
+        "OPENBLAS_NUM_THREADS",
+        "MKL_NUM_THREADS",
+        "BLIS_NUM_THREADS",
+        "VECLIB_MAXIMUM_THREADS",
+        "NUMEXPR_NUM_THREADS",
+    )
+}
+
+
+def _init_scoring_worker(contig_info: dict, batch_size: int) -> None:
+    """Initialize a scoring worker process: load the CheckM2 models once."""
+    global _worker_scorer
+    _initialize_keras_environment()
+    _worker_scorer = QualityScorer(contig_info, threads=1, batch_size=batch_size)
+
+
+def _score_in_worker(contig_sets: Sequence[BitMap]) -> QualityScores:
+    """Score contig sets in a worker process."""
+    return _worker_scorer.score(contig_sets)
+
+
+@contextmanager
+def _single_thread_env_for_children() -> Generator[None]:
+    """Set single-thread environment variables while worker processes are started."""
+    previous = {var: os.environ.get(var) for var in _SINGLE_THREAD_ENV}
+    os.environ.update(_SINGLE_THREAD_ENV)
+    try:
+        yield
+    finally:
+        for var, value in previous.items():
+            if value is None:
+                os.environ.pop(var, None)
+            else:
+                os.environ[var] = value
+
+
+def score_contig_set_batches(
+    batches: Iterable[Sequence[BitMap]],
+    contig_info: dict,
+    threads: int,
+    batch_size: int = 500,
+    max_pending: int | None = None,
+) -> Iterator[tuple[int, QualityScores]]:
+    """
+    Score batches of contig sets in worker processes.
+
+    Each worker loads the CheckM2 models and the contig annotations once. Only contig
+    sets are sent to workers and only scores are sent back. Batches are read lazily
+    from ``batches``: at most ``max_pending`` batches are being scored at any time,
+    so a generator can feed batches without all of them being held in memory.
+
+    :param batches: Batches of contig sets to score.
+    :param contig_info: Contig annotations (see QualityScorer).
+    :param threads: Number of worker processes.
+    :param batch_size: Maximum number of contig sets sent to the models at once.
+    :param max_pending: Maximum number of batches submitted and not yet returned
+        (default: twice the number of workers).
+
+    :return: Iterator of (batch index, scores), in completion order.
+    """
+    if max_pending is None:
+        max_pending = 2 * threads
+
+    batch_iter = enumerate(batches)
+    # Workers only need the annotations used by the scorer.
+    scorer_info = {key: contig_info[key] for key in QualityScorer.CONTIG_INFO_KEYS}
+    # spawn: the parent process may have TensorFlow loaded, which is not fork-safe.
+    executor = cf.ProcessPoolExecutor(
+        max_workers=threads,
+        mp_context=multiprocessing.get_context("spawn"),
+        initializer=_init_scoring_worker,
+        initargs=(scorer_info, batch_size),
+    )
+    pending: dict[cf.Future, int] = {}
+
+    def submit_next() -> bool:
+        next_batch = next(batch_iter, None)
+        if next_batch is None:
+            return False
+        index, batch = next_batch
+        pending[executor.submit(_score_in_worker, batch)] = index
+        return True
+
+    try:
+        # Worker processes are started by the first submissions (one per submission
+        # until all are started): they inherit single-thread settings, the parent
+        # process keeps its own.
+        with _single_thread_env_for_children():
+            while len(pending) < max_pending and submit_next():
+                pass
+
+        while pending:
+            done, _ = cf.wait(pending, return_when=cf.FIRST_COMPLETED)
+            for future in done:
+                index = pending.pop(future)
+                yield index, future.result()
+                submit_next()
+    except BaseException:
+        # On error (or if the caller stops early), don't score the queued batches.
+        executor.shutdown(wait=True, cancel_futures=True)
+        raise
+    executor.shutdown(wait=True)
+
+
 def add_bin_metrics(
-    bins: list[Bin],
+    bins: Iterable[Bin],
     contig_info: dict,
     contamination_weight: float,
     threads: int = 1,
     checkm2_batch_size: int = 500,
     disable_progress_bar: bool = False,
-):
+    task_size: int | None = None,
+    min_bins_for_parallel: int = 6000,
+    min_bins_per_worker: int = 3000,
+) -> list[Bin]:
     """
-    Add metrics to a Set of bins.
+    Add completeness, contamination, score and CheckM2 model to bins.
 
-    :param bins: Set of bin objects.
-    :param contig_info: Dictionary containing contig information.
-    :param contamination_weight: Weight for contamination assessment.
-    :param threads: Number of threads for parallel processing (default is 1).
-                    If threads=1, all processing happens sequentially using one thread.
-                    If threads>1, processing is parallelized across multiple processes.
-                    The number of parallel workers will be approximately equal to threads.
-    :param checkm2_batch_size: Maximum number of bins to send to CheckM2 at once within each process
-                              to control memory usage. This creates sub-batches
-                              within each worker to manage CheckM2's memory consumption.
+    Bins are updated in place.
+
+    :param bins: Bins to assess.
+    :param contig_info: Contig annotations (see QualityScorer).
+    :param contamination_weight: Weight of contamination in the bin score.
+    :param threads: Number of threads. With more than one thread and more than
+        ``min_bins_for_parallel`` bins, bins are scored in up to ``threads`` worker
+        processes.
+    :param checkm2_batch_size: Maximum number of bins sent to the CheckM2 models at once,
+        to bound the memory used by feature vectors.
     :param disable_progress_bar: Disable the progress bar if True.
+    :param task_size: Number of bins sent to a worker process at once. By default,
+        about 4 tasks per worker, between 500 and 2000 bins each, to balance the load.
+    :param min_bins_for_parallel: Below this number of bins, bins are scored in the
+        main process, avoiding the cost of starting worker processes.
+    :param min_bins_per_worker: Each worker process gets at least this many bins:
+        a worker loads its own copy of the CheckM2 models, which costs memory and
+        start-up time, so few bins are scored with fewer workers.
 
-    :return: List of processed bin objects with quality metrics added.
+    :return: The bins, with quality metrics.
     """
-    if not bins:
+    bins_list = list(bins)
+    if not bins_list:
         logger.warning("No bins provided for quality assessment")
         return []
-
-    bins_list = list(bins)
 
     logger.info(
         f"Assessing bin quality for {len(bins_list)} bins using {threads} threads"
     )
 
-    # Extract data from contig_info
-    contig_to_kegg_counter = contig_info["contig_to_kegg_counter"]
-    contig_to_cds_count = contig_info["contig_to_cds_count"]
-    contig_to_aa_counter = contig_info["contig_to_aa_counter"]
-    contig_to_aa_length = contig_info["contig_to_aa_length"]
+    contig_sets = [bin_obj.contigs for bin_obj in bins_list]
 
-    def _process_sequential():
-        """Helper function for sequential processing"""
-        modelPostprocessing = get_modelPostprocessing()
-        postProcessor = modelPostprocessing.modelProcessor(threads)
-        return assess_bins_quality(
-            bins=bins_list,
-            contig_to_kegg_counter=contig_to_kegg_counter,
-            contig_to_cds_count=contig_to_cds_count,
-            contig_to_aa_counter=contig_to_aa_counter,
-            contig_to_aa_length=contig_to_aa_length,
-            contamination_weight=contamination_weight,
-            postProcessor=postProcessor,
-            threads=threads,
-            checkm2_batch_size=checkm2_batch_size,
-        )
+    def assign(start: int, scores: QualityScores) -> None:
+        for bin_obj, completeness, contamination, model in zip(
+            bins_list[start : start + len(scores[0])], *scores, strict=True
+        ):
+            bin_obj.add_quality(completeness, contamination, contamination_weight)
+            bin_obj.add_model(model)
 
-    min_bins_per_chunk = checkm2_batch_size * 6
-
-    if threads == 1 or len(bins_list) <= min_bins_per_chunk * 2:
-        if len(bins_list) <= min_bins_per_chunk:
-            logger.info(
-                f"Only {len(bins_list)} bins (≤ {min_bins_per_chunk}). Using sequential processing to avoid multiprocessing overhead."
-            )
-        return _process_sequential()
-
-    # For parallel processing, use joblib
-    # Calculate number of chunks ensuring each chunk has sufficient work
-    max_possible_chunks = len(bins_list) // min_bins_per_chunk
-    n_chunks = max(1, min(threads * 2, max_possible_chunks))
-
-    n_jobs = min(threads, n_chunks)
-    # Use balanced chunking to distribute work evenly across available threads
-    chunks_list = balanced_chunks(bins_list, n_chunks)
-
-    logger.info(
-        f"Created {len(chunks_list)} balanced chunks for {n_jobs} parallel jobs"
-    )
-    logger.info(
-        f"Configuration: {len(bins_list)} bins, {threads} threads, {n_chunks} chunks, batch_size={checkm2_batch_size}"
-    )
-    for idx, chunk in enumerate(chunks_list):
-        logger.debug(f"Chunk {idx + 1}/{len(chunks_list)} contains {len(chunk)} bins")
-
-    # Define a simple function to process a chunk
-    def process_chunk(chunk_bins):
-        # Initialize TensorFlow/Keras environment for this subprocess
-        _initialize_keras_environment()
-
-        # Determine optimal thread count for this worker
-        # For best efficiency, we allocate a portion of total threads to each worker
-        # Math.ceil(total_threads / n_jobs) would be most aggressive
-        # But we use 1 thread per worker as the default to avoid oversubscription
-        worker_threads = max(
-            1, threads // (2 * n_jobs)
-        )  # Conservative thread allocation
-
-        # Create local processor instance
-        modelPostprocessing = get_modelPostprocessing()
-        local_postProcessor = modelPostprocessing.modelProcessor(worker_threads)
-
-        # Process bins with nested chunking for memory management
-        return assess_bins_quality(
-            bins=chunk_bins,
-            contig_to_kegg_counter=contig_to_kegg_counter,
-            contig_to_cds_count=contig_to_cds_count,
-            contig_to_aa_counter=contig_to_aa_counter,
-            contig_to_aa_length=contig_to_aa_length,
-            contamination_weight=contamination_weight,
-            postProcessor=local_postProcessor,
-            threads=worker_threads,  # Use allocated threads in each worker
-            checkm2_batch_size=checkm2_batch_size,
-        )
-
-    # Process chunks in parallel using joblib
     with Progress(disable=disable_progress_bar) as progress:
         task = progress.add_task("Assessing bin quality", total=len(bins_list))
 
-        # Use joblib for parallelization
-        results = joblib.Parallel(n_jobs=n_jobs)(
-            joblib.delayed(process_chunk)(chunk) for chunk in chunks_list
-        )
+        if threads == 1 or len(bins_list) <= min_bins_for_parallel:
+            logger.debug(f"Scoring {len(bins_list)} bins in the main process")
+            scorer = QualityScorer(
+                contig_info, threads=threads, batch_size=checkm2_batch_size
+            )
+            task_size = task_size or 2000
+            for start in range(0, len(contig_sets), task_size):
+                scores = scorer.score(contig_sets[start : start + task_size])
+                assign(start, scores)
+                progress.update(task, advance=len(scores[0]))
+        else:
+            n_workers = max(1, min(threads, len(contig_sets) // min_bins_per_worker))
+            if task_size is None:
+                task_size = min(2000, max(500, len(contig_sets) // (4 * n_workers)))
+            logger.debug(
+                f"Scoring {len(bins_list)} bins in {n_workers} worker processes, "
+                f"{task_size} bins per task"
+            )
+            starts = range(0, len(contig_sets), task_size)
+            batches = (contig_sets[start : start + task_size] for start in starts)
+            # closing: on error, queued batches are cancelled right away.
+            with closing(
+                score_contig_set_batches(
+                    batches, contig_info, n_workers, batch_size=checkm2_batch_size
+                )
+            ) as results:
+                for index, scores in results:
+                    assign(starts[index], scores)
+                    progress.update(task, advance=len(scores[0]))
 
-        # Combine results
-        all_bins = []
-        for chunk_result in results:
-            all_bins.extend(chunk_result)
-            progress.update(task, advance=len(chunk_result))
-
-        return all_bins
-
-
-def chunks(iterable, size: int) -> Iterator[tuple]:
-    """
-    Generate adjacent chunks of data from an iterable.
-
-    :param iterable: The iterable to be divided into chunks.
-    :param size: The size of each chunk.
-    :return: An iterator that produces tuples of elements in chunks.
-    """
-    it = iter(iterable)
-    return iter(lambda: tuple(islice(it, size)), ())
-
-
-def balanced_chunks(items: list, num_chunks: int) -> list[list]:
-    """
-    Distribute items into balanced chunks with more even size distribution.
-
-    :param items: List of items to chunk.
-    :param num_chunks: Number of chunks to create.
-    :return: List of chunks with balanced sizes.
-    """
-    if num_chunks <= 0:
-        return [items]
-    if num_chunks >= len(items):
-        return [[item] for item in items]
-
-    # Calculate base size and remainder
-    base_size = len(items) // num_chunks
-    remainder = len(items) % num_chunks
-
-    chunks_list = []
-    start_idx = 0
-
-    for i in range(num_chunks):
-        # Some chunks get an extra item to distribute the remainder
-        chunk_size = base_size + (1 if i < remainder else 0)
-        chunk = items[start_idx : start_idx + chunk_size]
-        if chunk:  # Only add non-empty chunks
-            chunks_list.append(chunk)
-        start_idx += chunk_size
-
-    return chunks_list
-
-
-def assess_bins_quality(
-    bins: Iterable[Bin],
-    contig_to_kegg_counter: dict,
-    contig_to_cds_count: dict,
-    contig_to_aa_counter: dict,
-    contig_to_aa_length: dict,
-    contamination_weight: float,
-    checkm2_batch_size: int,
-    postProcessor=None,
-    threads: int = 1,
-):
-    """
-    Assess the quality of bins.
-
-    This function assesses the quality of bins based on various criteria and assigns completeness and contamination scores.
-    This code is taken from checkm2 and adjusted
-
-    :param bins: List of bin objects.
-    :param contig_to_kegg_counter: Dictionary mapping contig names to KEGG counters.
-    :param contig_to_cds_count: Dictionary mapping contig names to CDS counts.
-    :param contig_to_aa_counter: Dictionary mapping contig names to amino acid counters.
-    :param contig_to_aa_length: Dictionary mapping contig names to amino acid lengths.
-    :param contamination_weight: Weight for contamination assessment.
-    :param postProcessor: A post-processor from checkm2
-    :param threads: Number of threads for parallel processing (default is 1).
-    :param checkm2_batch_size: Maximum number of bins to process in a single CheckM2 call.
-    """
-    if postProcessor is None:
-        modelPostprocessing = get_modelPostprocessing()
-        postProcessor = modelPostprocessing.modelProcessor(threads)
-
-    bins_list = list(bins)
-
-    # If we have fewer bins than the batch size, process them all at once
-    if len(bins_list) <= checkm2_batch_size:
-        return _assess_bins_quality_batch(
-            bins_list,
-            contig_to_kegg_counter,
-            contig_to_cds_count,
-            contig_to_aa_counter,
-            contig_to_aa_length,
-            contamination_weight,
-            postProcessor,
-            threads,
-        )
-
-    # Split bins into smaller batches for memory management
-    logger.debug(
-        f"Splitting {len(bins_list)} bins into batches of {checkm2_batch_size} for CheckM2 processing"
-    )
-
-    all_processed_bins = []
-    batch_chunks = list(chunks(bins_list, checkm2_batch_size))
-
-    for i, batch_bins in enumerate(batch_chunks):
-        logger.debug(
-            f"Processing CheckM2 batch {i + 1}/{len(batch_chunks)} with {len(batch_bins)} bins"
-        )
-
-        # Process this batch
-        processed_batch = _assess_bins_quality_batch(
-            batch_bins,
-            contig_to_kegg_counter,
-            contig_to_cds_count,
-            contig_to_aa_counter,
-            contig_to_aa_length,
-            contamination_weight,
-            postProcessor,
-            threads,
-        )
-
-        all_processed_bins.extend(processed_batch)
-
-        # Force garbage collection between batches to free memory
-        gc.collect()
-
-    return all_processed_bins
-
-
-def _assess_bins_quality_batch(
-    bins: list[Bin],
-    contig_to_kegg_counter: dict,
-    contig_to_cds_count: dict,
-    contig_to_aa_counter: dict,
-    contig_to_aa_length: dict,
-    contamination_weight: float,
-    postProcessor,
-    threads: int,
-):
-    """
-    Assess the quality of a batch of bins (internal function).
-
-    This function processes a single batch of bins through CheckM2.
-    It's called by assess_bins_quality for each batch when memory management is needed.
-    """
-
-    metadata_df = get_bins_metadata_df(
-        bins, contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length
-    )
-
-    diamond_complete_results, ko_list_length = get_diamond_feature_per_bin_df(
-        bins, contig_to_kegg_counter
-    )
-    diamond_complete_results = diamond_complete_results.drop(columns=["Name"])
-
-    feature_vectors = pd.concat([metadata_df, diamond_complete_results], axis=1)
-    feature_vectors = feature_vectors.sort_values(by="Name")
-
-    # Create mapping from bin name to bin object for easy lookup
-    bin_name_to_bin = {bin_obj.contigs_key: bin_obj for bin_obj in bins}
-
-    # 4: Call general model & specific models and derive predictions"""
-    modelProcessing = get_modelProcessing()
-    modelProc = modelProcessing.modelProcessor(threads)
-
-    vector_array = feature_vectors.iloc[:, 1:].values.astype(float)
-
-    logger.debug("Predicting completeness and contamination using the general model")
-    general_results_comp, general_results_cont = modelProc.run_prediction_general(
-        vector_array
-    )
-
-    logger.debug("Predicting completeness using the specific model")
-    specific_model_vector_len = (ko_list_length + len(metadata_df.columns)) - 1
-
-    # also retrieve scaled data for CSM calculations
-    specific_results_comp, scaled_features = modelProc.run_prediction_specific(
-        vector_array, specific_model_vector_len
-    )
-
-    logger.debug(
-        "Using cosine similarity to reference data to select an appropriate predictor model."
-    )
-
-    final_comp, final_cont, models_chosen, csm_array = (
-        postProcessor.calculate_general_specific_ratio(
-            vector_array[:, 20],
-            scaled_features,
-            general_results_comp,
-            general_results_cont,
-            specific_results_comp,
-        )
-    )
-
-    # Directly iterate through results arrays and lookup corresponding bins
-    for bin_name, completeness, contamination, chosen_model in zip(
-        feature_vectors["Name"],
-        np.round(final_comp, 2),
-        np.round(final_cont, 2),
-        models_chosen,
-        strict=True,
-    ):
-        bin_obj = bin_name_to_bin[bin_name]
-        bin_obj.add_quality(completeness, contamination, contamination_weight)
-        bin_obj.add_model(chosen_model)
-
-    return bins
+    return bins_list
 
 
 def log_selected_bin_info(
