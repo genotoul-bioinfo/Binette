@@ -614,14 +614,27 @@ def create_and_assess_intermediate_bins(
 
     logger.info(f"Assessing quality for {len(contig_key_to_new_bin)} intermediate bins")
 
-    new_bins = bin_quality.add_bin_metrics(
+    # Bins are updated in place.
+    bin_quality.add_bin_metrics(
         bins=contig_key_to_new_bin.values(),
         contig_info=contig_metadata,
         contamination_weight=config.contamination_weight,
         threads=config.threads,
         disable_progress_bar=not config.show_progress,
     )
-    contig_key_to_new_bin = {b.contigs_key: b for b in new_bins}
+
+    # Only bins passing the completeness and contamination thresholds can be selected:
+    # drop the others now to free memory.
+    contig_key_to_new_bin = {
+        key: b
+        for key, b in contig_key_to_new_bin.items()
+        if b.is_high_quality(config.min_completeness, config.max_contamination)
+    }
+    logger.info(
+        f"{len(contig_key_to_new_bin)} intermediate bins with completeness >= "
+        f"{config.min_completeness} and contamination <= {config.max_contamination} "
+        "kept for bin selection"
+    )
 
     contig_key_to_all_bin = contig_key_to_original_bin | contig_key_to_new_bin
 
@@ -630,7 +643,10 @@ def create_and_assess_intermediate_bins(
     )
 
     if config.debug:
-        logger.info(f"Writing all bins to '{paths.all_bin_compo_file}'")
+        logger.info(
+            "Writing input bins and selectable intermediate bins to "
+            f"'{paths.all_bin_compo_file}'"
+        )
         io.write_bin_info(
             contig_key_to_all_bin.values(), paths.all_bin_compo_file, add_contigs=True
         )
