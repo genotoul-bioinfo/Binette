@@ -13,5 +13,6 @@ dependencies:
   - pyfastx>=2,<3
   - pyrodigal>=3,<4
   - pyroaring>=1.0,<2.0
+  - scipy>=1.8,<2
   - typer>=0.9.0,<1.0.0
   - rich>=12.0.0,<16.0.0
