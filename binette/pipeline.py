@@ -602,39 +602,26 @@ def create_and_assess_intermediate_bins(
 
     contig_lengths = bin_quality.prepare_contig_sizes(inputs.contig_to_length)
 
-    contig_key_to_new_bin = bin_manager.create_intermediate_bins(
+    # Intermediate bins are scored as they are created, and only those that can be
+    # selected are kept: memory depends on the number of bins kept.
+    contig_sets = bin_manager.iter_intermediate_contig_sets(
         contig_key_to_original_bin,
         contig_lengths=contig_lengths,
         min_comp=config.min_completeness,
         max_conta=config.max_contamination,
         min_len=config.min_length,
         max_len=config.max_length,
-        disable_progress_bar=not config.show_progress,
     )
-
-    logger.info(f"Assessing quality for {len(contig_key_to_new_bin)} intermediate bins")
-
-    # Bins are updated in place.
-    bin_quality.add_bin_metrics(
-        bins=contig_key_to_new_bin.values(),
+    new_bins = bin_quality.assess_and_keep_selectable_bins(
+        contig_sets,
         contig_info=contig_metadata,
         contamination_weight=config.contamination_weight,
+        min_completeness=config.min_completeness,
+        max_contamination=config.max_contamination,
         threads=config.threads,
         disable_progress_bar=not config.show_progress,
     )
-
-    # Only bins passing the completeness and contamination thresholds can be selected:
-    # drop the others now to free memory.
-    contig_key_to_new_bin = {
-        key: b
-        for key, b in contig_key_to_new_bin.items()
-        if b.is_high_quality(config.min_completeness, config.max_contamination)
-    }
-    logger.info(
-        f"{len(contig_key_to_new_bin)} intermediate bins with completeness >= "
-        f"{config.min_completeness} and contamination <= {config.max_contamination} "
-        "kept for bin selection"
-    )
+    contig_key_to_new_bin = {b.contigs_key: b for b in new_bins}
 
     contig_key_to_all_bin = contig_key_to_original_bin | contig_key_to_new_bin
 
