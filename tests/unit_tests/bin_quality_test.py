@@ -259,6 +259,68 @@ def test_add_bin_metrics_parallel_path_matches_sequential_path():
         )
 
 
+def test_assess_and_keep_selectable_bins_keeps_only_selectable_bins():
+    contig_sets = (BitMap((i,)) for i in range(25))  # a generator, read lazily
+
+    with patch("binette.bin_quality.QualityScorer", FakeScorer):
+        kept = bin_quality.assess_and_keep_selectable_bins(
+            contig_sets,
+            contig_info={},
+            contamination_weight=2,
+            min_completeness=10,
+            max_contamination=2,
+            threads=1,
+            disable_progress_bar=True,
+            task_size=4,
+        )
+
+    # completeness = i, contamination = i / 10
+    assert [b.contigs for b in kept] == [BitMap((i,)) for i in range(10, 21)]
+    for bin_obj in kept:
+        i = bin_obj.contigs.min()
+        assert (bin_obj.completeness, bin_obj.contamination) == (i, i / 10)
+        assert bin_obj.checkm2_model == Bin.CHECKM2_MODELS[i % 2]
+        assert not bin_obj.is_original
+
+
+def test_assess_and_keep_selectable_bins_streams_to_worker_processes():
+    """More contig sets than read ahead: scored by workers as they are read."""
+    contig_info = make_contig_info(300)
+    contig_sets = make_contig_sets(90, 300)
+
+    sequential = bin_quality.add_bin_metrics(
+        [Bin(c) for c in contig_sets],
+        contig_info,
+        contamination_weight=2,
+        threads=1,
+        disable_progress_bar=True,
+    )
+    streamed = bin_quality.assess_and_keep_selectable_bins(
+        iter(contig_sets),
+        contig_info,
+        contamination_weight=2,
+        min_completeness=0,
+        max_contamination=100,  # keep all bins
+        threads=2,
+        disable_progress_bar=True,
+        task_size=20,
+        min_bins_for_parallel=0,
+        min_bins_per_worker=10,  # read ahead 20 contig sets only
+    )
+
+    # Bins come back in batch completion order.
+    streamed_by_contigs = {b.contigs_key: b for b in streamed}
+    assert len(streamed_by_contigs) == len(sequential)
+    for s in sequential:
+        p = streamed_by_contigs[s.contigs_key]
+        assert (s.completeness, s.contamination, s.score, s.checkm2_model) == (
+            p.completeness,
+            p.contamination,
+            p.score,
+            p.checkm2_model,
+        )
+
+
 def test_add_bin_metrics_empty_bins():
     result_bins = bin_quality.add_bin_metrics(
         bins=[],
