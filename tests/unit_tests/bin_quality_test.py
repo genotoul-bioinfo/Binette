@@ -1,9 +1,12 @@
 import logging
 from collections import Counter
+from collections.abc import Sequence
 from unittest.mock import patch
 
 import numpy as np
+import pandas as pd
 import pytest
+from checkm2 import keggData
 from pyroaring import BitMap
 
 from binette import bin_quality
@@ -36,89 +39,294 @@ class BinOLD:
         self.score = comp - weight * cont
 
 
-def test_get_bins_metadata_df():
-    # Mock input data
+def test_feature_builder_metadata():
     contig_sets = [BitMap((1, 3)), BitMap((2,))]
-
-    contig_to_cds_count = {1: 10, 2: 45, 3: 20, 4: 25}
-    contig_to_aa_counter = {
-        1: Counter({"A": 5, "D": 10}),
-        2: Counter({"G": 8, "V": 12, "T": 2}),
-        3: Counter({"D": 8, "Y": 12}),
-    }
-    contig_to_aa_length = {
-        1: 1000,
-        2: 1500,
-        3: 2000,
-        4: 2500,
+    contig_info = {
+        "contig_to_kegg_counter": {},
+        "contig_to_cds_count": {1: 10, 2: 45, 3: 20, 4: 25},
+        "contig_to_aa_counter": {
+            1: Counter({"A": 5, "D": 10}),
+            2: Counter({"G": 8, "V": 12, "T": 2}),
+            3: Counter({"D": 8, "Y": 12}),
+        },
+        "contig_to_aa_length": {1: 1000, 2: 1500, 3: 2000, 4: 2500},
     }
 
-    # Call the function
-    result_df = bin_quality.get_bins_metadata_df(
-        contig_sets, contig_to_cds_count, contig_to_aa_counter, contig_to_aa_length
-    )
+    builder = bin_quality.FeatureBuilder(contig_info, keggData.KeggCalculator())
+    features = builder.build(contig_sets)
 
-    # Define expected values based on the provided input
-    expected_columns = [
-        "Name",
-        "A",
-        "C",
-        "D",
-        "E",
-        "F",
-        "G",
-        "H",
-        "I",
-        "K",
-        "L",
-        "M",
-        "N",
-        "P",
-        "Q",
-        "R",
-        "S",
-        "T",
-        "V",
-        "W",
-        "Y",
-        "AALength",
-        "CDS",
+    n_metadata = len(builder.metadata_names)
+    assert builder.metadata_names == list("ACDEFGHIKLMNPQRSTVWY") + ["AALength", "CDS"]
+    assert features[:, :n_metadata].tolist() == [
+        [5, 0, 18, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 3000, 30],
+        [0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 12, 0, 0, 1500, 45],
     ]
 
-    expected_values = [
-        ["NA", 5, 0, 18, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 3000, 30],
-        ["NA", 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 12, 0, 0, 1500, 45],
-    ]
 
-    result_df["Name"] = "NA"
-    result_df.index = range(len(result_df))
-    print(result_df)
-    # Check if the generated DataFrame matches the expected DataFrame
-    assert result_df.columns.tolist() == expected_columns
-    assert result_df.values.tolist() == expected_values
-
-
-def test_get_diamond_feature_per_bin_df():
-    # Mock input data
+def test_feature_builder_ko_counts():
     contig_sets = [BitMap((1, 2)), BitMap((2, 3))]
-
-    contig_to_kegg_counter = {
-        1: Counter({"K01810": 5, "K15916": 7}),
-        2: Counter({"K01810": 10}),
-        3: Counter({"K00918": 8}),
+    contig_info = {
+        "contig_to_kegg_counter": {
+            1: Counter({"K01810": 5, "K15916": 7}),
+            2: Counter({"K01810": 10}),
+            3: Counter({"K00918": 8}),
+        },
+        "contig_to_cds_count": {},
+        "contig_to_aa_counter": {},
+        "contig_to_aa_length": {},
     }
 
-    # Call the function
-    result_df, default_ko_count = bin_quality.get_diamond_feature_per_bin_df(
-        contig_sets, contig_to_kegg_counter
+    builder = bin_quality.FeatureBuilder(contig_info, keggData.KeggCalculator())
+    features = builder.build(contig_sets)
+    column = {name: i for i, name in enumerate(builder.feature_names)}
+
+    assert features.shape == (2, len(builder.feature_names))
+    assert features[0, column["K01810"]] == 15  # in set 0 from contig 1 and 2
+    assert features[0, column["K15916"]] == 7  # in set 0 from contig 1
+    assert features[1, column["K01810"]] == 10  # in set 1 from contig 2
+    assert features[1, column["K00918"]] == 8  # in set 1 from contig 3
+
+
+# Feature building of Binette <= 1.3 (pandas, one contig at a time), kept as the
+# reference that FeatureBuilder must match exactly.
+
+
+def get_bins_metadata_df(
+    contig_sets: Sequence[BitMap],
+    contig_to_cds_count: dict[int, int],
+    contig_to_aa_counter: dict[int, Counter],
+    contig_to_aa_length: dict[int, int],
+    kegg_calc: keggData.KeggCalculator | None = None,
+) -> pd.DataFrame:
+    """
+    Generate a DataFrame containing metadata (CDS count, amino acid length and
+    composition) for a list of contig sets.
+
+    :param contig_sets: Contig sets (one per bin) to describe.
+    :param contig_to_cds_count: Number of CDS per contig.
+    :param contig_to_aa_counter: Amino acid composition per contig.
+    :param contig_to_aa_length: Total amino acid length per contig.
+    :param kegg_calc: KeggCalculator to reuse (one is created when not given).
+
+    :return: DataFrame with one row per contig set, in input order. The "Name" column
+        and the index hold the position of the contig set in ``contig_sets``.
+    """
+    if kegg_calc is None:
+        kegg_calc = keggData.KeggCalculator()
+    metadata_order = kegg_calc.return_proper_order("Metadata")
+
+    rows = []
+    for i, contigs in enumerate(contig_sets):
+        cds = 0
+        aa_length = 0
+        aa_counter = Counter()
+        for contig in contigs:
+            cds += contig_to_cds_count.get(contig, 0)
+            aa_length += contig_to_aa_length.get(contig, 0)
+            counter = contig_to_aa_counter.get(contig)
+            if counter:
+                aa_counter.update(counter)
+        row = {"Name": i, "CDS": cds, "AALength": aa_length}
+        row.update(aa_counter)
+        rows.append(row)
+
+    metadata_df = pd.DataFrame(rows).fillna(0)
+
+    # Ensure column order
+    all_cols = ["Name"] + metadata_order
+    for col in metadata_order:
+        if col not in metadata_df.columns:
+            metadata_df[col] = 0
+
+    metadata_df = metadata_df[all_cols].astype(dict.fromkeys(metadata_order, int))
+    metadata_df = metadata_df.set_index("Name", drop=False)
+
+    return metadata_df
+
+
+def get_diamond_feature_per_bin_df(
+    contig_sets: Sequence[BitMap],
+    contig_to_kegg_counter: dict[int, Counter],
+    kegg_calc: keggData.KeggCalculator | None = None,
+) -> tuple[pd.DataFrame, int]:
+    """
+    Generate a DataFrame containing Diamond feature counts per contig set,
+    including KEGG KO counts and completeness information for pathways, categories, and modules.
+
+    :param contig_sets: Contig sets (one per bin) to describe.
+    :param contig_to_kegg_counter: KO counts per contig.
+    :param kegg_calc: KeggCalculator to reuse (one is created when not given).
+
+    :return: DataFrame with one row per contig set, indexed by the position of the
+        contig set in ``contig_sets``, and the number of default KOs.
+    """
+    if kegg_calc is None:
+        kegg_calc = keggData.KeggCalculator()
+    defaultKOs = kegg_calc.return_default_values_from_category("KO_Genes")
+    row_ids = range(len(contig_sets))
+
+    # --- Aggregate KO counters per contig set ---
+    row_to_ko_counter = {}
+    for i, contigs in enumerate(contig_sets):
+        ko_counter = Counter()
+        for contig in contigs:
+            contig_ko_counter = contig_to_kegg_counter.get(contig)
+            if contig_ko_counter:
+                ko_counter.update(contig_ko_counter)
+        row_to_ko_counter[i] = ko_counter
+
+    # --- Build KO count DataFrame directly ---
+    ko_count_per_bin_df = (
+        pd.DataFrame.from_dict(row_to_ko_counter, orient="index")
+        .reindex(row_ids)  # keep input order
+        .fillna(0)
+        .astype(int)
     )
 
-    # rows are indexed by the position of the contig set
-    assert result_df.index.tolist() == [0, 1]
-    assert result_df.loc[0, "K01810"] == 15  # in set 0 from contig 1 and 2
-    assert result_df.loc[0, "K15916"] == 7  # in set 0 from contig 1
-    assert result_df.loc[1, "K01810"] == 10  # in set 1 from contig 2
-    assert result_df.loc[1, "K00918"] == 8  # in set 1 from contig 3
+    # Ensure all defaultKOs exist
+    ko_count_per_bin_df = ko_count_per_bin_df.reindex(
+        columns=list(defaultKOs), fill_value=0
+    )
+
+    ko_count_per_bin_df["Name"] = ko_count_per_bin_df.index
+
+    # --- Calculate higher-level completeness ---
+    KO_pathways = calculate_KO_group(kegg_calc, "KO_Pathways", ko_count_per_bin_df)
+    KO_categories = calculate_KO_group(kegg_calc, "KO_Categories", ko_count_per_bin_df)
+
+    KO_modules = calculate_module_completeness(kegg_calc, ko_count_per_bin_df)
+
+    # --- Concatenate results ---
+    diamond_complete_results = pd.concat(
+        [ko_count_per_bin_df, KO_pathways, KO_modules, KO_categories], axis=1
+    )
+
+    return diamond_complete_results, len(defaultKOs)
+
+
+def calculate_KO_group(
+    KeggCalc: keggData.KeggCalculator, group: str, KO_gene_data: pd.DataFrame
+) -> pd.DataFrame:
+    """
+    Calculate the completeness of KEGG feature groups per bin.
+
+    :param KeggCalc: An instance of KeggCalculator containing KEGG mappings.
+    :param group: Feature group name (e.g., "KO_Pathways", "KO_Categories").
+    :param KO_gene_data: DataFrame containing KO counts per bin with last column "Name".
+
+    :return: DataFrame with completeness values for each feature vector in the group.
+    """
+
+    # last column is 'Name'
+    data = KO_gene_data.drop(columns=["Name"]).values
+    n_bins = data.shape[0]
+
+    # Build output DataFrame
+    ordered_entries = KeggCalc.return_default_values_from_category(group)
+    feature_vectors = list(ordered_entries.keys())
+    n_features = len(feature_vectors)
+
+    # Create empty numpy array for results
+    result = np.zeros((n_bins, n_features), dtype=float)
+
+    # Map Kegg_IDs to column indices in KO_gene_data
+    col_map = {ko: idx for idx, ko in enumerate(KO_gene_data.columns[:-1])}
+
+    for f_idx, vector in enumerate(feature_vectors):
+        # KOs belonging to this feature vector
+        kegg_ids = KeggCalc.path_category_mapping.loc[
+            KeggCalc.path_category_mapping[group] == vector, "Kegg_ID"
+        ].values
+
+        # Only keep KOs present in DataFrame columns
+        present_cols = [col_map[ko] for ko in kegg_ids if ko in col_map]
+        if not present_cols:
+            continue
+
+        # Presence/absence: values >1 -> 1
+        vals = data[:, present_cols]
+        vals[vals > 1] = 1
+        result[:, f_idx] = vals.sum(axis=1) / len(kegg_ids)
+
+    return pd.DataFrame(result, columns=feature_vectors, index=KO_gene_data.index)
+
+
+def calculate_module_completeness(
+    KeggCalc: keggData.KeggCalculator, KO_gene_data: pd.DataFrame
+) -> pd.DataFrame:
+    """
+    Compute module completeness per bin using NumPy for speed.
+
+    :param KeggCalc: An instance of KeggCalculator containing module definitions.
+    :param KO_gene_data: DataFrame containing KO counts per bin with last column "Name".
+
+    :return: DataFrame with completeness values for each module.
+    """
+    data = KO_gene_data.drop(columns=["Name"]).values
+    n_bins = data.shape[0]
+
+    modules = list(KeggCalc.module_definitions.keys())
+    n_modules = len(modules)
+
+    # Map KO names to column indices
+    col_map = {
+        ko: idx for idx, ko in enumerate(KO_gene_data.drop(columns=["Name"]).columns)
+    }
+
+    # Prepare result array
+    result = np.zeros((n_bins, n_modules), dtype=float)
+
+    for m_idx, module in enumerate(modules):
+        # Only keep KOs that exist in the DataFrame
+
+        module_kos = [ko for ko in KeggCalc.module_definitions[module] if ko in col_map]
+        if not module_kos:
+            continue
+        cols = [col_map[ko] for ko in module_kos]
+
+        vals = data[:, cols]
+        # vals[vals > 1] = 1  # presence/absence
+
+        result[:, m_idx] = vals.sum(axis=1) / len(KeggCalc.module_definitions[module])
+
+    return pd.DataFrame(result, columns=modules, index=KO_gene_data.index)
+
+
+def reference_feature_vectors(contig_sets, contig_info):
+    kegg_calc = keggData.KeggCalculator()
+    metadata_df = get_bins_metadata_df(
+        contig_sets,
+        contig_info["contig_to_cds_count"],
+        contig_info["contig_to_aa_counter"],
+        contig_info["contig_to_aa_length"],
+        kegg_calc,
+    )
+    diamond_df, _ = get_diamond_feature_per_bin_df(
+        contig_sets, contig_info["contig_to_kegg_counter"], kegg_calc
+    )
+    feature_vectors = pd.concat(
+        [metadata_df, diamond_df.drop(columns=["Name"])], axis=1
+    )
+    return feature_vectors.columns[1:].tolist(), feature_vectors.iloc[
+        :, 1:
+    ].values.astype(float)
+
+
+def test_feature_builder_matches_reference_feature_building():
+    contig_info = make_contig_info(300)
+    # Contigs without any annotation, inside and beyond the annotated range.
+    for key in bin_quality.QualityScorer.CONTIG_INFO_KEYS:
+        for contig in (5, 17, 299):
+            contig_info[key].pop(contig, None)
+    contig_sets = make_contig_sets(120, 300) + [BitMap((5, 17)), BitMap((3, 450, 451))]
+
+    names, expected = reference_feature_vectors(contig_sets, contig_info)
+    builder = bin_quality.FeatureBuilder(contig_info, keggData.KeggCalculator())
+    features = builder.build(contig_sets)
+
+    assert builder.feature_names == names
+    assert features.shape == expected.shape
+    assert np.array_equal(features, expected)  # bit-identical
 
 
 def test_add_bin_size_and_N50():
