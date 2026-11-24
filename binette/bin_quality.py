@@ -6,6 +6,7 @@ import os
 from collections import Counter
 from collections.abc import Generator, Iterable, Iterator, Sequence
 from contextlib import closing, contextmanager
+from itertools import chain, islice
 
 import numpy as np
 import pandas as pd
@@ -572,6 +573,94 @@ def score_contig_set_batches(
     executor.shutdown(wait=True)
 
 
+def iter_scored_batches(
+    contig_sets: Iterable[BitMap],
+    contig_info: dict,
+    threads: int = 1,
+    checkm2_batch_size: int = 500,
+    task_size: int | None = None,
+    min_bins_for_parallel: int = 6000,
+    min_bins_per_worker: int = 3000,
+) -> Iterator[tuple[int, list[BitMap], QualityScores]]:
+    """
+    Score a stream of contig sets in batches.
+
+    Contig sets are read lazily: only the batches being scored are held in memory.
+    The first contig sets are read ahead to choose how to score them: in the main
+    process when there are few, otherwise in worker processes.
+
+    :param contig_sets: Contig sets to score.
+    :param contig_info: Contig annotations (see QualityScorer).
+    :param threads: Number of threads. With more than one thread and more than
+        ``min_bins_for_parallel`` contig sets, sets are scored in up to ``threads``
+        worker processes.
+    :param checkm2_batch_size: Maximum number of contig sets sent to the CheckM2 models
+        at once, to bound the memory used by feature vectors.
+    :param task_size: Number of contig sets per batch. By default, about 4 batches per
+        worker, between 500 and 2000 contig sets each, to balance the load.
+    :param min_bins_for_parallel: Up to this number of contig sets, sets are scored in
+        the main process, avoiding the cost of starting worker processes.
+    :param min_bins_per_worker: Each worker process gets at least this many contig
+        sets: a worker loads its own copy of the CheckM2 models, which costs memory
+        and start-up time, so few sets are scored with fewer workers.
+
+    :return: Iterator of (position of the first contig set of the batch in the input,
+        batch of contig sets, scores), in completion order.
+    """
+    contig_set_iter = iter(contig_sets)
+    # Read enough contig sets to know whether there are few of them.
+    look_ahead_size = max(min_bins_for_parallel, threads * min_bins_per_worker)
+    first_sets = list(islice(contig_set_iter, look_ahead_size + 1))
+    # Number of contig sets, when all of them have been read.
+    n_sets = len(first_sets) if len(first_sets) <= look_ahead_size else None
+    all_sets = chain(first_sets, contig_set_iter)
+    del first_sets
+
+    def batches_of(size: int) -> Iterator[tuple[int, list[BitMap]]]:
+        start = 0
+        while batch := list(islice(all_sets, size)):
+            yield start, batch
+            start += len(batch)
+
+    if threads == 1 or (n_sets is not None and n_sets <= min_bins_for_parallel):
+        logger.debug("Scoring bins in the main process")
+        scorer = QualityScorer(
+            contig_info, threads=threads, batch_size=checkm2_batch_size
+        )
+        for start, batch in batches_of(task_size or 2000):
+            yield start, batch, scorer.score(batch)
+        return
+
+    if n_sets is None:
+        n_workers = threads
+        task_size = task_size or 2000
+    else:
+        n_workers = max(1, min(threads, n_sets // min_bins_per_worker))
+        if task_size is None:
+            task_size = min(2000, max(500, n_sets // (4 * n_workers)))
+    logger.debug(
+        f"Scoring bins in {n_workers} worker processes, {task_size} bins per task"
+    )
+
+    # Batches being scored, by batch index.
+    pending_batches: dict[int, tuple[int, list[BitMap]]] = {}
+
+    def batches_to_score() -> Iterator[list[BitMap]]:
+        for index, (start, batch) in enumerate(batches_of(task_size)):
+            pending_batches[index] = (start, batch)
+            yield batch
+
+    # closing: on error, queued batches are cancelled right away.
+    with closing(
+        score_contig_set_batches(
+            batches_to_score(), contig_info, n_workers, batch_size=checkm2_batch_size
+        )
+    ) as results:
+        for index, scores in results:
+            start, batch = pending_batches.pop(index)
+            yield start, batch, scores
+
+
 def add_bin_metrics(
     bins: Iterable[Bin],
     contig_info: dict,
@@ -579,9 +668,7 @@ def add_bin_metrics(
     threads: int = 1,
     checkm2_batch_size: int = 500,
     disable_progress_bar: bool = False,
-    task_size: int | None = None,
-    min_bins_for_parallel: int = 6000,
-    min_bins_per_worker: int = 3000,
+    **scoring_options,
 ) -> list[Bin]:
     """
     Add completeness, contamination, score and CheckM2 model to bins.
@@ -591,19 +678,11 @@ def add_bin_metrics(
     :param bins: Bins to assess.
     :param contig_info: Contig annotations (see QualityScorer).
     :param contamination_weight: Weight of contamination in the bin score.
-    :param threads: Number of threads. With more than one thread and more than
-        ``min_bins_for_parallel`` bins, bins are scored in up to ``threads`` worker
-        processes.
+    :param threads: Number of threads (see iter_scored_batches).
     :param checkm2_batch_size: Maximum number of bins sent to the CheckM2 models at once,
         to bound the memory used by feature vectors.
     :param disable_progress_bar: Disable the progress bar if True.
-    :param task_size: Number of bins sent to a worker process at once. By default,
-        about 4 tasks per worker, between 500 and 2000 bins each, to balance the load.
-    :param min_bins_for_parallel: Below this number of bins, bins are scored in the
-        main process, avoiding the cost of starting worker processes.
-    :param min_bins_per_worker: Each worker process gets at least this many bins:
-        a worker loads its own copy of the CheckM2 models, which costs memory and
-        start-up time, so few bins are scored with fewer workers.
+    :param scoring_options: Other options of iter_scored_batches.
 
     :return: The bins, with quality metrics.
     """
@@ -616,49 +695,95 @@ def add_bin_metrics(
         f"Assessing bin quality for {len(bins_list)} bins using {threads} threads"
     )
 
-    contig_sets = [bin_obj.contigs for bin_obj in bins_list]
-
-    def assign(start: int, scores: QualityScores) -> None:
-        for bin_obj, completeness, contamination, model in zip(
-            bins_list[start : start + len(scores[0])], *scores, strict=True
-        ):
-            bin_obj.add_quality(completeness, contamination, contamination_weight)
-            bin_obj.add_model(model)
-
-    with Progress(disable=disable_progress_bar) as progress:
+    with (
+        Progress(disable=disable_progress_bar) as progress,
+        closing(
+            iter_scored_batches(
+                (bin_obj.contigs for bin_obj in bins_list),
+                contig_info,
+                threads=threads,
+                checkm2_batch_size=checkm2_batch_size,
+                **scoring_options,
+            )
+        ) as results,
+    ):
         task = progress.add_task("Assessing bin quality", total=len(bins_list))
-
-        if threads == 1 or len(bins_list) <= min_bins_for_parallel:
-            logger.debug(f"Scoring {len(bins_list)} bins in the main process")
-            scorer = QualityScorer(
-                contig_info, threads=threads, batch_size=checkm2_batch_size
-            )
-            task_size = task_size or 2000
-            for start in range(0, len(contig_sets), task_size):
-                scores = scorer.score(contig_sets[start : start + task_size])
-                assign(start, scores)
-                progress.update(task, advance=len(scores[0]))
-        else:
-            n_workers = max(1, min(threads, len(contig_sets) // min_bins_per_worker))
-            if task_size is None:
-                task_size = min(2000, max(500, len(contig_sets) // (4 * n_workers)))
-            logger.debug(
-                f"Scoring {len(bins_list)} bins in {n_workers} worker processes, "
-                f"{task_size} bins per task"
-            )
-            starts = range(0, len(contig_sets), task_size)
-            batches = (contig_sets[start : start + task_size] for start in starts)
-            # closing: on error, queued batches are cancelled right away.
-            with closing(
-                score_contig_set_batches(
-                    batches, contig_info, n_workers, batch_size=checkm2_batch_size
-                )
-            ) as results:
-                for index, scores in results:
-                    assign(starts[index], scores)
-                    progress.update(task, advance=len(scores[0]))
+        for start, batch, scores in results:
+            for bin_obj, completeness, contamination, model in zip(
+                bins_list[start : start + len(batch)], *scores, strict=True
+            ):
+                bin_obj.add_quality(completeness, contamination, contamination_weight)
+                bin_obj.add_model(model)
+            progress.update(task, advance=len(batch))
 
     return bins_list
+
+
+def assess_and_keep_selectable_bins(
+    contig_sets: Iterable[BitMap],
+    contig_info: dict,
+    contamination_weight: float,
+    min_completeness: float,
+    max_contamination: float,
+    threads: int = 1,
+    checkm2_batch_size: int = 500,
+    disable_progress_bar: bool = False,
+    **scoring_options,
+) -> list[Bin]:
+    """
+    Score a stream of contig sets and make bins of those that can be selected.
+
+    Only contig sets with completeness >= ``min_completeness`` and contamination <=
+    ``max_contamination`` become bins; the others are dropped once scored, so memory
+    depends on the number of bins kept, not on the number of contig sets.
+
+    :param contig_sets: Contig sets to score.
+    :param contig_info: Contig annotations (see QualityScorer).
+    :param contamination_weight: Weight of contamination in the bin score.
+    :param min_completeness: Minimum completeness of the bins kept.
+    :param max_contamination: Maximum contamination of the bins kept.
+    :param threads: Number of threads (see iter_scored_batches).
+    :param checkm2_batch_size: Maximum number of contig sets sent to the CheckM2 models
+        at once.
+    :param disable_progress_bar: Disable the progress bar if True.
+    :param scoring_options: Other options of iter_scored_batches.
+
+    :return: Bins kept, with quality metrics.
+    """
+    logger.info(f"Assessing intermediate bin quality using {threads} threads")
+    kept_bins = []
+    n_scored = 0
+    with (
+        Progress(disable=disable_progress_bar) as progress,
+        closing(
+            iter_scored_batches(
+                contig_sets,
+                contig_info,
+                threads=threads,
+                checkm2_batch_size=checkm2_batch_size,
+                **scoring_options,
+            )
+        ) as results,
+    ):
+        task = progress.add_task("Assessing intermediate bin quality", total=None)
+        for _, batch, scores in results:
+            for contigs, completeness, contamination, model in zip(
+                batch, *scores, strict=True
+            ):
+                bin_obj = Bin(contigs, is_original=False)
+                bin_obj.add_quality(completeness, contamination, contamination_weight)
+                if bin_obj.is_high_quality(min_completeness, max_contamination):
+                    bin_obj.add_model(model)
+                    kept_bins.append(bin_obj)
+            n_scored += len(batch)
+            progress.update(task, advance=len(batch))
+
+    logger.info(
+        f"{n_scored} intermediate bins assessed, {len(kept_bins)} with completeness >= "
+        f"{min_completeness} and contamination <= {max_contamination} kept for bin "
+        "selection"
+    )
+    return kept_bins
 
 
 def log_selected_bin_info(
