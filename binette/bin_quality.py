@@ -6,6 +6,7 @@ import os
 from collections import Counter
 from collections.abc import Generator, Iterable, Iterator, Sequence
 from contextlib import closing, contextmanager
+from dataclasses import dataclass
 from itertools import chain, islice
 
 import numpy as np
@@ -349,6 +350,14 @@ QualityScores = tuple[np.ndarray, np.ndarray, np.ndarray]
 """Completeness, contamination and CheckM2 model chosen, one value per contig set."""
 
 
+@dataclass(frozen=True)
+class SelectionThresholds:
+    """Completeness and contamination a bin needs to be selectable."""
+
+    min_completeness: float
+    max_contamination: float
+
+
 class QualityScorer:
     """
     Predict completeness and contamination of contig sets with the CheckM2 models.
@@ -364,14 +373,24 @@ class QualityScorer:
         "contig_to_aa_length",
     )
 
-    def __init__(self, contig_info: dict, threads: int = 1, batch_size: int = 500):
+    def __init__(
+        self,
+        contig_info: dict,
+        threads: int = 1,
+        batch_size: int = 500,
+        selectable_only: SelectionThresholds | None = None,
+    ):
         """
         :param contig_info: Contig annotations: "contig_to_kegg_counter",
             "contig_to_cds_count", "contig_to_aa_counter" and "contig_to_aa_length".
         :param threads: Number of threads used by the CheckM2 models.
         :param batch_size: Maximum number of contig sets sent to the models at once,
             to bound the memory used by feature vectors.
+        :param selectable_only: When given, the CheckM2 steps that can't change
+            whether a contig set is selectable are skipped (see _score_batch). Contig
+            sets found not selectable get a NaN completeness and no model.
         """
+        self.selectable_only = selectable_only
         self.contig_to_kegg_counter = contig_info["contig_to_kegg_counter"]
         self.contig_to_cds_count = contig_info["contig_to_cds_count"]
         self.contig_to_aa_counter = contig_info["contig_to_aa_counter"]
@@ -426,38 +445,63 @@ class QualityScorer:
         logger.debug(
             "Predicting completeness and contamination using the general model"
         )
-        general_results_comp, general_results_cont = (
-            self.model_processor.run_prediction_general(vector_array)
+        general_comp, general_cont = self.model_processor.run_prediction_general(
+            vector_array
         )
+
+        n_sets = len(contig_sets)
+        completeness = np.full(n_sets, np.nan)
+        contamination = np.round(np.asarray(general_cont, dtype=float), 2)
+        models = np.full(n_sets, None, dtype=object)
+
+        # Rows still to score. With selectable_only, two shortcuts skip the costly
+        # steps for contig sets that can't be selected, without changing any result:
+        # - contamination only comes from the general model: above the maximum
+        #   contamination, the set is not selectable whatever its completeness;
+        # - the final completeness is the general or the specific prediction: when
+        #   both are below the minimum completeness, the model choice can't help.
+        rows = np.arange(n_sets)
+        thresholds = self.selectable_only
+        if thresholds is not None:
+            rows = rows[contamination <= thresholds.max_contamination]
+        if rows.size == 0:
+            return completeness, contamination, models
 
         logger.debug("Predicting completeness using the specific model")
         specific_model_vector_len = (ko_list_length + len(metadata_df.columns)) - 1
 
         # also retrieve scaled data for CSM calculations
-        specific_results_comp, scaled_features = (
-            self.model_processor.run_prediction_specific(
-                vector_array, specific_model_vector_len
-            )
+        specific_comp, scaled_features = self.model_processor.run_prediction_specific(
+            vector_array[rows], specific_model_vector_len
         )
+
+        if thresholds is not None:
+            best_comp = np.maximum(general_comp[rows], specific_comp)
+            can_pass = (
+                np.round(best_comp.astype(float), 2) >= thresholds.min_completeness
+            )
+            rows = rows[can_pass]
+            specific_comp = specific_comp[can_pass]
+            scaled_features = scaled_features[can_pass]
+            if rows.size == 0:
+                return completeness, contamination, models
 
         logger.debug(
             "Using cosine similarity to reference data to select an appropriate predictor model."
         )
-        final_comp, final_cont, models_chosen, _ = (
+        final_comp, _, models_chosen, _ = (
             self.post_processor.calculate_general_specific_ratio(
-                vector_array[:, 20],
+                vector_array[rows, 20],
                 scaled_features,
-                general_results_comp,
-                general_results_cont,
-                specific_results_comp,
+                general_comp[rows],
+                general_cont[rows],
+                specific_comp,
             )
         )
 
-        return (
-            np.round(np.asarray(final_comp, dtype=float), 2),
-            np.round(np.asarray(final_cont, dtype=float), 2),
-            np.asarray(models_chosen, dtype=object),
-        )
+        completeness[rows] = np.round(np.asarray(final_comp, dtype=float), 2)
+        models[rows] = models_chosen
+        return completeness, contamination, models
 
 
 # Scorer of a worker process, created once by the pool initializer.
@@ -478,11 +522,18 @@ _SINGLE_THREAD_ENV = {
 }
 
 
-def _init_scoring_worker(contig_info: dict, batch_size: int) -> None:
+def _init_scoring_worker(
+    contig_info: dict, batch_size: int, selectable_only: SelectionThresholds | None
+) -> None:
     """Initialize a scoring worker process: load the CheckM2 models once."""
     global _worker_scorer
     _initialize_keras_environment()
-    _worker_scorer = QualityScorer(contig_info, threads=1, batch_size=batch_size)
+    _worker_scorer = QualityScorer(
+        contig_info,
+        threads=1,
+        batch_size=batch_size,
+        selectable_only=selectable_only,
+    )
 
 
 def _score_in_worker(contig_sets: Sequence[BitMap]) -> QualityScores:
@@ -511,6 +562,7 @@ def score_contig_set_batches(
     threads: int,
     batch_size: int = 500,
     max_pending: int | None = None,
+    selectable_only: SelectionThresholds | None = None,
 ) -> Iterator[tuple[int, QualityScores]]:
     """
     Score batches of contig sets in worker processes.
@@ -526,6 +578,7 @@ def score_contig_set_batches(
     :param batch_size: Maximum number of contig sets sent to the models at once.
     :param max_pending: Maximum number of batches submitted and not yet returned
         (default: twice the number of workers).
+    :param selectable_only: See QualityScorer.
 
     :return: Iterator of (batch index, scores), in completion order.
     """
@@ -540,7 +593,7 @@ def score_contig_set_batches(
         max_workers=threads,
         mp_context=multiprocessing.get_context("spawn"),
         initializer=_init_scoring_worker,
-        initargs=(scorer_info, batch_size),
+        initargs=(scorer_info, batch_size, selectable_only),
     )
     pending: dict[cf.Future, int] = {}
 
@@ -580,6 +633,7 @@ def iter_scored_batches(
     checkm2_batch_size: int = 500,
     task_size: int | None = None,
     min_bins_per_worker: int = 1000,
+    selectable_only: SelectionThresholds | None = None,
 ) -> Iterator[tuple[int, list[BitMap], QualityScores]]:
     """
     Score a stream of contig sets in batches.
@@ -599,6 +653,7 @@ def iter_scored_batches(
         sets: a worker takes a few seconds to start and loads its own copy of the
         CheckM2 models (about 1 GB), so few sets are scored with fewer workers. When
         that leaves fewer than two workers, sets are scored in the main process.
+    :param selectable_only: See QualityScorer.
 
     :return: Iterator of (position of the first contig set of the batch in the input,
         batch of contig sets, scores), in completion order.
@@ -626,7 +681,10 @@ def iter_scored_batches(
     if n_workers < 2:
         logger.debug("Scoring bins in the main process")
         scorer = QualityScorer(
-            contig_info, threads=threads, batch_size=checkm2_batch_size
+            contig_info,
+            threads=threads,
+            batch_size=checkm2_batch_size,
+            selectable_only=selectable_only,
         )
         for start, batch in batches_of(task_size or 2000):
             yield start, batch, scorer.score(batch)
@@ -651,7 +709,11 @@ def iter_scored_batches(
     # closing: on error, queued batches are cancelled right away.
     with closing(
         score_contig_set_batches(
-            batches_to_score(), contig_info, n_workers, batch_size=checkm2_batch_size
+            batches_to_score(),
+            contig_info,
+            n_workers,
+            batch_size=checkm2_batch_size,
+            selectable_only=selectable_only,
         )
     ) as results:
         for index, scores in results:
@@ -751,6 +813,8 @@ def assess_and_keep_selectable_bins(
     logger.info(f"Assessing intermediate bin quality using {threads} threads")
     kept_bins = []
     n_scored = 0
+    # Contig sets found not selectable before the end of the CheckM2 scoring.
+    n_set_aside_early = 0
     with (
         Progress(disable=disable_progress_bar) as progress,
         closing(
@@ -759,6 +823,9 @@ def assess_and_keep_selectable_bins(
                 contig_info,
                 threads=threads,
                 checkm2_batch_size=checkm2_batch_size,
+                selectable_only=SelectionThresholds(
+                    min_completeness, max_contamination
+                ),
                 **scoring_options,
             )
         ) as results,
@@ -768,6 +835,9 @@ def assess_and_keep_selectable_bins(
             for contigs, completeness, contamination, model in zip(
                 batch, *scores, strict=True
             ):
+                if np.isnan(completeness):
+                    n_set_aside_early += 1
+                    continue
                 bin_obj = Bin(contigs, is_original=False)
                 bin_obj.add_quality(completeness, contamination, contamination_weight)
                 if bin_obj.is_high_quality(min_completeness, max_contamination):
@@ -780,6 +850,10 @@ def assess_and_keep_selectable_bins(
         f"{n_scored} intermediate bins assessed, {len(kept_bins)} with completeness >= "
         f"{min_completeness} and contamination <= {max_contamination} kept for bin "
         "selection"
+    )
+    logger.debug(
+        f"{n_set_aside_early} intermediate bins found not selectable before the "
+        "end of the CheckM2 scoring"
     )
     return kept_bins
 

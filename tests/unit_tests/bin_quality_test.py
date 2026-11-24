@@ -144,7 +144,7 @@ def test_add_bin_size_and_N50():
 class FakeScorer:
     """Stand-in for QualityScorer: scores derived from the contig ids, no CheckM2."""
 
-    def __init__(self, contig_info, threads=1, batch_size=500):
+    def __init__(self, contig_info, threads=1, batch_size=500, selectable_only=None):
         pass
 
     def score(self, contig_sets):
@@ -224,6 +224,38 @@ def test_quality_scorer_results_do_not_depend_on_batches():
         assert len(a) == len(contig_sets)
         assert list(a) == list(b)
         assert list(a) == list(r[::-1])
+
+
+def test_selectable_only_scoring_keeps_scores_of_selectable_bins():
+    """Real CheckM2 models: skipping steps only drops bins that can't be selected."""
+    contig_info = make_contig_info(300)
+    contig_sets = make_contig_sets(200, 300)
+    full_comp, full_cont, full_models = bin_quality.QualityScorer(contig_info).score(
+        contig_sets
+    )
+    # Thresholds in the middle of the scores, so that both shortcuts are used.
+    thresholds = bin_quality.SelectionThresholds(
+        min_completeness=float(np.median(full_comp)),
+        max_contamination=float(np.median(full_cont)),
+    )
+
+    comp, cont, models = bin_quality.QualityScorer(
+        contig_info, selectable_only=thresholds
+    ).score(contig_sets)
+
+    selectable = (full_comp >= thresholds.min_completeness) & (
+        full_cont <= thresholds.max_contamination
+    )
+    set_aside = np.isnan(comp)
+    assert selectable.any() and set_aside.any()
+    assert not (selectable & set_aside).any()
+    too_contaminated = full_cont > thresholds.max_contamination
+    assert (set_aside & too_contaminated).any()  # first shortcut used
+    assert (set_aside & ~too_contaminated).any()  # second shortcut used
+    assert list(cont) == list(full_cont)
+    assert list(comp[~set_aside]) == list(full_comp[~set_aside])
+    assert list(models[~set_aside]) == list(full_models[~set_aside])
+    assert all(m is None for m in models[set_aside])
 
 
 def test_add_bin_metrics_parallel_path_matches_sequential_path():
