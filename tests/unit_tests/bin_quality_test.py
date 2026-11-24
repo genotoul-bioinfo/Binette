@@ -245,7 +245,6 @@ def test_add_bin_metrics_parallel_path_matches_sequential_path():
         threads=2,
         disable_progress_bar=True,
         task_size=20,  # 5 tasks, the last one partial
-        min_bins_for_parallel=0,  # force worker processes
         min_bins_per_worker=1,  # use both workers
     )
 
@@ -304,7 +303,6 @@ def test_assess_and_keep_selectable_bins_streams_to_worker_processes():
         threads=2,
         disable_progress_bar=True,
         task_size=20,
-        min_bins_for_parallel=0,
         min_bins_per_worker=10,  # read ahead 20 contig sets only
     )
 

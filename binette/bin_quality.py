@@ -579,8 +579,7 @@ def iter_scored_batches(
     threads: int = 1,
     checkm2_batch_size: int = 500,
     task_size: int | None = None,
-    min_bins_for_parallel: int = 6000,
-    min_bins_per_worker: int = 3000,
+    min_bins_per_worker: int = 1000,
 ) -> Iterator[tuple[int, list[BitMap], QualityScores]]:
     """
     Score a stream of contig sets in batches.
@@ -591,25 +590,22 @@ def iter_scored_batches(
 
     :param contig_sets: Contig sets to score.
     :param contig_info: Contig annotations (see QualityScorer).
-    :param threads: Number of threads. With more than one thread and more than
-        ``min_bins_for_parallel`` contig sets, sets are scored in up to ``threads``
-        worker processes.
+    :param threads: Maximum number of worker processes.
     :param checkm2_batch_size: Maximum number of contig sets sent to the CheckM2 models
         at once, to bound the memory used by feature vectors.
     :param task_size: Number of contig sets per batch. By default, about 4 batches per
         worker, between 500 and 2000 contig sets each, to balance the load.
-    :param min_bins_for_parallel: Up to this number of contig sets, sets are scored in
-        the main process, avoiding the cost of starting worker processes.
     :param min_bins_per_worker: Each worker process gets at least this many contig
-        sets: a worker loads its own copy of the CheckM2 models, which costs memory
-        and start-up time, so few sets are scored with fewer workers.
+        sets: a worker takes a few seconds to start and loads its own copy of the
+        CheckM2 models (about 1 GB), so few sets are scored with fewer workers. When
+        that leaves fewer than two workers, sets are scored in the main process.
 
     :return: Iterator of (position of the first contig set of the batch in the input,
         batch of contig sets, scores), in completion order.
     """
     contig_set_iter = iter(contig_sets)
-    # Read enough contig sets to know whether there are few of them.
-    look_ahead_size = max(min_bins_for_parallel, threads * min_bins_per_worker)
+    # Read enough contig sets to know whether there are too few for all workers.
+    look_ahead_size = threads * min_bins_per_worker
     first_sets = list(islice(contig_set_iter, look_ahead_size + 1))
     # Number of contig sets, when all of them have been read.
     n_sets = len(first_sets) if len(first_sets) <= look_ahead_size else None
@@ -622,7 +618,12 @@ def iter_scored_batches(
             yield start, batch
             start += len(batch)
 
-    if threads == 1 or (n_sets is not None and n_sets <= min_bins_for_parallel):
+    if n_sets is None:
+        n_workers = threads
+    else:
+        n_workers = min(threads, n_sets // min_bins_per_worker)
+
+    if n_workers < 2:
         logger.debug("Scoring bins in the main process")
         scorer = QualityScorer(
             contig_info, threads=threads, batch_size=checkm2_batch_size
@@ -631,13 +632,10 @@ def iter_scored_batches(
             yield start, batch, scorer.score(batch)
         return
 
-    if n_sets is None:
-        n_workers = threads
-        task_size = task_size or 2000
-    else:
-        n_workers = max(1, min(threads, n_sets // min_bins_per_worker))
-        if task_size is None:
-            task_size = min(2000, max(500, n_sets // (4 * n_workers)))
+    if task_size is None:
+        task_size = (
+            2000 if n_sets is None else min(2000, max(500, n_sets // (4 * n_workers)))
+        )
     logger.debug(
         f"Scoring bins in {n_workers} worker processes, {task_size} bins per task"
     )
