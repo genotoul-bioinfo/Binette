@@ -3,14 +3,13 @@ import concurrent.futures as cf
 import logging
 import multiprocessing
 import os
-from collections import Counter
 from collections.abc import Generator, Iterable, Iterator, Sequence
 from contextlib import closing, contextmanager
 from dataclasses import dataclass
 from itertools import chain, islice
 
 import numpy as np
-import pandas as pd
+import scipy.sparse
 from checkm2 import keggData
 from pyroaring import BitMap
 from rich.progress import Progress
@@ -79,206 +78,192 @@ def get_modelProcessing():
     return _modelProcessing
 
 
-def get_bins_metadata_df(
-    contig_sets: Sequence[BitMap],
-    contig_to_cds_count: dict[int, int],
-    contig_to_aa_counter: dict[int, Counter],
-    contig_to_aa_length: dict[int, int],
-    kegg_calc: keggData.KeggCalculator | None = None,
-) -> pd.DataFrame:
+class FeatureBuilder:
     """
-    Generate a DataFrame containing metadata (CDS count, amino acid length and
-    composition) for a list of contig sets.
+    Build the CheckM2 feature vectors of contig sets.
 
-    :param contig_sets: Contig sets (one per bin) to describe.
-    :param contig_to_cds_count: Number of CDS per contig.
-    :param contig_to_aa_counter: Amino acid composition per contig.
-    :param contig_to_aa_length: Total amino acid length per contig.
-    :param kegg_calc: KeggCalculator to reuse (one is created when not given).
-
-    :return: DataFrame with one row per contig set, in input order. The "Name" column
-        and the index hold the position of the contig set in ``contig_sets``.
-    """
-    if kegg_calc is None:
-        kegg_calc = keggData.KeggCalculator()
-    metadata_order = kegg_calc.return_proper_order("Metadata")
-
-    rows = []
-    for i, contigs in enumerate(contig_sets):
-        cds = 0
-        aa_length = 0
-        aa_counter = Counter()
-        for contig in contigs:
-            cds += contig_to_cds_count.get(contig, 0)
-            aa_length += contig_to_aa_length.get(contig, 0)
-            counter = contig_to_aa_counter.get(contig)
-            if counter:
-                aa_counter.update(counter)
-        row = {"Name": i, "CDS": cds, "AALength": aa_length}
-        row.update(aa_counter)
-        rows.append(row)
-
-    metadata_df = pd.DataFrame(rows).fillna(0)
-
-    # Ensure column order
-    all_cols = ["Name"] + metadata_order
-    for col in metadata_order:
-        if col not in metadata_df.columns:
-            metadata_df[col] = 0
-
-    metadata_df = metadata_df[all_cols].astype(dict.fromkeys(metadata_order, int))
-    metadata_df = metadata_df.set_index("Name", drop=False)
-
-    return metadata_df
-
-
-def get_diamond_feature_per_bin_df(
-    contig_sets: Sequence[BitMap],
-    contig_to_kegg_counter: dict[int, Counter],
-    kegg_calc: keggData.KeggCalculator | None = None,
-) -> tuple[pd.DataFrame, int]:
-    """
-    Generate a DataFrame containing Diamond feature counts per contig set,
-    including KEGG KO counts and completeness information for pathways, categories, and modules.
-
-    :param contig_sets: Contig sets (one per bin) to describe.
-    :param contig_to_kegg_counter: KO counts per contig.
-    :param kegg_calc: KeggCalculator to reuse (one is created when not given).
-
-    :return: DataFrame with one row per contig set, indexed by the position of the
-        contig set in ``contig_sets``, and the number of default KOs.
-    """
-    if kegg_calc is None:
-        kegg_calc = keggData.KeggCalculator()
-    defaultKOs = kegg_calc.return_default_values_from_category("KO_Genes")
-    row_ids = range(len(contig_sets))
-
-    # --- Aggregate KO counters per contig set ---
-    row_to_ko_counter = {}
-    for i, contigs in enumerate(contig_sets):
-        ko_counter = Counter()
-        for contig in contigs:
-            contig_ko_counter = contig_to_kegg_counter.get(contig)
-            if contig_ko_counter:
-                ko_counter.update(contig_ko_counter)
-        row_to_ko_counter[i] = ko_counter
-
-    # --- Build KO count DataFrame directly ---
-    ko_count_per_bin_df = (
-        pd.DataFrame.from_dict(row_to_ko_counter, orient="index")
-        .reindex(row_ids)  # keep input order
-        .fillna(0)
-        .astype(int)
-    )
-
-    # Ensure all defaultKOs exist
-    ko_count_per_bin_df = ko_count_per_bin_df.reindex(
-        columns=list(defaultKOs), fill_value=0
-    )
-
-    ko_count_per_bin_df["Name"] = ko_count_per_bin_df.index
-
-    # --- Calculate higher-level completeness ---
-    logger.debug("Calculating completeness of pathways, categories, and modules")
-    KO_pathways = calculate_KO_group(kegg_calc, "KO_Pathways", ko_count_per_bin_df)
-    KO_categories = calculate_KO_group(kegg_calc, "KO_Categories", ko_count_per_bin_df)
-
-    KO_modules = calculate_module_completeness(kegg_calc, ko_count_per_bin_df)
-
-    # --- Concatenate results ---
-    diamond_complete_results = pd.concat(
-        [ko_count_per_bin_df, KO_pathways, KO_modules, KO_categories], axis=1
-    )
-
-    return diamond_complete_results, len(defaultKOs)
-
-
-def calculate_KO_group(
-    KeggCalc: keggData.KeggCalculator, group: str, KO_gene_data: pd.DataFrame
-) -> pd.DataFrame:
-    """
-    Calculate the completeness of KEGG feature groups per bin.
-
-    :param KeggCalc: An instance of KeggCalculator containing KEGG mappings.
-    :param group: Feature group name (e.g., "KO_Pathways", "KO_Categories").
-    :param KO_gene_data: DataFrame containing KO counts per bin with last column "Name".
-
-    :return: DataFrame with completeness values for each feature vector in the group.
+    The features of a contig set are sums over its contigs (CDS count, amino acid
+    length and composition, KO counts), plus the completeness of KEGG pathways,
+    modules and categories computed from the KO counts. Per-contig values are stored
+    in matrices once, so the features of a batch of contig sets come from a few
+    integer matrix products with the contig set x contig incidence matrix.
     """
 
-    # last column is 'Name'
-    data = KO_gene_data.drop(columns=["Name"]).values
-    n_bins = data.shape[0]
+    def __init__(self, contig_info: dict, kegg_calc: keggData.KeggCalculator):
+        """
+        :param contig_info: Contig annotations: "contig_to_kegg_counter",
+            "contig_to_cds_count", "contig_to_aa_counter" and "contig_to_aa_length".
+        :param kegg_calc: CheckM2 KeggCalculator, giving feature names and KEGG groups.
+        """
+        contig_to_kegg_counter = contig_info["contig_to_kegg_counter"]
+        contig_to_cds_count = contig_info["contig_to_cds_count"]
+        contig_to_aa_counter = contig_info["contig_to_aa_counter"]
+        contig_to_aa_length = contig_info["contig_to_aa_length"]
 
-    # Build output DataFrame
-    ordered_entries = KeggCalc.return_default_values_from_category(group)
-    feature_vectors = list(ordered_entries.keys())
-    n_features = len(feature_vectors)
+        self.metadata_names = kegg_calc.return_proper_order("Metadata")
+        self.ko_names = list(kegg_calc.return_default_values_from_category("KO_Genes"))
+        ko_index = {ko: i for i, ko in enumerate(self.ko_names)}
 
-    # Create empty numpy array for results
-    result = np.zeros((n_bins, n_features), dtype=float)
+        # Contigs without annotation are not stored: they add nothing to features.
+        self.n_contigs = 1 + max(
+            max(annotations, default=-1)
+            for annotations in (
+                contig_to_kegg_counter,
+                contig_to_cds_count,
+                contig_to_aa_counter,
+                contig_to_aa_length,
+            )
+        )
 
-    # Map Kegg_IDs to column indices in KO_gene_data
-    col_map = {ko: idx for idx, ko in enumerate(KO_gene_data.columns[:-1])}
+        # Contig x metadata (CDS count, amino acid length and composition).
+        metadata_index = {name: i for i, name in enumerate(self.metadata_names)}
+        aa_names = set(self.metadata_names) - {"CDS", "AALength"}
+        self.contig_metadata = np.zeros(
+            (self.n_contigs, len(self.metadata_names)), dtype=np.int64
+        )
+        for contig, count in contig_to_cds_count.items():
+            self.contig_metadata[contig, metadata_index["CDS"]] = count
+        for contig, length in contig_to_aa_length.items():
+            self.contig_metadata[contig, metadata_index["AALength"]] = length
+        for contig, aa_counter in contig_to_aa_counter.items():
+            for aa, count in aa_counter.items():
+                if aa in aa_names:
+                    self.contig_metadata[contig, metadata_index[aa]] += count
 
-    for f_idx, vector in enumerate(feature_vectors):
-        # KOs belonging to this feature vector
-        kegg_ids = KeggCalc.path_category_mapping.loc[
-            KeggCalc.path_category_mapping[group] == vector, "Kegg_ID"
-        ].values
+        # Contig x KO counts (KOs not used by CheckM2 are ignored).
+        rows, cols, counts = [], [], []
+        for contig, ko_counter in contig_to_kegg_counter.items():
+            for ko, count in ko_counter.items():
+                if ko in ko_index:
+                    rows.append(contig)
+                    cols.append(ko_index[ko])
+                    counts.append(count)
+        self.contig_ko_counts = scipy.sparse.csr_matrix(
+            (np.array(counts, dtype=np.int64), (rows, cols)),
+            shape=(self.n_contigs, len(self.ko_names)),
+        )
 
-        # Only keep KOs present in DataFrame columns
-        present_cols = [col_map[ko] for ko in kegg_ids if ko in col_map]
-        if not present_cols:
-            continue
+        # KO x group membership and group sizes. Pathway and category completeness
+        # count the KOs present; module completeness sums KO counts, and a KO listed
+        # twice in a module definition counts twice.
+        self.pathway_names, self.pathway_members, self.pathway_sizes = (
+            self._group_matrix(ko_index, self._group_kos(kegg_calc, "KO_Pathways"))
+        )
+        self.category_names, self.category_members, self.category_sizes = (
+            self._group_matrix(ko_index, self._group_kos(kegg_calc, "KO_Categories"))
+        )
+        self.module_names, self.module_members, self.module_sizes = self._group_matrix(
+            ko_index, kegg_calc.module_definitions
+        )
 
-        # Presence/absence: values >1 -> 1
-        vals = data[:, present_cols]
-        vals[vals > 1] = 1
-        result[:, f_idx] = vals.sum(axis=1) / len(kegg_ids)
+    @staticmethod
+    def _group_kos(kegg_calc: keggData.KeggCalculator, group: str) -> dict:
+        """KOs of each entry of a KEGG group (pathways or categories), in CheckM2 order."""
+        mapping = kegg_calc.path_category_mapping
+        kos_by_entry = mapping.groupby(group, sort=False)["Kegg_ID"].agg(list)
+        return {
+            entry: kos_by_entry.get(entry, [])
+            for entry in kegg_calc.return_default_values_from_category(group)
+        }
 
-    return pd.DataFrame(result, columns=feature_vectors, index=KO_gene_data.index)
+    @staticmethod
+    def _group_matrix(
+        ko_index: dict[str, int], group_kos: dict[str, list[str]]
+    ) -> tuple[list[str], scipy.sparse.csr_matrix, np.ndarray]:
+        """
+        KO x group matrix (number of times a KO is listed in a group) and group sizes.
 
+        :param ko_index: Column of each KO in the KO count matrix.
+        :param group_kos: KOs of each group, in group order.
+        :return: Group names, KO x group matrix and number of KOs listed per group.
+        """
+        names = list(group_kos)
+        rows, cols = [], []
+        sizes = np.zeros(len(names), dtype=np.int64)
+        for j, name in enumerate(names):
+            kos = list(group_kos[name])
+            sizes[j] = len(kos)
+            for ko in kos:
+                if ko in ko_index:
+                    rows.append(ko_index[ko])
+                    cols.append(j)
+        members = scipy.sparse.csr_matrix(
+            (np.ones(len(rows), dtype=np.int64), (rows, cols)),
+            shape=(len(ko_index), len(names)),
+        )
+        # Empty groups have no members: any size other than 0 gives 0.
+        sizes[sizes == 0] = 1
+        return names, members, sizes
 
-def calculate_module_completeness(
-    KeggCalc: keggData.KeggCalculator, KO_gene_data: pd.DataFrame
-) -> pd.DataFrame:
-    """
-    Compute module completeness per bin using NumPy for speed.
+    @property
+    def feature_names(self) -> list[str]:
+        """Names of the features, in the order of CheckM2 feature vectors."""
+        return (
+            self.metadata_names
+            + self.ko_names
+            + self.pathway_names
+            + self.module_names
+            + self.category_names
+        )
 
-    :param KeggCalc: An instance of KeggCalculator containing module definitions.
-    :param KO_gene_data: DataFrame containing KO counts per bin with last column "Name".
+    @property
+    def specific_model_vector_len(self) -> int:
+        """Number of leading features used by the CheckM2 specific model."""
+        return len(self.metadata_names) + len(self.ko_names)
 
-    :return: DataFrame with completeness values for each module.
-    """
-    data = KO_gene_data.drop(columns=["Name"]).values
-    n_bins = data.shape[0]
+    def incidence_matrix(
+        self, contig_sets: Sequence[BitMap]
+    ) -> scipy.sparse.csr_matrix:
+        """Contig set x contig matrix: 1 where the contig is in the set."""
+        contig_ids = [
+            np.asarray(contigs.to_array(), dtype=np.int64) for contigs in contig_sets
+        ]
+        indptr = np.zeros(len(contig_sets) + 1, dtype=np.int64)
+        indptr[1:] = np.cumsum([len(ids) for ids in contig_ids])
+        indices = (
+            np.concatenate(contig_ids) if contig_ids else np.zeros(0, dtype=np.int64)
+        )
+        # Contigs without annotation are beyond the stored matrices: drop them.
+        if indices.size and indices.max() >= self.n_contigs:
+            annotated = indices < self.n_contigs
+            kept_before = np.concatenate(([0], np.cumsum(annotated)))
+            indptr = kept_before[indptr]
+            indices = indices[annotated]
+        return scipy.sparse.csr_matrix(
+            (np.ones(len(indices), dtype=np.int64), indices, indptr),
+            shape=(len(contig_sets), self.n_contigs),
+        )
 
-    modules = list(KeggCalc.module_definitions.keys())
-    n_modules = len(modules)
+    def build(self, contig_sets: Sequence[BitMap]) -> np.ndarray:
+        """
+        Feature vectors of contig sets.
 
-    # Map KO names to column indices
-    col_map = {
-        ko: idx for idx, ko in enumerate(KO_gene_data.drop(columns=["Name"]).columns)
-    }
+        :param contig_sets: Contig sets (one per bin).
+        :return: Array with one row per contig set, in input order, and one column
+            per feature (see feature_names).
+        """
+        incidence = self.incidence_matrix(contig_sets)
+        metadata = incidence @ self.contig_metadata
+        ko_counts = incidence @ self.contig_ko_counts
+        ko_presence = ko_counts.copy()
+        ko_presence.eliminate_zeros()
+        ko_presence.data[:] = 1
 
-    # Prepare result array
-    result = np.zeros((n_bins, n_modules), dtype=float)
+        pathways = (ko_presence @ self.pathway_members).toarray() / self.pathway_sizes
+        modules = (ko_counts @ self.module_members).toarray() / self.module_sizes
+        categories = (
+            ko_presence @ self.category_members
+        ).toarray() / self.category_sizes
 
-    for m_idx, module in enumerate(modules):
-        # Only keep KOs that exist in the DataFrame
-
-        module_kos = [ko for ko in KeggCalc.module_definitions[module] if ko in col_map]
-        if not module_kos:
-            continue
-        cols = [col_map[ko] for ko in module_kos]
-
-        vals = data[:, cols]
-        # vals[vals > 1] = 1  # presence/absence
-
-        result[:, m_idx] = vals.sum(axis=1) / len(KeggCalc.module_definitions[module])
-
-    return pd.DataFrame(result, columns=modules, index=KO_gene_data.index)
+        return np.hstack(
+            [
+                np.asarray(metadata, dtype=float),
+                ko_counts.toarray().astype(float),
+                pathways,
+                modules,
+                categories,
+            ]
+        )
 
 
 def prepare_contig_sizes(contig_to_size: dict[int, int]) -> np.ndarray:
@@ -391,13 +376,9 @@ class QualityScorer:
             sets found not selectable get a NaN completeness and no model.
         """
         self.selectable_only = selectable_only
-        self.contig_to_kegg_counter = contig_info["contig_to_kegg_counter"]
-        self.contig_to_cds_count = contig_info["contig_to_cds_count"]
-        self.contig_to_aa_counter = contig_info["contig_to_aa_counter"]
-        self.contig_to_aa_length = contig_info["contig_to_aa_length"]
         self.batch_size = batch_size
 
-        self.kegg_calc = keggData.KeggCalculator()
+        self.features = FeatureBuilder(contig_info, keggData.KeggCalculator())
         self.model_processor = get_modelProcessing().modelProcessor(threads)
         self.post_processor = get_modelPostprocessing().modelProcessor(threads)
 
@@ -424,23 +405,7 @@ class QualityScorer:
 
     def _score_batch(self, contig_sets: Sequence[BitMap]) -> QualityScores:
         """Score one batch of contig sets. This code is adapted from CheckM2."""
-        metadata_df = get_bins_metadata_df(
-            contig_sets,
-            self.contig_to_cds_count,
-            self.contig_to_aa_counter,
-            self.contig_to_aa_length,
-            self.kegg_calc,
-        )
-
-        diamond_complete_results, ko_list_length = get_diamond_feature_per_bin_df(
-            contig_sets, self.contig_to_kegg_counter, self.kegg_calc
-        )
-        diamond_complete_results = diamond_complete_results.drop(columns=["Name"])
-
-        # Both tables have one row per contig set, in input order.
-        feature_vectors = pd.concat([metadata_df, diamond_complete_results], axis=1)
-
-        vector_array = feature_vectors.iloc[:, 1:].values.astype(float)
+        vector_array = self.features.build(contig_sets)
 
         logger.debug(
             "Predicting completeness and contamination using the general model"
@@ -468,7 +433,7 @@ class QualityScorer:
             return completeness, contamination, models
 
         logger.debug("Predicting completeness using the specific model")
-        specific_model_vector_len = (ko_list_length + len(metadata_df.columns)) - 1
+        specific_model_vector_len = self.features.specific_model_vector_len
 
         # also retrieve scaled data for CSM calculations
         specific_comp, scaled_features = self.model_processor.run_prediction_specific(
