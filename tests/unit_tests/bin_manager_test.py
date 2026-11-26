@@ -275,7 +275,7 @@ def test_select_best_bins_simple():
     b3.N50 = 100
 
     assert bin_manager.select_best_bins(
-        {1: b1, 2: b2, 3: b3}, min_completeness=40, max_contamination=10
+        [b1, b2, b3], min_completeness=40, max_contamination=10
     ) == [b1, b3]
 
 
@@ -301,7 +301,7 @@ def test_select_best_bins_with_same_score():
     b3.contamination = 0
 
     assert bin_manager.select_best_bins(
-        {1: b1, 2: b2, 3: b3}, max_contamination=0, min_completeness=40
+        [b1, b2, b3], max_contamination=0, min_completeness=40
     ) == [b2, b3]
 
 
@@ -325,10 +325,9 @@ def test_select_best_bins_with_equality_based_on_original():
     b1.contamination = 0
     b2.contamination = 0
     b3.contamination = 0
-    # when score and n50 is the same, selection is made on the smallest key.
-    # bin created first have a smaller id. so b1 should selected
+    # when score and N50 are the same, input bins are preferred: b2 is selected
     assert bin_manager.select_best_bins(
-        {1: b1, 2: b2, 3: b3}, max_contamination=0, min_completeness=40
+        [b1, b2, b3], max_contamination=0, min_completeness=40
     ) == [b2, b3]
 
 
@@ -351,11 +350,12 @@ def test_select_best_bins_with_equality():
     b1.contamination = 0
     b2.contamination = 0
     b3.contamination = 0
-    # when score, n50 and is_original is the same, selection is made on the smallest key.
-    # bin created first have a smaller id. so b1 should selected
+    # when score, N50 and is_original are the same, the bin with the smallest
+    # serialized contig set is selected
+    assert b2.contigs.serialize() < b1.contigs.serialize()
     assert bin_manager.select_best_bins(
-        {1: b1, 2: b2, 3: b3}, max_contamination=0, min_completeness=40
-    ) == [b1, b3]
+        [b1, b2, b3], max_contamination=0, min_completeness=40
+    ) == [b2, b3]
 
 
 # The function should create intersection bins when there are overlapping contigs between bins.
@@ -665,10 +665,44 @@ def test_select_best_bins_matches_index_based_selection(seed):
         bins[b.contigs_key] = b
 
     expected = select_best_bins_with_index(bins, 40, 10)
-    selected = bin_manager.select_best_bins(bins, 40, 10)
+    selected = bin_manager.select_best_bins(list(bins.values()), 40, 10)
 
     assert [b.contigs_key for b in selected] == expected
     used = BitMap()
     for b in selected:
         assert b.contigs.isdisjoint(used)
         used |= b.contigs
+
+
+def random_bins_with_ties(seed: int, n_bins: int = 300) -> list[bin_manager.Bin]:
+    """Distinct random bins with few distinct score and N50 values, so many ties."""
+    rng = random.Random(seed)
+    bins = {}
+    while len(bins) < n_bins:
+        start = rng.randrange(200)
+        contigs = BitMap(range(start, start + rng.randint(1, 15)))
+        b = bin_manager.Bin(contigs, is_original=rng.random() < 0.3)
+        b.add_quality(rng.choice([35, 50, 80, 95]), rng.choice([0, 5, 12]), 2)
+        b.N50 = rng.choice([1000, 2000])
+        bins[contigs.serialize()] = b
+    return list(bins.values())
+
+
+@pytest.mark.parametrize("seed", range(5))
+def test_sort_bins_by_quality_matches_sort_on_contig_keys(seed):
+    bins = random_bins_with_ties(seed)
+    expected = sorted(
+        bins,
+        key=lambda b: (-b.score, -b.N50, -b.is_original, b.contigs.serialize()),
+    )
+
+    assert bin_manager.sort_bins_by_quality(bins) == expected
+
+
+def test_sorting_and_selection_do_not_cache_contig_keys():
+    bins = random_bins_with_ties(0)
+
+    bin_manager.sort_bins_by_quality(bins)
+    bin_manager.select_best_bins(bins, 40, 10)
+
+    assert not any("contigs_key" in b.__dict__ for b in bins)
