@@ -85,11 +85,11 @@ def run(config: RunConfig) -> int:
         config, paths, inputs, contig_metadata, contig_to_coding_length
     )
 
-    contig_key_to_all_bin = create_and_assess_intermediate_bins(
+    all_bins = create_and_assess_intermediate_bins(
         config, paths, inputs, contig_key_to_original_bin, contig_metadata
     )
 
-    selected_bins = select_bins(config, contig_key_to_all_bin, contig_to_coding_length)
+    selected_bins = select_bins(config, all_bins, contig_to_coding_length)
 
     write_final_outputs(
         config,
@@ -592,11 +592,11 @@ def create_and_assess_intermediate_bins(
     inputs: InputData,
     contig_key_to_original_bin: dict[Any, Bin],
     contig_metadata: dict,
-) -> dict[Any, Bin]:
+) -> list[Bin]:
     """
     Create intermediate bins from the input bins and assess their quality.
 
-    :return: Mapping of contig key to all bins (input and intermediate).
+    :return: List of all bins (input and intermediate).
     """
     logger.info("Creating intermediate bins")
 
@@ -621,34 +621,29 @@ def create_and_assess_intermediate_bins(
         threads=config.threads,
         disable_progress_bar=not config.show_progress,
     )
-    contig_key_to_new_bin = {b.contigs_key: b for b in new_bins}
 
-    contig_key_to_all_bin = contig_key_to_original_bin | contig_key_to_new_bin
+    all_bins = list(contig_key_to_original_bin.values()) + new_bins
 
-    bin_quality.add_bin_size_and_N50(
-        contig_key_to_all_bin.values(), inputs.contig_to_length
-    )
+    bin_quality.add_bin_size_and_N50(all_bins, inputs.contig_to_length)
 
     if config.debug:
         logger.info(
             "Writing input bins and selectable intermediate bins to "
             f"'{paths.all_bin_compo_file}'"
         )
-        io.write_bin_info(
-            contig_key_to_all_bin.values(), paths.all_bin_compo_file, add_contigs=True
-        )
+        io.write_bin_info(all_bins, paths.all_bin_compo_file, add_contigs=True)
 
-    return contig_key_to_all_bin
+    return all_bins
 
 
 def select_bins(
     config: RunConfig,
-    contig_key_to_all_bin: dict[Any, Bin],
+    all_bins: list[Bin],
     contig_to_coding_length: dict[int, int | None] | None,
 ) -> list[Bin]:
     """Select the best non-overlapping bins."""
     selected_bins = bin_manager.select_best_bins(
-        contig_key_to_all_bin,
+        all_bins,
         min_completeness=config.min_completeness,
         max_contamination=config.max_contamination,
         prefix=config.prefix,

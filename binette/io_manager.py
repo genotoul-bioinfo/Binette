@@ -7,7 +7,7 @@ from pathlib import Path
 import pandas as pd
 import pyfastx
 
-from binette.bin_manager import Bin
+from binette.bin_manager import Bin, sort_bins_by_quality
 from binette.checkpoint import atomic_replace, partial_path
 
 logger = logging.getLogger(__name__)
@@ -145,9 +145,7 @@ def write_bin_info(bins: Iterable[Bin], output: Path, add_contigs: bool = False)
 
     # Create a list of dictionaries to build the DataFrame
     data = []
-    for bin_obj in sorted(
-        bins, key=lambda x: (-x.score, -x.N50, -x.is_original, x.contigs_key)
-    ):
+    for bin_obj in sort_bins_by_quality(bins):
         original_name = bin_obj.original_name if bin_obj.original_name else bin_obj.name
         origins = bin_obj.origin if bin_obj.is_original else {"binette"}
 
