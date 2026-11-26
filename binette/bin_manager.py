@@ -415,8 +415,34 @@ def iter_cliques(graph: nx.Graph) -> Iterator[tuple]:
         yield from extend((node,), larger_neighbors[node])
 
 
+def sort_bins_by_quality(bins: Iterable[Bin]) -> list[Bin]:
+    """
+    Sort bins from best to worst: highest score, then highest N50, then input bins
+    before intermediate bins, then by serialized contig set.
+
+    The serialized contig sets are only computed for bins that tie on the other
+    criteria, and are not cached on the bins: sorting millions of bins doesn't keep a
+    serialized copy of each contig set.
+
+    :param bins: Bins to sort.
+
+    :return: Sorted list of bins.
+    """
+
+    def quality(b: Bin) -> tuple:
+        return (-b.score, -b.N50, -b.is_original)
+
+    sorted_bins = []
+    for _, tied_bins in itertools.groupby(sorted(bins, key=quality), key=quality):
+        tied_bins = list(tied_bins)
+        if len(tied_bins) > 1:
+            tied_bins.sort(key=lambda b: b.contigs.serialize())
+        sorted_bins.extend(tied_bins)
+    return sorted_bins
+
+
 def select_best_bins(
-    bins_dict: dict[bytes, Bin],
+    all_bins: Iterable[Bin],
     min_completeness: float,
     max_contamination: float,
     prefix: str = "binette",
@@ -424,7 +450,7 @@ def select_best_bins(
     """
     Select the best non-overlapping bins based on score, N50, and ID.
 
-    :param bins_dict: Mapping from contig_key -> Bin.
+    :param all_bins: Candidate bins, input and intermediate.
     :param min_completeness: Minimum completeness threshold for a bin to be considered.
     :param max_contamination: Maximum contamination threshold for a bin to be considered.
     :param prefix: Prefix to use for naming selected bins.
@@ -436,22 +462,12 @@ def select_best_bins(
         f"Filtering bins: only bins with completeness >= {min_completeness} "
         f"and contamination <= {max_contamination}"
     )
-    good_enough_bins = {
-        k: b
-        for k, b in bins_dict.items()
-        if b.is_high_quality(min_completeness, max_contamination)
-    }
+    good_enough_bins = (
+        b for b in all_bins if b.is_high_quality(min_completeness, max_contamination)
+    )
 
     logger.info("Sorting bins")
-    sorted_bin_keys = sorted(
-        good_enough_bins,
-        key=lambda k: (
-            -good_enough_bins[k].score,
-            -good_enough_bins[k].N50,
-            -good_enough_bins[k].is_original,
-            k,  # contigs_key itself is sortable (bytes)
-        ),
-    )
+    sorted_bins = sort_bins_by_quality(good_enough_bins)
 
     logger.info("Selecting bins")
     # A bin is selected when it shares no contig with the bins selected before it.
@@ -460,8 +476,7 @@ def select_best_bins(
     selected_bins = []
     used_contigs = BitMap()
 
-    for bin_key in sorted_bin_keys:
-        bin_obj = good_enough_bins[bin_key]
+    for bin_obj in sorted_bins:
         if bin_obj.contigs.isdisjoint(used_contigs):
             selected_bins.append(bin_obj)
             used_contigs |= bin_obj.contigs
