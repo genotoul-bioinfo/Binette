@@ -49,12 +49,13 @@ For minor changes like fixing typos or making small edits, create a new Pull Req
    - Code changes are automatically checked by Ruff and Pyright in our CI pipeline via GitHub Actions.  
    - **Ensure your code passes these checks before committing.**  
 
-   The simplest way is to install the git hooks defined in `.pre-commit-config.yaml` with [prek](https://prek.j178.dev/) (prek, Ruff and Pyright are part of the `[dev]` extra). They run Ruff and Pyright on your changes at each commit:  
+   The simplest way is to install the git hooks defined in `.pre-commit-config.yaml` with [prek](https://prek.j178.dev/) (prek, Ruff and Pyright are part of the `[dev]` extra). They run Ruff on your changes at each commit, and Pyright at each push:  
    ```bash
    prek install
 
    # Optionally, run the hooks on all files
-   prek run --all-files
+   prek run --all-files                         # Ruff
+   prek run --all-files --hook-stage pre-push   # Pyright
    ```  
 
    [pre-commit](https://pre-commit.com/) reads the same configuration, so `pre-commit install` works too.  

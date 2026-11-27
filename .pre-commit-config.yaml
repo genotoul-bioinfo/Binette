@@ -1,5 +1,10 @@
 # Hooks run with prek (https://prek.j178.dev/), in the `dev` extra. pre-commit also works.
 # Install the hooks with `prek install`, run them on all files with `prek run --all-files`.
+# Pyright takes a few seconds, so it runs on `git push` rather than on each commit
+# (run it on all files with `prek run --all-files --hook-stage pre-push`).
+default_install_hook_types: [pre-commit, pre-push]
+default_stages: [pre-commit]
+
 repos:
 - repo: https://github.com/pre-commit/pre-commit-hooks
   rev: v6.0.0
@@ -36,5 +41,7 @@ repos:
       name: pyright
       entry: pyright
       language: system
+      files: ^binette/
       types: [python]
       pass_filenames: false
+      stages: [pre-push]
