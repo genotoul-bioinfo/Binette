@@ -1,10 +1,40 @@
+# Hooks run with prek (https://prek.j178.dev/), in the `dev` extra. pre-commit also works.
+# Install the hooks with `prek install`, run them on all files with `prek run --all-files`.
 repos:
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v6.0.0
+  hooks:
+    - id: check-yaml
+    - id: check-toml
+    - id: check-merge-conflict
+    - id: check-added-large-files
+    - id: end-of-file-fixer
+      files: ^(binette|tests)/
+      types: [python]
+    - id: trailing-whitespace
+      files: ^(binette|tests)/
+      types: [python]
+
 - repo: https://github.com/astral-sh/ruff-pre-commit
-  # Ruff version.
+  # Ruff version: keep in sync with pyproject.toml and the lint CI workflow.
   rev: v0.13.3
   hooks:
     # Run the linter.
     - id: ruff-check
       args: [ --fix ]
+      files: ^(binette|tests)/
     # Run the formatter.
     - id: ruff-format
+      files: ^(binette|tests)/
+
+# Pyright needs Binette dependencies (including checkm2, only available with conda) to
+# check the code, so it runs from the active environment rather than an isolated one.
+# Install it with `pip install -e .[dev]` in the binette conda environment.
+- repo: local
+  hooks:
+    - id: pyright
+      name: pyright
+      entry: pyright
+      language: system
+      types: [python]
+      pass_filenames: false

@@ -7,7 +7,7 @@ from binette.main import preprocess_args
 
 
 @pytest.mark.parametrize(
-    "argv, expected",
+    ("argv", "expected"),
     [
         # No options at all: command is left untouched
         (["binette"], ["binette"]),

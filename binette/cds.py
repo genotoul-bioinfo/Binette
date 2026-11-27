@@ -3,7 +3,7 @@ import gzip
 import logging
 import multiprocessing.pool
 from collections import Counter, defaultdict
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any
 
@@ -41,7 +41,7 @@ def predict(
     :return: A dictionary mapping contig names to predicted genes and a dictionary mapping contig names to coding lengths.
     """
 
-    orf_finder = pyrodigal.GeneFinder(meta="meta")
+    orf_finder = pyrodigal.GeneFinder(meta=True)
 
     logger.info(f"Predicting CDS sequences with Pyrodigal using {threads} threads")
 
@@ -67,21 +67,21 @@ def predict(
 
 
 def get_contig_coding_len(
-    genes: list[pyrodigal.Gene], contig_length: int
+    genes: Iterable[pyrodigal.Gene], contig_length: int
 ) -> int | None:
     """
     Compute the coding length of a contig. Use a mask to account for overlapping genes.
 
     :param genes: A list of gene annotations for the contig.
     :param contig_length: The length of the contig in base pairs.
-    :return: The coding length as a float, or None if contig_length is zero.
+    :return: The coding length, or None if contig_length is zero.
     """
     if contig_length == 0:
         return None
     conding_base_mask = np.zeros(contig_length)
     for g in genes:
         conding_base_mask[g.begin - 1 : g.end] = 1
-    return np.sum(conding_base_mask)
+    return int(np.sum(conding_base_mask))
 
 
 def predict_genes(find_genes, name, seq) -> tuple[str, pyrodigal.Genes]:
@@ -115,11 +115,7 @@ def is_nucleic_acid(sequence: str) -> bool:
     nucleotidic_bases = set("ATCGNUatcgnu")
 
     # Check if all characters in the sequence are valid nucleotidic bases (DNA or RNA)
-    if all(base in nucleotidic_bases for base in sequence):
-        return True
-
-    # If any character is invalid, return False
-    return False
+    return all(base in nucleotidic_bases for base in sequence)
 
 
 def parse_faa_file(faa_file: str) -> dict[str, list[str]]:

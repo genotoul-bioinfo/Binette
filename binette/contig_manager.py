@@ -1,5 +1,4 @@
-from collections.abc import Iterable
-from typing import Any
+from collections.abc import Iterable, Mapping
 
 import pyfastx
 
@@ -16,21 +15,21 @@ def parse_fasta_file(fasta_file: str, index_file: str) -> pyfastx.Fasta:
     return fa
 
 
-def make_contig_index(contigs: set[str]) -> dict[str, int]:
+def make_contig_index(contigs: Iterable[str]) -> dict[str, int]:
     """
     Create an index mapping for contigs.
 
-    :param contigs: A list of contig names.
+    :param contigs: Contig names.
 
-    :return: A tuple containing the contig index mapping dictionaries (contig_to_index, index_to_contig).
+    :return: A dictionary mapping each contig name to its index.
     """
     contig_to_index = {contig: index for index, contig in enumerate(contigs)}
     return contig_to_index
 
 
-def apply_contig_index(
-    contig_to_index: dict[str, int], contig_to_info: dict[str, Any]
-) -> dict[int, Any | Iterable[Any]]:
+def apply_contig_index[T](
+    contig_to_index: Mapping[str, int], contig_to_info: Mapping[str, T]
+) -> dict[int, T]:
     """
     Apply the contig index mapping to the contig info dictionary.
 

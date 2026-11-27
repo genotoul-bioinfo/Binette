@@ -185,7 +185,7 @@ def binette(
             exists=True,
             rich_help_panel="Input Arguments",
         ),
-    ] = ...,  # Required
+    ] = ...,  # pyright: ignore[reportArgumentType]  # Ellipsis: required option
     proteins: Annotated[
         Path | None,
         typer.Option(
@@ -352,7 +352,7 @@ def binette(
             help="Show version and exit.",
             callback=version_callback,
         ),
-    ] = None,
+    ] = False,
     progress: Annotated[
         bool,
         typer.Option(

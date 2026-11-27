@@ -20,7 +20,9 @@ classifiers=[
     "Intended Audience :: Science/Research",
     "Natural Language :: English",
     "Operating System :: POSIX :: Linux",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Bio-Informatics"]
 requires-python = ">=3.12"
 
@@ -55,7 +57,10 @@ doc = [
 dev = [
     "pytest>=7.0.0",
     "pytest-cov",
-    "ruff>=0.1.0"
+    "ruff==0.13.3",  # same version as in .pre-commit-config.yaml
+    "pyright==1.1.414",
+    "pandas-stubs>=2,<3",
+    "prek",
 ]
 #
 [project.urls]
@@ -78,14 +83,33 @@ version = {attr = "binette.__version__"}
 line-length = 88
 target-version = "py312"
 
-# Essential linting rules
-lint.select = ["E", "F", "I", "UP", "B"]
+lint.select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "I",    # isort
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "SIM",  # flake8-simplify
+    "PIE",  # flake8-pie
+    "PT",   # flake8-pytest-style
+    "RUF",  # ruff-specific rules
+]
 
-# Ignore rules that conflict with scientific code conventions
-lint.ignore = ["E501", "E203"]
+lint.ignore = [
+    "E501",   # line length is handled by the formatter
+    "E203",   # whitespace before ':' (conflicts with formatter)
+    "RUF005", # allow list concatenation (`a + [b]`)
+    "PT011",  # allow `pytest.raises(ValueError)` without `match=`
+]
 
 [tool.ruff.lint.isort]
 known-first-party = ["binette"]
+
+[tool.pyright]
+include = ["binette"]
+pythonVersion = "3.12"
+typeCheckingMode = "standard"
 
 [tool.pytest.ini_options]
 markers = [
