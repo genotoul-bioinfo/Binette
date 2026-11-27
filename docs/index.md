@@ -4,16 +4,18 @@
 % contain the root `toctree` directive.
 
 
-[![install with bioconda](https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg?style=flat)](http://bioconda.github.io/recipes/binette/README.html)  [![Anaconda-Server Badge](https://anaconda.org/bioconda/binette/badges/downloads.svg)](https://anaconda.org/bioconda/binette)
-[![Anaconda-Server Badge](https://anaconda.org/bioconda/binette/badges/license.svg)](https://anaconda.org/bioconda/binette) 
-[![Anaconda-Server Badge](https://anaconda.org/bioconda/binette/badges/version.svg)](https://anaconda.org/bioconda/binette)
-[![PyPI version](https://badge.fury.io/py/Binette.svg)](https://badge.fury.io/py/Binette)
-[![status](https://joss.theoj.org/papers/ad304709d59f1a51a31614393b09ba2b/status.svg)](https://joss.theoj.org/papers/ad304709d59f1a51a31614393b09ba2b)
+[![Bioconda](https://img.shields.io/conda/vn/bioconda/binette?label=bioconda&logo=anaconda&logoColor=white)](https://bioconda.github.io/recipes/binette/README.html)
+[![Bioconda downloads](https://img.shields.io/conda/dn/bioconda/binette?label=bioconda%20downloads)](https://anaconda.org/bioconda/binette)
+[![PyPI](https://img.shields.io/pypi/v/binette?logo=pypi&logoColor=white)](https://pypi.org/project/Binette/)
+[![Python](https://img.shields.io/pypi/pyversions/binette?logo=python&logoColor=white)](https://pypi.org/project/Binette/)
+[![License](https://img.shields.io/github/license/genotoul-bioinfo/Binette)](https://github.com/genotoul-bioinfo/Binette/blob/main/LICENSE)
 
-[![Test Coverage](https://genotoul-bioinfo.github.io/Binette/coverage-badge.svg)](https://genotoul-bioinfo.github.io/Binette/) 
-[![CI Status](https://github.com/genotoul-bioinfo/Binette/actions/workflows/binette_ci.yml/badge.svg)](https://github.com/genotoul-bioinfo/Binette/actions/workflows)
-[![Documentation Status](https://readthedocs.org/projects/binette/badge/?version=latest)](https://binette.readthedocs.io/en/latest/?badge=latest)
-[![Source](https://img.shields.io/badge/source-GitHub-303030.svg?maxAge=2678400&style=flat-square)](https://github.com/genotoul-bioinfo/Binette)
+[![CI](https://img.shields.io/github/actions/workflow/status/genotoul-bioinfo/Binette/binette_ci.yml?branch=main&label=CI&logo=github)](https://github.com/genotoul-bioinfo/Binette/actions/workflows/binette_ci.yml)
+[![Coverage](https://genotoul-bioinfo.github.io/Binette/coverage-badge.svg)](https://genotoul-bioinfo.github.io/Binette/)
+[![Documentation](https://img.shields.io/readthedocs/binette/latest?logo=readthedocs&logoColor=white)](https://binette.readthedocs.io/en/latest/)
+
+[![JOSS](https://joss.theoj.org/papers/10.21105/joss.06782/status.svg)](https://doi.org/10.21105/joss.06782)
+[![Source](https://img.shields.io/badge/source-GitHub-303030?logo=github)](https://github.com/genotoul-bioinfo/Binette)
 
 # Binette
 
