@@ -105,22 +105,20 @@ def test_add_length_positive_integer():
 def test_add_length_negative_integer():
     bin_obj = bin_manager.Bin(contigs=BitMap({1, 2, 3}), origin="test1", name="bin1")
     with pytest.raises(ValueError):
-        length = -50
-        bin_obj.add_length(length)
+        bin_obj.add_length(-50)
 
 
 def test_add_n50_positive_integer():
     bin_obj = bin_manager.Bin(contigs=BitMap({1, 2, 3}), origin="test1", name="bin1")
     n50 = 100
     bin_obj.add_N50(n50)
-    assert bin_obj.N50 == n50
+    assert n50 == bin_obj.N50
 
 
 def test_add_n50_negative_integer():
     bin_obj = bin_manager.Bin(contigs=BitMap({1, 2, 3}), origin="test1", name="bin1")
     with pytest.raises(ValueError):
-        n50 = -50
-        bin_obj.add_N50(n50)
+        bin_obj.add_N50(-50)
 
 
 def test_add_quality():
@@ -588,8 +586,8 @@ def test_parse_bin_directories(create_temp_bin_directories):
     assert len(bins) == 2  # Ensure that the correct number of bin directories is parsed
 
     # Check if the Bin objects are created with the correct contigs, set name, and bin names
-    assert isinstance(list(bins["set1"])[0], dict)
-    assert isinstance(list(bins["set2"])[0], dict)
+    assert isinstance(next(iter(bins["set1"])), dict)
+    assert isinstance(next(iter(bins["set2"])), dict)
 
     assert len(bins["set2"]) == 1
     assert len(bins["set1"]) == 2

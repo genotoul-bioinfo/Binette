@@ -48,7 +48,7 @@ def test_predict_orf_with_1_thread(contig1, contig2, tmp_path):
     outfaa = tmp_path / "output.fasta"
     threads = 1
 
-    result, contig_to_coding_density = cds.predict(contigs_iterator, outfaa, threads)
+    result, _contig_to_coding_density = cds.predict(contigs_iterator, outfaa, threads)
 
     assert isinstance(result, dict)
     assert len(result) == 2
@@ -67,7 +67,7 @@ def test_predict_orf_with_multiple_threads(contig1, contig2, tmp_path):
     outfaa = tmp_path / "output.fasta"
     threads = 4
 
-    result, contig_to_coding_density = cds.predict(
+    result, _contig_to_coding_density = cds.predict(
         contigs_iterator, outfaa.as_posix(), threads
     )
 
@@ -105,7 +105,7 @@ def test_extract_contig_name_from_cds_name():
 
 
 def test_write_faa(contig1, orf_finder, tmp_path):
-    name, seq = contig1
+    _name, seq = contig1
     predicted_genes = orf_finder.find_genes(seq)
     contig_name = "contig"
     output_file = tmp_path / "tmp_file.faa.gz"
@@ -294,7 +294,7 @@ def test_no_overlap():
 
 def test_with_overlap():
     genes = [MockGene(1, 5), MockGene(3, 7)]
-    assert cds.get_contig_coding_len(genes, 10) == 7  # overlap from 3–5 counted once
+    assert cds.get_contig_coding_len(genes, 10) == 7  # overlap from 3-5 counted once
 
 
 def test_single_gene():

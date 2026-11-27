@@ -95,24 +95,29 @@ def test_step_status_invalid_cases(outdir, manifest_path):
     ckpt.record_step("step", {"x": 1}, [output])
 
     is_valid, reason = ckpt.step_status("unknown", {"x": 1})
-    assert not is_valid and "no record" in reason
+    assert not is_valid
+    assert "no record" in reason
 
     is_valid, reason = ckpt.step_status("step", {"x": 2})
-    assert not is_valid and "inputs changed" in reason
+    assert not is_valid
+    assert "inputs changed" in reason
 
     # Truncated file (e.g. job killed while writing)
     output.write_text("complete")
     is_valid, reason = ckpt.step_status("step", {"x": 1})
-    assert not is_valid and "incomplete" in reason
+    assert not is_valid
+    assert "incomplete" in reason
 
     # Same size, different content
     output.write_text("COMPLETE content")
     is_valid, reason = ckpt.step_status("step", {"x": 1})
-    assert not is_valid and "changed" in reason
+    assert not is_valid
+    assert "changed" in reason
 
     output.unlink()
     is_valid, reason = ckpt.step_status("step", {"x": 1})
-    assert not is_valid and "missing" in reason
+    assert not is_valid
+    assert "missing" in reason
 
 
 def test_invalidate(outdir, manifest_path):
@@ -128,7 +133,7 @@ def test_invalidate(outdir, manifest_path):
 
 
 @pytest.mark.parametrize(
-    "content, expected_reason",
+    ("content", "expected_reason"),
     [
         ("{not json", "unreadable"),
         (json.dumps({"format_version": 999}), "unsupported format version"),

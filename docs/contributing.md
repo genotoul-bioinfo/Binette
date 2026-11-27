@@ -44,24 +44,39 @@ For minor changes like fixing typos or making small edits, create a new Pull Req
 
    Installing in editable mode allows you to modify the codebase and experiment with new features directly.  
 
-5. **Code Quality and Formatting with Ruff:**  
-   To maintain consistent code styling and quality, we use [Ruff](https://docs.astral.sh/ruff/) as our linter and formatter.  
-   - Code changes are automatically checked for linting and formatting as part of our CI pipeline via a GitHub Action.  
-   - **Ensure your code passes Ruff checks before committing.**  
+5. **Code Quality: Linting, Formatting and Type Checking:**  
+   We use [Ruff](https://docs.astral.sh/ruff/) as linter and formatter, and [Pyright](https://microsoft.github.io/pyright/) to check type annotations of the `binette` package. Their settings are in `pyproject.toml`.  
+   - Code changes are automatically checked by Ruff and Pyright in our CI pipeline via GitHub Actions.  
+   - **Ensure your code passes these checks before committing.**  
 
-   To check and format your code:  
-   1. Install Ruff (e.g., `pip install ruff`).  
-   2. Run Ruff linter and formatter from the root of the Binette repository:  
-      ```bash
-      # Check for linting issues (with auto-fix)
-      ruff check --fix binette/
-      
-      # Format code
-      ruff format binette/
-      ```  
+   The simplest way is to install the git hooks defined in `.pre-commit-config.yaml` with [prek](https://prek.j178.dev/) (prek, Ruff and Pyright are part of the `[dev]` extra). They run Ruff and Pyright on your changes at each commit:  
+   ```bash
+   prek install
+
+   # Optionally, run the hooks on all files
+   prek run --all-files
+   ```  
+
+   [pre-commit](https://pre-commit.com/) reads the same configuration, so `pre-commit install` works too.  
+
+   ```{note}
+   Pyright needs Binette dependencies to check the code, so the hook runs it from the active environment: activate the Binette conda environment before committing.
+   ```  
+
+   You can also run the tools directly from the root of the Binette repository:  
+   ```bash
+   # Check for linting issues (with auto-fix)
+   ruff check --fix binette/ tests/
+
+   # Format code
+   ruff format binette/ tests/
+
+   # Check types
+   pyright
+   ```  
 
    ```{tip}
-   Configure your IDE to integrate Ruff for automatic code linting and formatting as you work.
+   Configure your IDE to integrate Ruff and Pyright (or Pylance in VS Code) for automatic linting, formatting and type checking as you work.
    ```  
 
 ### Making Your Changes

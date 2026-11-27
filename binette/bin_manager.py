@@ -2,7 +2,7 @@ import hashlib
 import itertools
 import logging
 from collections import Counter, defaultdict
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Mapping
 from functools import cached_property
 from pathlib import Path
 from typing import Any
@@ -24,7 +24,7 @@ class Bin:
     def __init__(
         self,
         contigs: BitMap,
-        origin: set[str] | None = None,
+        origin: str | None = None,
         name: str | None = None,
         is_original: bool = False,
     ) -> None:
@@ -39,10 +39,7 @@ class Bin:
         if not isinstance(contigs, BitMap):
             raise TypeError("Contigs should be a BitMap object.")
 
-        if origin is None:
-            self.origin = set()
-        else:
-            self.origin = {origin}
+        self.origin: set[str] = set() if origin is None else {origin}
 
         self.name = name
 
@@ -50,30 +47,32 @@ class Bin:
 
         self.contigs = contigs
 
-        self.length = None
-        self.N50 = None
+        self.length: int | None = None
+        self.N50: int | None = None
 
-        self.completeness = None
-        self.contamination = None
-        self.score = None
-        self.coding_density = None
-        self.original_name = None
-        self._checkm2_model_index = None
+        self.completeness: float | None = None
+        self.contamination: float | None = None
+        self.score: float | None = None
+        self.coding_density: float | None = None
+        self.original_name: str | None = None
+        self._checkm2_model_index: int | None = None
 
     @cached_property
-    def contigs_key(self):
+    def contigs_key(self) -> bytes:
         """
         Serialize the contigs for easier comparison.
         """
         return self.contigs.serialize()
 
-    def __eq__(self, other: "Bin") -> bool:
+    def __eq__(self, other: object) -> bool:
         """
         Compare the Bin object with another object for equality.
 
         :param other: The object to compare with.
         :return: True if the objects are equal, False otherwise.
         """
+        if not isinstance(other, Bin):
+            return NotImplemented
         return self.contigs_key == other.contigs_key
 
     def __str__(self) -> str:
@@ -84,12 +83,12 @@ class Bin:
         """
         return f"Bin {self.name} from {';'.join(self.origin)}  ({len(self.contigs)} contigs)"
 
-    def overlaps_with(self, other: "Bin") -> set[str]:
+    def overlaps_with(self, other: "Bin") -> BitMap:
         """
         Find the contigs that overlap between this bin and another bin.
 
         :param other: The other Bin object.
-        :return: A set of contig names that overlap between the bins.
+        :return: The contigs shared by the two bins.
         """
         return self.contigs & other.contigs
 
@@ -148,7 +147,7 @@ class Bin:
             ) from exc
 
     @cached_property
-    def checkm2_model(self):
+    def checkm2_model(self) -> str | None:
         """
         Get the CheckM2 model for the bin.
         """
@@ -205,7 +204,7 @@ class Bin:
         )
 
     def add_coding_density(
-        self, contig_to_coding_length: dict[int, int]
+        self, contig_to_coding_length: Mapping[int, int | None]
     ) -> float | None:
         """
         Calculate the coding density of the bin.
@@ -218,7 +217,7 @@ class Bin:
             return None
 
         total_coding = sum(
-            contig_to_coding_length.get(contig_id, 0) for contig_id in self.contigs
+            contig_to_coding_length.get(contig_id) or 0 for contig_id in self.contigs
         )
 
         self.coding_density = total_coding / self.length
@@ -228,7 +227,7 @@ def make_bins_from_bins_info(
     bin_set_name_to_bins_info: dict[str, list[dict[str, Any]]],
     contig_to_index: dict[str, int],
     are_original_bins: bool,
-):
+) -> dict[bytes, Bin]:
     """
     Create Bin objects from the provided bin information.
 
@@ -355,7 +354,7 @@ def get_bins_from_contig2bin_table(
     bin_name2contigs = defaultdict(set)
     with open(contig2bin_table) as fl:
         for line in fl:
-            if line.startswith("#") or line.startswith("@"):
+            if line.startswith(("#", "@")):
                 logger.debug(f"Ignoring a line from {contig2bin_table}: {line}")
                 continue
             contig_name = line.strip().split()[0]
@@ -429,7 +428,9 @@ def sort_bins_by_quality(bins: Iterable[Bin]) -> list[Bin]:
     :return: Sorted list of bins.
     """
 
-    def quality(b: Bin) -> tuple:
+    def quality(b: Bin) -> tuple[float, int, int]:
+        assert b.score is not None, f"Bin {b.name} has no score"
+        assert b.N50 is not None, f"Bin {b.name} has no N50"
         return (-b.score, -b.N50, -b.is_original)
 
     sorted_bins = []
@@ -492,13 +493,16 @@ def select_best_bins(
     return selected_bins
 
 
-def get_contigs_in_bin_sets(bin_set_name_to_bins: dict[str, set[Bin]]) -> list[str]:
+def get_contigs_in_bin_sets(
+    bin_set_name_to_bins: dict[str, list[dict[str, Any]]],
+) -> list[str]:
     """
     Processes bin sets to check for duplicated contigs and logs detailed information about each bin set.
 
-    :param bin_set_name_to_bins: A dictionary where keys are bin set names and values are sets of Bin objects.
+    :param bin_set_name_to_bins: A dictionary where keys are bin set names and values are lists of bin info
+        dictionaries (with a "contigs" key).
 
-    :return:  A set of contig names found in bin sets
+    :return: The contig names found in bin sets.
     """
     # To track all unique contigs across bin sets
     all_contigs_in_bins = set()
@@ -613,21 +617,31 @@ def iter_intermediate_contig_sets(
         discarded_count[operation] += 1
         return False
 
+    def usable_for_intersection_and_difference(b: Bin) -> bool:
+        assert b.completeness is not None
+        assert b.length is not None
+        return b.completeness >= min_comp and b.length >= min_len
+
+    def usable_for_union(b: Bin) -> bool:
+        assert b.contamination is not None
+        assert b.length is not None
+        return b.contamination <= max_conta and b.length <= max_len
+
     for bin_contig_keys in iter_cliques(connected_bins_graph):
         bins = [contig_key_to_initial_bin[ck] for ck in bin_contig_keys]
 
-        if all(b.completeness >= min_comp and b.length >= min_len for b in bins):
+        if all(usable_for_intersection_and_difference(b) for b in bins):
             contigs = bins[0].contig_intersection(*bins[1:])
             if is_new_bin(contigs, "intersection"):
                 yield contigs
 
         for bin_a in bins:
-            if bin_a.completeness >= min_comp and bin_a.length >= min_len:
+            if usable_for_intersection_and_difference(bin_a):
                 contigs = bin_a.contig_difference(*(b for b in bins if b != bin_a))
                 if is_new_bin(contigs, "difference"):
                     yield contigs
 
-        if all(b.contamination <= max_conta and b.length <= max_len for b in bins):
+        if all(usable_for_union(b) for b in bins):
             contigs = bins[0].contig_union(*bins[1:])
             if is_new_bin(contigs, "union"):
                 yield contigs

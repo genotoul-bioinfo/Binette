@@ -455,7 +455,8 @@ def test_selectable_only_scoring_keeps_scores_of_selectable_bins():
         full_cont <= thresholds.max_contamination
     )
     set_aside = np.isnan(comp)
-    assert selectable.any() and set_aside.any()
+    assert selectable.any()
+    assert set_aside.any()
     assert not (selectable & set_aside).any()
     too_contaminated = full_cont > thresholds.max_contamination
     assert (set_aside & too_contaminated).any()  # first shortcut used
