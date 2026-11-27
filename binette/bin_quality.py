@@ -3,10 +3,11 @@ import concurrent.futures as cf
 import logging
 import multiprocessing
 import os
-from collections.abc import Generator, Iterable, Iterator, Sequence
+from collections.abc import Generator, Iterable, Iterator, Mapping, Sequence
 from contextlib import closing, contextmanager
 from dataclasses import dataclass
 from itertools import chain, islice
+from typing import cast
 
 import numpy as np
 import scipy.sparse
@@ -244,13 +245,17 @@ class FeatureBuilder:
         """
         incidence = self.incidence_matrix(contig_sets)
         metadata = incidence @ self.contig_metadata
-        ko_counts = incidence @ self.contig_ko_counts
+        # scipy has no type hints: products of sparse matrices are sparse matrices.
+        ko_counts = cast(scipy.sparse.csr_matrix, incidence @ self.contig_ko_counts)
         ko_presence = ko_counts.copy()
         ko_presence.eliminate_zeros()
         ko_presence.data[:] = 1
 
         pathways = (ko_presence @ self.pathway_members).toarray() / self.pathway_sizes
-        modules = (ko_counts @ self.module_members).toarray() / self.module_sizes
+        modules = (
+            cast(scipy.sparse.csr_matrix, ko_counts @ self.module_members).toarray()
+            / self.module_sizes
+        )
         categories = (
             ko_presence @ self.category_members
         ).toarray() / self.category_sizes
@@ -293,7 +298,7 @@ def compute_N50(lengths: np.ndarray) -> int:
     arr = np.sort(lengths)
     half = arr.sum() / 2
     csum = np.cumsum(arr)
-    return arr[np.searchsorted(csum, half)]
+    return int(arr[np.searchsorted(csum, half)])
 
 
 def add_bin_size_and_N50(bins: Iterable[Bin], contig_to_size: dict[int, int]):
@@ -318,14 +323,14 @@ def add_bin_size_and_N50(bins: Iterable[Bin], contig_to_size: dict[int, int]):
 
 
 def add_bin_coding_density(
-    bins: list[Bin], contig_to_coding_length: dict[int, int]
-) -> float | None:
+    bins: list[Bin], contig_to_coding_length: Mapping[int, int | None]
+) -> None:
     """
     Calculate the coding density of the given bins.
 
     :param contig_to_coding_length: A dictionary mapping contig IDs to their total coding lengths.
 
-    :return: The coding density of the bin, or None if the length is not set or is zero.
+    :return: None. The bin objects are updated in place with their coding density.
     """
     for bin_obj in bins:
         bin_obj.add_coding_density(contig_to_coding_length)
@@ -474,17 +479,17 @@ _worker_scorer: QualityScorer | None = None
 
 # Environment variables limiting the threads of numerical libraries in worker processes:
 # each worker uses one thread, parallelism comes from the number of workers.
-_SINGLE_THREAD_ENV = {
-    var: "1"
-    for var in (
+_SINGLE_THREAD_ENV: dict[str, str] = dict.fromkeys(
+    (
         "OMP_NUM_THREADS",
         "OPENBLAS_NUM_THREADS",
         "MKL_NUM_THREADS",
         "BLIS_NUM_THREADS",
         "VECLIB_MAXIMUM_THREADS",
         "NUMEXPR_NUM_THREADS",
-    )
-}
+    ),
+    "1",
+)
 
 
 def _init_scoring_worker(
@@ -503,6 +508,7 @@ def _init_scoring_worker(
 
 def _score_in_worker(contig_sets: Sequence[BitMap]) -> QualityScores:
     """Score contig sets in a worker process."""
+    assert _worker_scorer is not None, "Worker was not initialized"
     return _worker_scorer.score(contig_sets)
 
 
@@ -528,7 +534,7 @@ def score_contig_set_batches(
     batch_size: int = 500,
     max_pending: int | None = None,
     selectable_only: SelectionThresholds | None = None,
-) -> Iterator[tuple[int, QualityScores]]:
+) -> Generator[tuple[int, QualityScores]]:
     """
     Score batches of contig sets in worker processes.
 
@@ -599,7 +605,7 @@ def iter_scored_batches(
     task_size: int | None = None,
     min_bins_per_worker: int = 1000,
     selectable_only: SelectionThresholds | None = None,
-) -> Iterator[tuple[int, list[BitMap], QualityScores]]:
+) -> Generator[tuple[int, list[BitMap], QualityScores]]:
     """
     Score a stream of contig sets in batches.
 

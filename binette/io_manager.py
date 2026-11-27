@@ -156,7 +156,7 @@ def write_bin_info(bins: Iterable[Bin], output: Path, add_contigs: bool = False)
             "original_name": original_name,
             "completeness": bin_obj.completeness,
             "contamination": bin_obj.contamination,
-            "score": round(bin_obj.score, 2),
+            "score": round(bin_obj.score, 2) if bin_obj.score is not None else None,
             "checkm2_model": bin_obj.checkm2_model,
             "size": bin_obj.length,
             "N50": bin_obj.N50,

@@ -132,7 +132,7 @@ def parse_input_files(
         bin_set_name_to_bins_info = bin_manager.parse_bin_directories(
             bin_name_to_bin_dir, fasta_extensions
         )
-    else:
+    elif contig2bin_tables:
         logger.info("Parsing bin2contig files")
         bin_name_to_bin_table = io.infer_bin_set_names_from_input_paths(
             contig2bin_tables
@@ -140,6 +140,8 @@ def parse_input_files(
         bin_set_name_to_bins_info = bin_manager.parse_contig2bin_tables(
             bin_name_to_bin_table
         )
+    else:
+        raise ValueError("Either bin directories or contig2bin tables are required.")
 
     logger.info(f"Processing {len(bin_set_name_to_bins_info)} bin sets")
     for bin_set_id, bins_info in bin_set_name_to_bins_info.items():
@@ -534,8 +536,9 @@ def annotate_contigs(
     contig_to_genes = contig_manager.apply_contig_index(
         contig_to_index, contig_name_to_genes
     )
+    contig_index_to_coding_length = None
     if contig_to_coding_length:
-        contig_to_coding_length = contig_manager.apply_contig_index(
+        contig_index_to_coding_length = contig_manager.apply_contig_index(
             contig_to_index, contig_to_coding_length
         )
 
@@ -544,7 +547,7 @@ def annotate_contigs(
     contig_metadata["contig_to_kegg_counter"] = contig_to_kegg_counter
     contig_metadata["contig_to_length"] = inputs.contig_to_length
 
-    return contig_metadata, contig_to_coding_length, diamond_step_inputs
+    return contig_metadata, contig_index_to_coding_length, diamond_step_inputs
 
 
 # Bins #

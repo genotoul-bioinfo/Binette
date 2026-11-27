@@ -8,7 +8,7 @@ import pytest
 logger = logging.getLogger(__name__)
 
 
-def validate_test_data_path(path_str: str = None) -> Path:
+def validate_test_data_path(path_str: str | None = None) -> Path:
     """
     Validate and return the test data path.
 

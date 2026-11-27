@@ -249,9 +249,11 @@ def test_get_contig_to_kegg_id_empty_file():
     # Mock empty dataframe
     empty_df = pd.DataFrame()
 
-    with patch("pandas.read_csv", return_value=empty_df):
-        with pytest.raises(diamond.DiamondError) as exc_info:
-            diamond.get_contig_to_kegg_id(diamond_result_file)
+    with (
+        patch("pandas.read_csv", return_value=empty_df),
+        pytest.raises(diamond.DiamondError) as exc_info,
+    ):
+        diamond.get_contig_to_kegg_id(diamond_result_file)
 
     assert exc_info.value.exit_code == 3
 
